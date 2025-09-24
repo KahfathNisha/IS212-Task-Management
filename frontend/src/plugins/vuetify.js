@@ -11,12 +11,15 @@ import {
   VNavigationDrawer,
   VDatePicker,
   VList,
+  VListItem,
   VAutocomplete,
   VCheckbox,
   VContainer,
   VRow,
   VCol,
   VSpacer,
+  VListItemTitle,
+  VIcon,
   
 } from 'vuetify/components';
 
@@ -30,12 +33,15 @@ export default createVuetify({
     VNavigationDrawer,
     VDatePicker,
     VList,
+    VListItem,
+    VListItemTitle,
     VAutocomplete,
     VCheckbox,
     VContainer,
     VRow,
     VCol,
     VSpacer,
+    VIcon,
     
   },
   theme: {

@@ -1,10 +1,14 @@
 <script setup>
+import NavBar from './components/NavBar.vue'
 </script>
 
 <template>
-  <div id="app">
-    <router-view />
-  </div>
+  <v-app>
+    <NavBar />
+    <v-main>
+      <router-view />
+    </v-main>
+  </v-app>
 </template>
 
 <style scoped>
