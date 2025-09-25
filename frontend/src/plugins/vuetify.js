@@ -4,6 +4,10 @@ import '@mdi/font/css/materialdesignicons.css';
 
 import {
   VApp,
+  VMain,
+  VAppBar,
+  VAppBarNavIcon,
+  VToolbarTitle,
   VBtn,
   VCard,
   VTextField,
@@ -12,6 +16,7 @@ import {
   VDatePicker,
   VList,
   VListItem,
+  VListItemSubtitle,
   VAutocomplete,
   VCheckbox,
   VContainer,
@@ -20,12 +25,16 @@ import {
   VSpacer,
   VListItemTitle,
   VIcon,
-  
+
 } from 'vuetify/components';
 
 export default createVuetify({
   components: {
     VApp,
+    VMain,
+    VAppBar,
+    VAppBarNavIcon,
+    VToolbarTitle,
     VBtn,
     VCard,
     VTextField,
@@ -34,6 +43,7 @@ export default createVuetify({
     VDatePicker,
     VList,
     VListItem,
+    VListItemSubtitle,
     VListItemTitle,
     VAutocomplete,
     VCheckbox,
@@ -42,7 +52,7 @@ export default createVuetify({
     VCol,
     VSpacer,
     VIcon,
-    
+
   },
   theme: {
     defaultTheme: 'light',  // Optional: customize theme
