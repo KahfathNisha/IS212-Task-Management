@@ -3,6 +3,9 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 
+// Import your custom styles
+import './style.css';
+
 // Vuetify
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
@@ -16,29 +19,43 @@ import './config/firebase';
 // Auth store
 import { useAuthStore } from './stores/auth';
 
-// Create Vuetify instance
+// Create Vuetify instance with your custom theme
 const vuetify = createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: 'light',
+    defaultTheme: 'customLight',
     themes: {
-      light: {
+      customLight: {
+        dark: false,
         colors: {
-          primary: '#667eea',
-          secondary: '#764ba2',
-          accent: '#f50057',
-          error: '#f44336',
-          warning: '#ff9800',
-          info: '#2196f3',
-          success: '#4caf50'
+          primary: '#7b92d1',      // Your primary blue
+          secondary: '#3a5998',    // Your secondary dark blue
+          accent: '#c5d49a',       // Your accent sage green
+          surface: '#e8e7f0',      // Your secondary background
+          background: '#f5f4f2',   // Your primary background
+          'on-primary': '#3d3d3d', // Text on primary
+          'on-secondary': '#f5f4f2', // Text on secondary
+          'on-surface': '#3d3d3d',  // Text on surface
+          'on-background': '#3d3d3d', // Text on background
+          error: '#d32f2f',
+          warning: '#f57c00',
+          info: '#1976d2',
+          success: '#388e3c'
         }
       },
-      dark: {
+      customDark: {
+        dark: true,
         colors: {
-          primary: '#667eea',
-          secondary: '#764ba2',
-          accent: '#f50057',
+          primary: '#7b92d1',      // Your primary blue
+          secondary: '#e8e7f0',    // Light secondary for dark mode
+          accent: '#c5d49a',       // Your accent sage green
+          surface: '#3a5998',      // Dark surface
+          background: '#3d3d3d',   // Dark background
+          'on-primary': '#3d3d3d', // Dark text on primary
+          'on-secondary': '#3d3d3d', // Dark text on secondary
+          'on-surface': '#f5f4f2', // Light text on dark surface
+          'on-background': '#f5f4f2', // Light text on dark background
           error: '#f44336',
           warning: '#ff9800',
           info: '#2196f3',
@@ -78,9 +95,17 @@ app.config.errorHandler = (err, instance, info) => {
 // Mount app
 app.mount('#app');
 
+// Make theme switching globally available
+window.toggleVuetifyTheme = () => {
+  const theme = vuetify.theme;
+  theme.global.name.value = theme.global.name.value === 'customLight' ? 'customDark' : 'customLight';
+};
+
 // Development helpers
 if (import.meta.env.DEV) {
   window.authStore = authStore;
+  window.vuetify = vuetify;
   console.log('🚀 IS212 Task Management System - Development Mode');
   console.log('📝 Auth store available as window.authStore');
+  console.log('🎨 Vuetify instance available as window.vuetify');
 }

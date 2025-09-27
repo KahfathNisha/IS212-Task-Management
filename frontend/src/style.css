@@ -1,79 +1,191 @@
+/* Custom Theme Variables */
 :root {
+  --bg-primary: #f5f4f2;
+  --bg-secondary: #e8e7f0;
+  --primary: #7b92d1;
+  --secondary: #3a5998;
+  --accent-light: #c5d49a; /*background of button*/
+  --accent-dark: #3d3d3d; /*font colour*/
+  --text-primary: #3d3d3d;
+  --text-secondary: #7b92d1;
+
+  /* Base font settings */
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+[data-theme="dark"] {
+  --bg-primary: #2a2a2a;
+  --bg-secondary: #3a5998;
+  --primary: #7b92d1;
+  --secondary: #c5d49a;
+  --accent-light: #7b92d1;
+  --accent-dark: #f5f4f2;
+  --text-primary: #f5f4f2;
+  --text-secondary: #c5d49a;
 }
 
+/* Apply theme colors */
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   min-width: 320px;
   min-height: 100vh;
+  transition: all 0.3s ease;
+}
+
+a {
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: var(--secondary);
 }
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+  color: var(--text-primary);
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 0.75em 1.5em;
+  font-size: 0.875em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--accent-light);
+  color: var(--accent-dark);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
+
 button:hover {
-  border-color: #646cff;
+  border-color: var(--secondary);
+  background-color: var(--bg-secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
+
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .card {
   padding: 2em;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
 }
 
 #app {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
-  text-align: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* Vuetify overrides for theme compatibility */
+.v-application {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.v-main {
+  background-color: var(--bg-primary) !important;
+}
+
+.v-card {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.v-btn {
+  background-color: var(--accent-light) !important;
+  color: var(--accent-dark) !important;
+  border: 1px solid #e5e7eb !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+
+.v-btn:hover {
+  background-color: var(--bg-secondary) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+}
+
+.v-btn--variant-outlined {
+  background-color: transparent !important;
+  border: 1px solid var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+.v-btn--variant-outlined:hover {
+  background-color: var(--accent-light) !important;
+}
+
+.v-snackbar {
+  background-color: var(--secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Dashboard specific styling */
+.dashboard-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Success message styling */
+.success-message {
+  background-color: #d1fae5;
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+/* Dark mode specific overrides */
+[data-theme="dark"] button {
+  border: 1px solid #404040;
+}
+
+[data-theme="dark"] .card {
+  border: 1px solid #404040;
+}
+
+[data-theme="dark"] .v-card {
+  border: 1px solid #404040 !important;
+}
+
+[data-theme="dark"] .v-btn {
+  border: 1px solid #404040 !important;
+}
+
+[data-theme="dark"] .dashboard-card {
+  border: 1px solid #404040;
+}
+
+[data-theme="dark"] .success-message {
+  background-color: #064e3b;
+  color: #a7f3d0;
 }

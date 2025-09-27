@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <!-- Navigation Bar (only show when authenticated) -->
+    <!-- Navigation Bar (only show when authenticated)
     <v-app-bar v-if="isAuthenticated" app elevation="2">
       <v-app-bar-nav-icon @click="drawer = !drawer" />
       
@@ -10,7 +10,7 @@
 
       <v-spacer />
 
-      <!-- User Menu -->
+       User Menu
       <v-menu offset-y>
         <template v-slot:activator="{ props }">
           <v-btn icon v-bind="props">
@@ -43,7 +43,7 @@
       </v-menu>
     </v-app-bar>
 
-    <!-- Navigation Drawer (only show when authenticated) -->
+     Navigation Drawer (only show when authenticated) 
     <v-navigation-drawer
       v-if="isAuthenticated"
       v-model="drawer"
@@ -59,7 +59,9 @@
           :title="item.title"
         />
       </v-list>
-    </v-navigation-drawer>
+    </v-navigation-drawer> -->
+    <!-- Replace v-app-bar and v-navigation-drawer with your custom NavBar -->
+  <NavBar v-if="isAuthenticated" />
 
     <!-- Main Content -->
     <v-main>
@@ -137,6 +139,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import NavBar from '@/components/NavBar.vue'; // Import your custom component
 
 const router = useRouter();
 const authStore = useAuthStore();
