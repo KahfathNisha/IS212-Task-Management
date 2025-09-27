@@ -5,9 +5,11 @@ require('dotenv').config();
 console.log('🔧 Starting server...');
 console.log('🔧 Environment variables loaded');
 
-// Import routes
+// Import individual routers
 console.log('🔧 Loading routes...');
-const authRoutes = require('./routes/authRoutes');
+const taskRouter = require('./routes/taskRouter');
+const authRouter = require('./routes/authRouter');
+
 console.log('✅ Routes loaded successfully');
 
 // Import Firebase configuration (this will initialize Firebase)
@@ -53,10 +55,23 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Auth routes
-app.use('/api/auth', authRoutes);
+// Use individual routers for API routes
+app.use('/tasks', taskRouter);
+app.use('/auth', authRouter);
 
 console.log('✅ Routes configured');
+
+// Add this to server.js for quick testing
+app.get('/firebase-test', async (req, res) => {
+  try {
+    const { db } = require('./config/firebase');
+    // Try to read from a test collection
+    const snapshot = await db.collection('test').get();
+    res.json({ success: true, count: snapshot.size });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

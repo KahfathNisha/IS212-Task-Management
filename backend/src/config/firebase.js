@@ -4,36 +4,30 @@ require('dotenv').config();
 
 console.log('🔥 Initializing Firebase Admin SDK...');
 
-// Initialize Firebase Admin SDK only once
-if (!admin.apps.length) {
-  try {
+try {
+  if (!admin.apps.length) {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
       console.log('🔑 Using service account key from:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-      const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+      const serviceAccount = require(require('path').resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH));
       admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: 'g1-fairprice-tm',
-        storageBucket: 'g1-fairprice-tm.firebasestorage.app'
+        credential: admin.credential.cert(serviceAccount)
       });
     } else {
       console.log('🔑 Using default credentials (no service account key)');
-      admin.initializeApp({
-        projectId: 'g1-fairprice-tm',
-        storageBucket: 'g1-fairprice-tm.firebasestorage.app'
-      });
+      admin.initializeApp();
     }
     console.log('✅ Firebase Admin SDK initialized successfully');
-  } catch (error) {
-    console.error('❌ Firebase Admin SDK initialization failed:', error.message);
-    throw error;
+  } else {
+    console.log('✅ Firebase Admin SDK already initialized');
   }
-} else {
-  console.log('✅ Firebase Admin SDK already initialized');
+} catch (error) {
+  console.error('❌ Firebase Admin SDK initialization failed:', error.message);
+  throw error;
 }
 
 // Export initialized services
 const auth = admin.auth();
-const db = admin.firestore();
+const db = admin.firestore(); // Use Firestore
 
 console.log('📦 Firebase services exported: auth, db, admin');
 

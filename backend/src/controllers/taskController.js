@@ -1,18 +1,19 @@
-const tasks = require("../models/taskModel");
-const { db } = require('../src/config/firebase');
+const { db, admin } = require('../config/firebase');
+const taskModel = require('../models/taskModel');
 
+// Create Task
 exports.createTask = async (req, res) => {
     try {
-        const task = req.body;
-        task.createdAt = Date.now();
-        task.updatedAt = Date.now();
-        task.status = 'Unassigned';
-        task.archived = false;
-
-        const newTaskRef = db.ref('tasks').push();
-        await newTaskRef.set(task);
-
-        res.status(201).json({ id: newTaskRef.key, message: 'Task created successfully' });
+        const task = {
+            ...taskModel,
+            ...req.body,
+            createdAt: admin.firestore.Timestamp.now(),
+            updatedAt: admin.firestore.Timestamp.now(),
+            status: 'Unassigned',
+            archived: false
+        };
+        const docRef = await db.collection('tasks').add(task);
+        res.status(201).json({ id: docRef.id, message: 'Task created successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -21,10 +22,10 @@ exports.createTask = async (req, res) => {
 // Get Task
 exports.getTask = async (req, res) => {
     try {
-        const snapshot = await db.ref(`tasks/${req.params.id}`).once('value');
-        if (!snapshot.exists()) return res.status(404).json({ message: 'Task not found' });
+        const doc = await db.collection('tasks').doc(req.params.id).get();
+        if (!doc.exists) return res.status(404).json({ message: 'Task not found' });
 
-        res.status(200).json(snapshot.val());
+        res.status(200).json(doc.data());
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -34,7 +35,7 @@ exports.getTask = async (req, res) => {
 exports.updateTaskStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        await db.ref(`tasks/${req.params.id}`).update({
+        await db.collection('tasks').doc(req.params.id).update({
             status,
             updatedAt: Date.now()
         });
@@ -48,7 +49,7 @@ exports.updateTaskStatus = async (req, res) => {
 exports.assignTask = async (req, res) => {
     try {
         const { assigneeId } = req.body;
-        await db.ref(`tasks/${req.params.id}`).update({
+        await db.collection('tasks').doc(req.params.id).update({
             assigneeId,
             updatedAt: Date.now()
         });
@@ -61,7 +62,7 @@ exports.assignTask = async (req, res) => {
 // Soft-delete / archive task
 exports.archiveTask = async (req, res) => {
     try {
-        await db.ref(`tasks/${req.params.id}`).update({
+        await db.collection('tasks').doc(req.params.id).update({
             archived: true,
             updatedAt: Date.now()
         });
