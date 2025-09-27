@@ -12,14 +12,14 @@ if (!admin.apps.length) {
       const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        projectId: 'is212-task-management',
-        storageBucket: 'is212-task-management.firebasestorage.app'
+        projectId: 'g1-fairprice-tm',
+        storageBucket: 'g1-fairprice-tm.firebasestorage.app'
       });
     } else {
       console.log('🔑 Using default credentials (no service account key)');
       admin.initializeApp({
-        projectId: 'is212-task-management',
-        storageBucket: 'is212-task-management.firebasestorage.app'
+        projectId: 'g1-fairprice-tm',
+        storageBucket: 'g1-fairprice-tm.firebasestorage.app'
       });
     }
     console.log('✅ Firebase Admin SDK initialized successfully');
