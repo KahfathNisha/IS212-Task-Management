@@ -6,13 +6,12 @@ import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCY2S4NyCq_gNNlSRCJgCpX2zW4-z9wNjA",
-  authDomain: "is212-task-management.firebaseapp.com",
-  projectId: "is212-task-management",
-  storageBucket: "is212-task-management.firebasestorage.app",
-  messagingSenderId: "320036814196",
-  appId: "1:320036814196:web:80392adc43882a0b4a8021",
-  measurementId: "G-3CFDCZE7PG"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 console.log('🔥 Initializing Firebase with config:', { 
