@@ -66,89 +66,78 @@ export const useAuthStore = defineStore('auth', () => {
   };
 
   // Login with email and password
-  const login = async (email, password) => {
-    loading.value = true;
-    error.value = null;
+// Replace the entire 'login' function in src/stores/auth.js with this
+
+const login = async (email, password) => {
+  loading.value = true;
+  error.value = null;
+  
+  try {
+    console.log('🔐 Attempting login for:', email);
     
-    try {
-      console.log('🔐 Attempting login for:', email);
-      
-      // First check if account is locked (call backend API)
-      console.log('📞 Checking account lockout status...');
-      const checkResponse = await fetch(`${API_BASE_URL}/auth/check-lockout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      
-      if (!checkResponse.ok) {
-        throw new Error(`API Error: ${checkResponse.status} ${checkResponse.statusText}`);
-      }
-      
-      const checkData = await checkResponse.json();
-      console.log('📞 Lockout check response:', checkData);
-      
-      if (checkData.isLocked) {
-        throw new Error(checkData.message || 'Account is locked. Please try again later.');
-      }
-      
-      // Attempt Firebase authentication
-      console.log('🔥 Attempting Firebase authentication...');
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('✅ Firebase authentication successful');
-      
-      // Get user data from Firestore
-      const userDoc = await firestoreHelpers.getUserByEmail(email);
-      userData.value = userDoc;
-      
-      // Update last login
-      await firestoreHelpers.updateLastLogin(email);
-      
-      // Notify backend of successful login to reset failed attempts
+    // First check if account is locked
+    console.log('📞 Checking account lockout status...');
+    const checkResponse = await fetch(`${API_BASE_URL}/auth/check-lockout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    
+    const checkData = await checkResponse.json();
+    console.log('📞 Lockout check response:', checkData);
+    
+    if (checkData.isLocked) {
+      throw new Error(checkData.message || 'Account is locked.');
+    }
+    
+    // Attempt Firebase authentication
+    console.log('🔥 Attempting Firebase authentication...');
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    console.log('✅ Firebase authentication successful');
+    
+    // Get user data from Firestore
+    const userDoc = await firestoreHelpers.getUserByEmail(email);
+    userData.value = userDoc;
+    
+    // Notify backend of successful login
+    await fetch(`${API_BASE_URL}/auth/login-success`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    
+    console.log('✅ Login completed successfully');
+    return { success: true, user: userCredential.user };
+
+  } catch (err) {
+    console.error('❌ Login error:', err);
+    let userFriendlyMessage = 'An unexpected error occurred.';
+
+    if (err.code === 'auth/too-many-requests' || err.code === 'auth/invalid-credential') {
       try {
-        await fetch(`${API_BASE_URL}/auth/login-success`, {
+        const recordResponse = await fetch(`${API_BASE_URL}/auth/record-failed-attempt`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email })
         });
-      } catch (recordError) {
-        console.warn('Failed to record login success:', recordError);
+        const recordData = await recordResponse.json();
+        userFriendlyMessage = recordData.message || 'Incorrect email or password.';
+      } catch (apiErr) {
+        console.error('API call during login error failed:', apiErr);
+        userFriendlyMessage = 'Could not verify login. Please try again later.';
       }
-      
-      console.log('✅ Login completed successfully');
-      return { success: true, user: userCredential.user };
-      
-    } catch (err) {
-      console.error('❌ Login error:', err);
-      error.value = err.message;
-      
-      // Record failed attempt if it's a wrong password error
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        try {
-          const recordResponse = await fetch(`${API_BASE_URL}/auth/record-failed-attempt`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-          });
-          
-          const recordData = await recordResponse.json();
-          
-          if (recordData.isLocked) {
-            error.value = recordData.message;
-          } else if (recordData.remainingAttempts !== undefined) {
-            error.value = `Invalid credentials. ${recordData.remainingAttempts} attempts remaining.`;
-          }
-        } catch (recordErr) {
-          console.error('Failed to record login attempt:', recordErr);
-        }
-      }
-      
-      throw err;
-    } finally {
-      loading.value = false;
+    } else if (err.message) {
+      userFriendlyMessage = err.message;
     }
-  };
+    
+    error.value = userFriendlyMessage;
+    throw new Error(userFriendlyMessage);
 
+  } finally {
+    // THIS IS THE FIX: This block will always run, ensuring the loading state is reset.
+    loading.value = false;
+  }
+};
 
 
 // Logout

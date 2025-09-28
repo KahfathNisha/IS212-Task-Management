@@ -97,12 +97,17 @@ exports.checkLockout = async (req, res) => {
     
     // Check if account is locked
     if (userData.lockedUntil && userData.lockedUntil > now) {
-      const remainingTime = Math.ceil((userData.lockedUntil - now) / 60000);
-      return res.status(423).json({ // Use 423 Locked status
+      const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+        timeZone: 'Asia/Singapore'
+      });
+      // --- FIX: Always respond 200 OK ---
+      return res.status(200).json({
         success: false,
         isLocked: true,
-        remainingTime,
-        message: `Account is locked. Please try again in ${remainingTime} minutes.`
+        message: `Account is locked. Please try again after ${unlockTime}.`
       });
     }
     
@@ -183,8 +188,8 @@ exports.recordFailedAttempt = async (req, res) => {
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
-      // Don't reveal if user exists
-      return res.status(401).json({
+      // Don't reveal if user exists, but respond calmly.
+      return res.status(200).json({
         success: false,
         message: 'Invalid credentials.'
       });
@@ -195,11 +200,17 @@ exports.recordFailedAttempt = async (req, res) => {
     
     // Check if already locked
     if (userData.lockedUntil && userData.lockedUntil > now) {
-        const remainingTime = Math.ceil((userData.lockedUntil - now) / 60000);
-        return res.status(423).json({
+        const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: true,
+            timeZone: 'Asia/Singapore'
+        });
+        // --- FIX: Always respond 200 OK ---
+        return res.status(200).json({
             success: false,
             isLocked: true,
-            message: `Account is locked for ${remainingTime} more minutes.`
+            message: `Account is locked. Please try again after ${unlockTime}.`
         });
     }
     
@@ -216,10 +227,18 @@ exports.recordFailedAttempt = async (req, res) => {
       
       await userRef.update(updateData);
       
-      return res.status(423).json({
+      const unlockTime = new Date(updateData.lockedUntil).toLocaleTimeString('en-SG', {
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: true,
+          timeZone: 'Asia/Singapore'
+      });
+      
+      // --- FIX: Always respond 200 OK ---
+      return res.status(200).json({
         success: false,
         isLocked: true,
-        message: 'Too many failed attempts. Account locked for 30 minutes.'
+        message: `Too many failed attempts. Account locked until ${unlockTime}.`
       });
     }
     
@@ -228,7 +247,8 @@ exports.recordFailedAttempt = async (req, res) => {
     
     const remainingAttempts = MAX_LOGIN_ATTEMPTS - failedAttempts;
     
-    res.status(401).json({
+    // Respond with 200 OK and a JSON body that indicates the failure and provides details.
+    res.status(200).json({
       success: false,
       isLocked: false,
       remainingAttempts,
