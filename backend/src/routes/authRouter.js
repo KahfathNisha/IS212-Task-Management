@@ -5,6 +5,12 @@ const { loginRateLimiter } = require('../middleware/auth');
 const router = express.Router();
 
 /**
+ * POST /api/auth/login
+ * Handles the main user login request after client-side Firebase auth
+ */
+router.post('/login', authController.login);
+
+/**
  * POST /api/auth/check-lockout
  * Check if an account is locked before attempting login
  */

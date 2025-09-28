@@ -43,31 +43,6 @@
                 required
               />
 
-              <!-- Account Locked Alert -->
-              <v-alert
-                v-if="accountLocked"
-                type="error"
-                variant="tonal"
-                class="mb-3"
-                closable
-                @click:close="accountLocked = false"
-              >
-                <strong>Account Locked</strong><br>
-                {{ lockMessage }}
-              </v-alert>
-
-              <!-- Failed Attempts Warning -->
-              <v-alert
-                v-if="showAttemptsWarning"
-                type="warning"
-                variant="tonal"
-                class="mb-3"
-                closable
-                @click:close="showAttemptsWarning = false"
-              >
-                {{ attemptsMessage }}
-              </v-alert>
-
               <!-- Error Alert -->
               <v-alert
                 v-if="errorMessage"
@@ -145,7 +120,6 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -161,10 +135,6 @@ const loading = ref(false);
 
 // Error handling state
 const errorMessage = ref('');
-const accountLocked = ref(false);
-const lockMessage = ref('');
-const showAttemptsWarning = ref(false);
-const attemptsMessage = ref('');
 const sessionExpiredDialog = ref(false);
 
 // Validation rules
@@ -184,94 +154,27 @@ onMounted(() => {
   }
 });
 
-// Handle login
+// --- THIS IS THE FIX ---
+// The entire login logic is simplified to a single call to the auth store.
 const handleLogin = async () => {
-  // Validate form
   const { valid } = await loginForm.value.validate();
-  
   if (!valid) return;
 
   loading.value = true;
   errorMessage.value = '';
-  accountLocked.value = false;
-  showAttemptsWarning.value = false;
 
   try {
-    const auth = getAuth();
-    
-    // Attempt to sign in with Firebase Auth
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email.value,
-      password.value
-    );
+    // Delegate ALL logic to the auth store
+    await authStore.login(email.value, password.value);
 
-    // Get ID token
-    const idToken = await userCredential.user.getIdToken();
+    // If the store's login is successful, redirect
+    const redirectTo = route.query.redirect || '/dashboard';
+    router.push(redirectTo);
 
-    // Call backend to verify login and track attempts
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email.value,
-        password: password.value,
-        idToken,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.success) {
-      // Store user data in Pinia store
-      await authStore.login({
-        user: userCredential.user,
-        userData: data.user,
-        token: idToken,
-      });
-
-      // Redirect to dashboard or intended page
-      const redirectTo = route.query.redirect || '/dashboard';
-      router.push(redirectTo);
-    } else {
-      // Handle various error scenarios
-      if (response.status === 423) {
-        // Account locked
-        accountLocked.value = true;
-        lockMessage.value = data.message;
-      } else if (data.remainingAttempts !== undefined) {
-        // Show remaining attempts warning
-        showAttemptsWarning.value = true;
-        attemptsMessage.value = `Invalid credentials. ${data.remainingAttempts} attempts remaining.`;
-        
-        if (data.remainingAttempts === 0) {
-          accountLocked.value = true;
-          lockMessage.value = 'Too many failed attempts. Your account has been locked for 30 minutes.';
-        }
-      } else {
-        errorMessage.value = data.message || 'Invalid login credentials';
-      }
-    }
   } catch (error) {
-    console.error('Login error:', error);
-    
-    // Handle Firebase Auth errors
-    if (error.code === 'auth/user-not-found') {
-      errorMessage.value = 'Invalid login credentials';
-    } else if (error.code === 'auth/wrong-password') {
-      errorMessage.value = 'Invalid login credentials';
-    } else if (error.code === 'auth/invalid-email') {
-      errorMessage.value = 'Invalid email format';
-    } else if (error.code === 'auth/user-disabled') {
-      errorMessage.value = 'This account has been disabled';
-    } else if (error.code === 'auth/too-many-requests') {
-      accountLocked.value = true;
-      lockMessage.value = 'Too many failed attempts. Please try again later.';
-    } else {
-      errorMessage.value = 'An error occurred during login. Please try again.';
-    }
+    // The store will throw an error on failure, which we can display here
+    console.error('LoginView.vue: Login failed:', error);
+    errorMessage.value = error.message || 'An unknown error occurred.';
   } finally {
     loading.value = false;
   }

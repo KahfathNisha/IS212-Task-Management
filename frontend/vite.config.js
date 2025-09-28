@@ -1,24 +1,22 @@
-import { fileURLToPath, URL } from 'node:url';
-import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { fileURLToPath, URL } from 'node:url' // Import Node.js URL helpers
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
+      // Use the modern, recommended way to create the '@' alias
       '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+    },
   },
   server: {
-    port: 5173,
-    host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3000', // Your backend is confirmed to be here
         changeOrigin: true,
-        secure: false
-      }
+      },
     }
   }
-});
+})
+

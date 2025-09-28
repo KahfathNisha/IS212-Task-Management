@@ -1,19 +1,70 @@
-const admin = require('firebase-admin');
+// --- THIS IS THE FIX ---
+// Remove any local Firebase initialization and instead import
+// the already-initialized instances from your central config file.
+const { admin, db } = require('../config/firebase');
 
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: 'is212-task-management',
-    storageBucket: 'is212-task-management.firebasestorage.app'
-  });
+// --- Debugging Check ---
+if (!db) {
+  console.error("❌ CRITICAL: Firestore 'db' object is undefined in authController.js. Check the export in your config/firebase.js file.");
+} else {
+  console.log("✅ Firestore 'db' object loaded successfully in authController.js.");
 }
+// --- End Debugging Check ---
 
-// Now initialize Firestore after Firebase is initialized
-const db = admin.firestore();
 
 // Constants
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Handles the actual login by verifying a Firebase ID token.
+ */
+exports.login = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: 'ID token is required.' });
+    }
+
+    // Verify the ID token with Firebase Admin SDK. This is a secure check.
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const email = decodedToken.email;
+
+    if (!email) {
+        return res.status(401).json({ success: false, message: 'Token is invalid or missing email.' });
+    }
+
+    // Fetch the user's profile from your Firestore database
+    const userRef = db.collection('users').doc(email);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, message: 'User profile not found in database.' });
+    }
+
+    // Successful login: Reset any failed attempts or lockouts
+    await userRef.update({
+      failedAttempts: 0,
+      lockedUntil: null,
+      lastLogin: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful!',
+      user: userDoc.data() // Send back the user's profile data
+    });
+
+  } catch (error) {
+    console.error('❌ API Login Error:', error);
+    if (error.code === 'auth/id-token-revoked' || error.code === 'auth/id-token-expired') {
+        return res.status(401).json({ success: false, message: 'Your session has expired. Please log in again.' });
+    }
+    res.status(500).json({ success: false, message: 'An internal server error occurred. Check backend logs.' });
+  }
+};
+
 
 /**
  * Check if an account is locked
@@ -22,10 +73,11 @@ exports.checkLockout = async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email) {
+    // --- STRENGTHENED VALIDATION ---
+    if (typeof email !== 'string' || email.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: 'A valid email string is required'
       });
     }
     
@@ -46,8 +98,8 @@ exports.checkLockout = async (req, res) => {
     // Check if account is locked
     if (userData.lockedUntil && userData.lockedUntil > now) {
       const remainingTime = Math.ceil((userData.lockedUntil - now) / 60000);
-      return res.json({
-        success: true,
+      return res.status(423).json({ // Use 423 Locked status
+        success: false,
         isLocked: true,
         remainingTime,
         message: `Account is locked. Please try again in ${remainingTime} minutes.`
@@ -68,10 +120,10 @@ exports.checkLockout = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Check lockout error:', error);
+    console.error('❌ Error in checkLockout function:', error);
     res.status(500).json({
       success: false,
-      message: 'Error checking account status'
+      message: 'Error checking account status. Check backend logs for details.'
     });
   }
 };
@@ -83,10 +135,11 @@ exports.loginSuccess = async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email) {
+    // --- STRENGTHENED VALIDATION ---
+    if (typeof email !== 'string' || email.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: 'A valid email string is required'
       });
     }
     
@@ -103,10 +156,10 @@ exports.loginSuccess = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Login success error:', error);
+    console.error('❌ Login success error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error recording login'
+      message: 'Error recording login. Check backend logs.'
     });
   }
 };
@@ -118,10 +171,11 @@ exports.recordFailedAttempt = async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email) {
+    // --- STRENGTHENED VALIDATION ---
+    if (typeof email !== 'string' || email.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: 'A valid email string is required'
       });
     }
     
@@ -130,9 +184,9 @@ exports.recordFailedAttempt = async (req, res) => {
     
     if (!userDoc.exists) {
       // Don't reveal if user exists
-      return res.json({
-        success: true,
-        remainingAttempts: MAX_LOGIN_ATTEMPTS
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials.'
       });
     }
     
@@ -141,13 +195,12 @@ exports.recordFailedAttempt = async (req, res) => {
     
     // Check if already locked
     if (userData.lockedUntil && userData.lockedUntil > now) {
-      const remainingTime = Math.ceil((userData.lockedUntil - now) / 60000);
-      return res.json({
-        success: true,
-        isLocked: true,
-        remainingTime,
-        message: `Account is locked for ${remainingTime} more minutes.`
-      });
+        const remainingTime = Math.ceil((userData.lockedUntil - now) / 60000);
+        return res.status(423).json({
+            success: false,
+            isLocked: true,
+            message: `Account is locked for ${remainingTime} more minutes.`
+        });
     }
     
     // Increment failed attempts
@@ -163,10 +216,9 @@ exports.recordFailedAttempt = async (req, res) => {
       
       await userRef.update(updateData);
       
-      return res.json({
-        success: true,
+      return res.status(423).json({
+        success: false,
         isLocked: true,
-        remainingTime: 30,
         message: 'Too many failed attempts. Account locked for 30 minutes.'
       });
     }
@@ -176,18 +228,18 @@ exports.recordFailedAttempt = async (req, res) => {
     
     const remainingAttempts = MAX_LOGIN_ATTEMPTS - failedAttempts;
     
-    res.json({
-      success: true,
+    res.status(401).json({
+      success: false,
       isLocked: false,
       remainingAttempts,
       message: `Invalid credentials. ${remainingAttempts} attempts remaining.`
     });
     
   } catch (error) {
-    console.error('Record failed attempt error:', error);
+    console.error('❌ Record failed attempt error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error recording failed attempt'
+      message: 'Error recording failed attempt. Check backend logs.'
     });
   }
 };
@@ -199,10 +251,11 @@ exports.requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email) {
+    // --- STRENGTHENED VALIDATION ---
+    if (typeof email !== 'string' || email.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: 'A valid email string is required'
       });
     }
     
@@ -241,10 +294,10 @@ exports.requestPasswordReset = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Password reset request error:', error);
+    console.error('❌ Password reset request error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error processing password reset request'
+      message: 'Error processing password reset request. Check backend logs.'
     });
   }
 };
@@ -290,7 +343,6 @@ exports.verifySecurityAnswer = async (req, res) => {
     const userData = userDoc.data();
     
     // Verify security answer (case-insensitive)
-    // In production, this should be hashed
     if (userData.securityAnswer?.toLowerCase() !== answer.toLowerCase()) {
       return res.status(401).json({
         success: false,
@@ -310,10 +362,10 @@ exports.verifySecurityAnswer = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Security answer verification error:', error);
+    console.error('❌ Security answer verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error verifying security answer'
+      message: 'Error verifying security answer. Check backend logs.'
     });
   }
 };
@@ -333,17 +385,10 @@ exports.resetPassword = async (req, res) => {
     }
     
     // Validate password requirements
-    if (newPassword.length < 12) {
+    if (newPassword.length < 12 || !/\d/.test(newPassword)) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 12 characters long'
-      });
-    }
-    
-    if (!/\d/.test(newPassword)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must contain at least one number'
+        message: 'Password must be at least 12 characters long and contain a number.'
       });
     }
     
@@ -394,10 +439,11 @@ exports.resetPassword = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Password reset error:', error);
+    console.error('❌ Password reset error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error resetting password'
+      message: 'Error resetting password. Check backend logs.'
     });
   }
 };
+

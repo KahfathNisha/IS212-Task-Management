@@ -1,34 +1,32 @@
-// backend/src/config/firebase.js (Backend - Admin SDK)
 const admin = require('firebase-admin');
-require('dotenv').config();
 
-console.log('🔥 Initializing Firebase Admin SDK...');
+// --- THIS IS THE FIX ---
+// Load the service account key you downloaded from Firebase.
+// Make sure the path to the JSON file is correct.
+const serviceAccount = require('./serviceAccountKey.json');
 
-try {
-  if (!admin.apps.length) {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-      console.log('🔑 Using service account key from:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-      const serviceAccount = require(require('path').resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH));
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
-    } else {
-      console.log('🔑 Using default credentials (no service account key)');
-      admin.initializeApp();
-    }
-    console.log('✅ Firebase Admin SDK initialized successfully');
-  } else {
-    console.log('✅ Firebase Admin SDK already initialized');
+// Initialize the Firebase Admin SDK
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      // Use the credentials from your service account key file
+      credential: admin.credential.cert(serviceAccount),
+      // Optional: Add your database URL if you use Realtime Database
+      // databaseURL: "https://<YOUR-PROJECT-ID>.firebaseio.com" 
+    });
+    console.log('✅ Firebase Admin SDK initialized successfully with service account.');
+  } catch (error) {
+    console.error('❌ Firebase Admin SDK initialization error:', error);
+    process.exit(1);
   }
-} catch (error) {
-  console.error('❌ Firebase Admin SDK initialization failed:', error.message);
-  throw error;
 }
 
-// Export initialized services
+// Export the initialized services for use in other parts of your app
 const auth = admin.auth();
-const db = admin.firestore(); // Use Firestore
+const db = admin.firestore();
 
-console.log('📦 Firebase services exported: auth, db, admin');
-
-module.exports = { admin, auth, db };
+module.exports = {
+  admin,
+  auth,
+  db
+};
