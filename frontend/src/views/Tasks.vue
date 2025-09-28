@@ -258,6 +258,22 @@
             <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
           </div>
 
+          <div class="detail-section" v-if="selectedTask.attachments && selectedTask.attachments.length > 0">
+            <h4>Attachments</h4>
+            <div class="attachments-list">
+              <v-chip
+                v-for="attachment in selectedTask.attachments"
+                :key="attachment.url"
+                variant="outlined"
+                class="attachment-chip"
+                @click="openAttachment(attachment.url)"
+              >
+                <v-icon start>mdi-paperclip</v-icon>
+                {{ attachment.name }}
+              </v-chip>
+            </div>
+          </div>
+
           <v-divider class="my-4"></v-divider>
           <div class="detail-section" v-if="selectedTask.isSubtask">
            <h4>Parent Task</h4>
@@ -404,6 +420,20 @@
               />
               </div>
 
+            <!-- Attachments -->
+            <div class="mb-4">
+              <v-file-input
+                v-model="newTask.attachments"
+                label="Attach Documents"
+                accept=".pdf"
+                multiple
+                variant="outlined"
+                prepend-icon="mdi-paperclip"
+                show-size
+                chips
+              />
+            </div>
+
             <!-- Row 4: Add Subtasks -->
 
             <!-- Subtask Button -->
@@ -481,6 +511,21 @@
                 />
               </div>
 
+              <!-- Subtask Attachments -->
+              <div class="mb-3">
+                <v-file-input
+                  v-model="subtask.attachments"
+                  label="Attach Documents/PDFs"
+                  accept=".pdf,.doc,.docx,.txt"
+                  multiple
+                  variant="outlined"
+                  prepend-icon="mdi-paperclip"
+                  show-size
+                  chips
+                  small-chips
+                />
+              </div>
+
               <!-- Remove Subtask Button -->
               <v-btn
                 variant="outlined"
@@ -519,6 +564,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { storage } from '@/config/firebase'
+import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 
 // Reactive data
 const viewMode = ref('month')
@@ -548,7 +595,8 @@ const newTask = ref({
   description: '',
   dueDate: '',
   assignedTo: '',
-  status: 'To Do'
+  status: 'To Do',
+  attachments: []
 })
 
 // Subtask data
@@ -696,39 +744,61 @@ const viewTaskDetails = (task) => {
   showDetailsDialog.value = true
 }
 
+const openAttachment = (url) => {
+  window.open(url, '_blank')
+}
+
 const editTask = (task) => {
   newTask.value = { ...task }
   subtasks.value = task.subtasks ? [...task.subtasks] : []
   isEditing.value = true
   showCreateDialog.value = true
   showDetailsDialog.value = false
+  // Note: For editing, attachments are already URLs, so v-file-input won't show them.
+  // In a real app, you'd need to handle displaying existing attachments separately.
 }
 
-const createTask = () => {
-  const task = {
-    id: newTask.value.id || Date.now().toString(),
-    ...newTask.value,
-    subtasks: subtasks.value,
-    status: newTask.value.status || 'To Do',
-    createdAt: newTask.value.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
+const createTask = async () => {
+  try {
+    // Upload main task attachments
+    //const mainAttachments = await uploadFiles(newTask.value.attachments)
+    const mainAttachments = [] //temporary
 
-  if (newTask.value.id) {
-    // Update existing task
-    const index = tasks.value.findIndex(t => t.id === task.id)
-    if (index !== -1) {
-      tasks.value[index] = task
-      showMessage('Task updated successfully!', 'success')
+    // Upload subtask attachments
+    const processedSubtasks = await Promise.all(subtasks.value.map(async (subtask) => ({
+      ...subtask,
+      attachments: await uploadFiles(subtask.attachments)
+    })))
+
+    const task = {
+      id: newTask.value.id || Date.now().toString(),
+      ...newTask.value,
+      attachments: mainAttachments,
+      subtasks: processedSubtasks,
+      status: newTask.value.status || 'To Do',
+      createdAt: newTask.value.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
-  } else {
-    // Create new task
-    tasks.value.unshift(task)
-    showMessage('Task created successfully!', 'success')
-  }
 
-  showCreateDialog.value = false
-  resetForm()
+    if (newTask.value.id) {
+      // Update existing task
+      const index = tasks.value.findIndex(t => t.id === task.id)
+      if (index !== -1) {
+        tasks.value[index] = task
+        showMessage('Task updated successfully!', 'success')
+      }
+    } else {
+      // Create new task
+      tasks.value.unshift(task)
+      showMessage('Task created successfully!', 'success')
+    }
+
+    showCreateDialog.value = false
+    resetForm()
+  } catch (error) {
+    console.error('Error creating task:', error)
+    showMessage('Failed to create task', 'error')
+  }
 }
 
 const changeTaskStatus = (task) => {
@@ -748,7 +818,8 @@ const resetForm = () => {
     description: '',
     dueDate: '',
     assignedTo: '',
-    status: 'To Do'
+    status: 'To Do',
+    attachments: []
   }
   subtasks.value = [] //to reset subtasks
   isEditing.value = false
@@ -761,7 +832,8 @@ const addSubtask = () => {
     assignedTo: '',
     startTime: '',
     endTime: '',
-    dueDate: ''
+    dueDate: '',
+    attachments: []
   })
 }
 
@@ -769,6 +841,24 @@ const showMessage = (message, color = 'success') => {
   snackbarMessage.value = message
   snackbarColor.value = color
   showSnackbar.value = true
+}
+
+const uploadFiles = async (files) => {
+  if (!files || files.length === 0) return []
+
+  const urls = []
+  for (const file of files) {
+    try {
+      const fileRef = storageRef(storage, `attachments/${Date.now()}_${file.name}`)
+      await uploadBytes(fileRef, file)
+      const url = await getDownloadURL(fileRef)
+      urls.push({ name: file.name, url })
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      showMessage(`Failed to upload ${file.name}`, 'error')
+    }
+  }
+  return urls
 }
 
 // Sample data initialization
@@ -1239,6 +1329,21 @@ onMounted(() => {
 .parent-title-btn:hover {
   background: rgba(33, 150, 243, 0.1) !important;
   box-shadow: none !important;
+}
+
+.attachments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-chip {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.attachment-chip:hover {
+  background-color: rgba(33, 150, 243, 0.1) !important;
 }
 
 .edit-parent-btn {
