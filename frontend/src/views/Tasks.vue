@@ -186,7 +186,7 @@
                   @click.stop="viewTaskDetails(task)"
                 >
                   <div class="task-content">
-                    <span class="task-title">{{ task.title }}</span>
+                    <span class="task-title">{{ task.isSubtask ? `${task.title} (${task.parentTask.title})` : task.title }}</span>
                     <div class="task-meta">
                       <v-chip 
                         :color="getStatusColor(task.status)" 
@@ -208,21 +208,38 @@
 
     <!-- Task Details Dialog -->
     <v-dialog v-model="showDetailsDialog" max-width="800px">
-      <v-card v-if="selectedTask" rounded="xl">
+      <v-card v-if="selectedTask" class="task-details-card" rounded="xl">
         <v-card-title class="task-details-header">
+          <v-btn icon="mdi-close" variant="text" @click="showDetailsDialog = false" />
           <div class="details-title-section">
             <h2>{{ selectedTask.title }}</h2>
             <div class="title-chips">
-              <v-chip 
-                :color="getStatusColor(selectedTask.status)" 
-                size="small"
-                rounded="lg"
-              >
-                {{ selectedTask.status }}
-              </v-chip>
-            </div>
+                <v-chip
+                  :color="getStatusColor(selectedTask.status)"
+                  size="small"
+                  rounded="lg"
+                >
+                  {{ selectedTask.status }}
+                </v-chip>
+                <!-- Type indicator chip -->
+                <v-chip
+                  v-if="selectedTask.isSubtask"
+                  color="secondary"
+                  size="small"
+                  rounded="lg"
+                >
+                  Subtask
+                </v-chip>
+                <v-chip
+                  v-else
+                  color="primary"
+                  size="small"
+                  rounded="lg"
+                >
+                  Task
+                </v-chip>
+              </div>
           </div>
-          <v-btn icon="mdi-close" variant="text" @click="showDetailsDialog = false" />
         </v-card-title>
 
         <v-card-text class="task-details-content">
@@ -240,19 +257,40 @@
             <h4>Assigned To</h4>
             <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
           </div>
+
+          <v-divider class="my-4"></v-divider>
+          <div class="detail-section" v-if="selectedTask.isSubtask">
+           <h4>Parent Task</h4>
+           <div class="parent-summary">
+             <div class="parent-title-section">
+               <v-btn
+                 variant="text"
+                 size="small"
+                 class="parent-title-btn"
+                 @click="viewTaskDetails(selectedTask.parentTask)"
+                 title="View task details"
+               >
+                 {{ selectedTask.parentTask.title }}
+               </v-btn>
+             </div>
+             <div class="parent-controls">
+               <v-chip :color="getStatusColor(selectedTask.parentTask.status)" size="small">{{ selectedTask.parentTask.status }}</v-chip>
+             </div>
+           </div>
+          </div>
         </v-card-text>
 
         <v-card-actions>
-          <v-btn 
-            color="white" 
+          <v-btn
+            color="white"
             @click="editTask(selectedTask)"
             prepend-icon="mdi-pencil"
             rounded="lg"
           >
-            Edit Task
+            {{ selectedTask.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
           </v-btn>
           <v-spacer />
-          <v-btn 
+          <v-btn
             color="white"
             @click="changeTaskStatus(selectedTask)"
             rounded="lg"
@@ -264,10 +302,10 @@
     </v-dialog>
 
         <!-- Create Task Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="700px">
-      <v-card rounded="xl">
+        <v-dialog v-model="showCreateDialog" max-width="700px">
+          <v-card class="create-task-card" rounded="xl">
         <v-card-title class="d-flex justify-space-between align-center">
-          <span>Create New Task</span>
+          <span>{{ isEditing ? 'Edit Task' : 'Create New Task' }}</span>
           <v-btn icon="mdi-close" variant="text" @click="cancelCreate" />
         </v-card-title>
         <v-card-text>
@@ -364,16 +402,108 @@
                 variant="outlined"
                 class="flex-1"
               />
+              </div>
+
+            <!-- Row 4: Add Subtasks -->
+
+            <!-- Subtask Button -->
+            <div class="d-flex justify-center mb-4">
+              <v-btn
+                variant="text"
+                prepend-icon="mdi-plus"
+                @click="addSubtask"
+                color="primary"
+                rounded="lg"
+              >
+                Add Subtask
+              </v-btn>
             </div>
-          </v-form>
+
+            <!-- Dynamic Subtask Forms -->
+            <div v-for="(subtask, index) in subtasks" :key="index" class="subtask-section mb-4">
+              <v-divider class="mb-4"></v-divider>
+              <h5 class="mb-3">Subtask {{ index + 1 }}</h5>
+
+              <!-- Subtask Title -->
+              <v-text-field
+                v-model="subtask.title"
+                label="Subtask Title *"
+                placeholder="Enter subtask title"
+                required
+                variant="outlined"
+                class="mb-3"
+              />
+
+              <!-- Subtask Description -->
+              <v-textarea
+                v-model="subtask.description"
+                label="Subtask Description"
+                placeholder="Enter subtask description"
+                variant="outlined"
+                rows="2"
+                class="mb-3"
+              />
+
+              <!-- Subtask Assignee and Start Time -->
+              <div class="d-flex ga-4 mb-3">
+                <v-select
+                  v-model="subtask.assignedTo"
+                  label="Assignee"
+                  :items="teamMembers"
+                  placeholder="Select assignee"
+                  variant="outlined"
+                  class="flex-1"
+                />
+                <v-text-field
+                  v-model="subtask.startTime"
+                  label="Start Time"
+                  type="datetime-local"
+                  variant="outlined"
+                  class="flex-1"
+                />
+              </div>
+
+              <!-- Subtask End Time and Due Date -->
+              <div class="d-flex ga-4 mb-3">
+                <v-text-field
+                  v-model="subtask.endTime"
+                  label="End Time"
+                  type="datetime-local"
+                  variant="outlined"
+                  class="flex-1"
+                />
+                <v-text-field
+                  v-model="subtask.dueDate"
+                  label="Due Date"
+                  type="date"
+                  variant="outlined"
+                  class="flex-1"
+                />
+              </div>
+
+              <!-- Remove Subtask Button -->
+              <v-btn
+                variant="outlined"
+                color="error"
+                size="small"
+                @click="subtasks.splice(index, 1)"
+                prepend-icon="mdi-delete"
+                rounded="lg"
+              >
+                Remove Subtask
+              </v-btn>
+
+          </div>
+        </v-form>
         </v-card-text>
         
         <v-card-actions class="px-6 pb-6">
           <v-spacer />
           <v-btn variant="text" @click="cancelCreate" class="mr-2" rounded="lg">Cancel</v-btn>
-          <v-btn color="secondary" @click="createTask" rounded="lg">Create Task</v-btn>
+          <v-btn color="secondary" @click="createTask" rounded="lg">{{ isEditing ? 'Update' : 'Save' }}</v-btn>
         </v-card-actions>
-      </v-card>
+        
+        </v-card>
     </v-dialog>
 
     <!-- Snackbar for notifications -->
@@ -399,6 +529,7 @@ const upcomingSidebarOpen = ref(true)
 // Dialog states
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
+const isEditing = ref(false)
 
 // Form states
 const formValid = ref(false)
@@ -409,6 +540,7 @@ const snackbarColor = ref('success')
 // Sample data
 const tasks = ref([])
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
 
 // Form data
 const newTask = ref({
@@ -418,6 +550,9 @@ const newTask = ref({
   assignedTo: '',
   status: 'To Do'
 })
+
+// Subtask data
+const subtasks = ref([])
 
 // Computed properties
 const calendarDates = computed(() => {
@@ -508,7 +643,30 @@ const selectDate = (date) => {
 }
 
 const getTasksForDate = (dateKey) => {
-  return tasks.value.filter(task => task.dueDate === dateKey)
+  const items = []
+  tasks.value.forEach(task => {
+    if (task.subtasks && task.subtasks.length > 0) {
+      // add subtasks that match the date
+      task.subtasks.forEach((subtask, index) => {
+        const subtaskDate = subtask.dueDate.split('T')[0]
+        if (subtaskDate === dateKey) {
+          items.push({
+            ...subtask,
+            id: `${task.id}-subtask-${index}`,
+            status: task.status, // inherit status from parent
+            isSubtask: true,
+            parentTask: task
+          })
+        }
+      })
+    } else {
+      // add the task if it matches
+      if (task.dueDate === dateKey) {
+        items.push(task)
+      }
+    }
+  })
+  return items
 }
 
 const getTaskStatusClass = (status) => {
@@ -540,22 +698,37 @@ const viewTaskDetails = (task) => {
 
 const editTask = (task) => {
   newTask.value = { ...task }
+  subtasks.value = task.subtasks ? [...task.subtasks] : []
+  isEditing.value = true
   showCreateDialog.value = true
   showDetailsDialog.value = false
 }
 
 const createTask = () => {
   const task = {
-    id: Date.now().toString(),
+    id: newTask.value.id || Date.now().toString(),
     ...newTask.value,
-    status: 'To Do',
-    createdAt: new Date().toISOString()
+    subtasks: subtasks.value,
+    status: newTask.value.status || 'To Do',
+    createdAt: newTask.value.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   }
-  
-  tasks.value.unshift(task)
+
+  if (newTask.value.id) {
+    // Update existing task
+    const index = tasks.value.findIndex(t => t.id === task.id)
+    if (index !== -1) {
+      tasks.value[index] = task
+      showMessage('Task updated successfully!', 'success')
+    }
+  } else {
+    // Create new task
+    tasks.value.unshift(task)
+    showMessage('Task created successfully!', 'success')
+  }
+
   showCreateDialog.value = false
   resetForm()
-  showMessage('Task created successfully!', 'success')
 }
 
 const changeTaskStatus = (task) => {
@@ -565,6 +738,7 @@ const changeTaskStatus = (task) => {
 
 const cancelCreate = () => {
   showCreateDialog.value = false
+  isEditing.value = false
   resetForm()
 }
 
@@ -576,6 +750,19 @@ const resetForm = () => {
     assignedTo: '',
     status: 'To Do'
   }
+  subtasks.value = [] //to reset subtasks
+  isEditing.value = false
+}
+
+const addSubtask = () => {
+  subtasks.value.push({
+    title: '',
+    description: '',
+    assignedTo: '',
+    startTime: '',
+    endTime: '',
+    dueDate: ''
+  })
 }
 
 const showMessage = (message, color = 'success') => {
@@ -603,7 +790,21 @@ onMounted(() => {
       status: 'In Progress',
       dueDate: '2025-09-27',
       assignedTo: 'Jane Smith',
-      createdAt: '2025-09-24T11:00:00Z'
+      createdAt: '2025-09-24T11:00:00Z',
+      subtasks: [
+        {
+          title: 'Create form layout',
+          description: 'Design the basic layout for the task creation form.',
+          assignedTo: 'Jane Smith',
+          dueDate: '2025-09-26T10:00:00Z'
+        },
+        // {
+        //   title: 'Add validation',
+        //   description: 'Implement form validation for required fields.',
+        //   assignedTo: 'Alice Johnson',
+        //   dueDate: '2025-09-27T10:00:00Z'
+        // }
+      ]
     }
   ]
 })
@@ -989,6 +1190,89 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.subtask-section {
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #ffffff;
+}
+
+.subtask-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.parent-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.parent-title-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.parent-title-btn {
+  padding: 4px 8px !important;
+  height: auto !important;
+  min-height: auto !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  color: #2c3e50 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  background: #f5f5f5 !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.parent-title-btn:hover {
+  background: rgba(33, 150, 243, 0.1) !important;
+  box-shadow: none !important;
+}
+
+.edit-parent-btn {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.edit-parent-btn:hover {
+  opacity: 1;
+}
+
+.parent-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rotated {
+  transform: rotate(180deg);
+  transition: transform 0.3s ease;
+}
+
+.parent-details {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.parent-section {
+  border-radius: 8px;
+  padding: 16px;
+}
+
 /* Dark mode overrides */
 [data-theme="dark"] .tasks-container {
   background: #000000 !important;
@@ -1174,6 +1458,45 @@ onMounted(() => {
 
 [data-theme="dark"] .weekend {
   background: #1a1a1a !important;
+}
+
+[data-theme="dark"] .subtask-section {
+  background: #2a2a2a !important;
+  border: 1px solid #1a1a1a !important;
+}
+
+[data-theme="dark"] .subtask-section h5 {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .parent-details {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .parent-title-btn {
+  color: #ffffff !important;
+  background: #2a2a2a !important;
+  border: 1px solid #555 !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .parent-title-btn:hover {
+  background: rgba(33, 150, 243, 0.2) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .edit-parent-btn {
+  color: #ffffff !important;
+}
+
+
+.create-task-card {
+  background: white !important;
+}
+
+.task-details-card {
+  background: white !important;
 }
 
 @media (max-width: 768px) {
