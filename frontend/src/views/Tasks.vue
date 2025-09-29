@@ -84,7 +84,6 @@
           </div>
         </div>
 
-        <!-- Collapsed state icon -->
         <div v-if="!upcomingSidebarOpen" class="collapsed-content">
           <v-icon size="24" class="collapsed-icon">mdi-clock-outline</v-icon>
         </div>
@@ -92,7 +91,6 @@
 
       <!-- Calendar Area -->
       <div class="calendar-area">
-        <!-- Calendar Header -->
         <div class="calendar-header">
           <div class="header-left">
             <h1>Good Morning, John!</h1>
@@ -101,67 +99,40 @@
           
           <div class="header-right">
             <v-btn variant="outlined" size="small" prepend-icon="mdi-bell" rounded="lg">
-              <!-- <v-badge color="primary" :content="3">
-                Notifications
-              </v-badge> -->
             </v-btn>
-            <!-- <v-btn variant="outlined" size="small" prepend-icon="mdi-share" rounded="lg">
-              Invite
-            </v-btn> -->
             <v-btn variant="outlined" size="small" prepend-icon="mdi-cog" rounded="lg">
-              <!-- Settings -->
             </v-btn>
           </div>
         </div>
 
-        <!-- Calendar Controls -->
         <div class="calendar-controls">
           <div class="view-controls">
-            <v-btn-toggle v-model="viewMode" mandatory rounded="lg">
-              <v-btn value="month" size="small" prepend-icon="mdi-calendar" rounded="lg">Month</v-btn>
-              <v-btn value="week" size="small" prepend-icon="mdi-view-week" rounded="lg">Week</v-btn>
-              <!-- <v-btn value="list" size="small" prepend-icon="mdi-format-list-bulleted" rounded="lg">List</v-btn>
-              <v-btn value="board" size="small" prepend-icon="mdi-view-dashboard" rounded="lg">Board</v-btn> -->
+            <v-btn-toggle v-model="viewMode" mandatory rounded="xl" class="view-toggle">
+              <v-btn value="month" size="small" prepend-icon="mdi-calendar" rounded="xl" class="view-btn">Month</v-btn>
+              <v-btn value="week" size="small" prepend-icon="mdi-view-week" rounded="xl" class="view-btn">Week</v-btn>
             </v-btn-toggle>
           </div>
 
-          <!-- <div class="project-info">
-            <v-chip color="green" prepend-icon="mdi-circle" size="small" rounded="lg">
-              Team Project - Timeline
-            </v-chip>
-            <v-chip color="primary" size="small" rounded="lg">Important</v-chip>
-            <v-chip color="primary" size="small" rounded="lg">11 Meet</v-chip>
-            <span class="date-range">24 Sept • 27 Sept 2024</span>
-          </div> -->
-
           <div class="action-controls">
-            <!-- <v-btn color="primary" prepend-icon="mdi-share" variant="outlined" size="small" rounded="lg">
-              Share
-            </v-btn> -->
             <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg">
               Add Task
             </v-btn>
-            <!-- <v-btn icon="mdi-filter" variant="outlined" size="small" rounded="lg"></v-btn> -->
           </div>
         </div>
 
-        <!-- Calendar Navigation -->
         <div class="calendar-nav">
           <v-btn icon="mdi-chevron-left" variant="text" @click="previousPeriod" rounded="lg"></v-btn>
           <h2 class="period-title">{{ getCurrentPeriodTitle() }}</h2>
           <v-btn icon="mdi-chevron-right" variant="text" @click="nextPeriod" rounded="lg"></v-btn>
         </div>
 
-        <!-- Calendar Grid -->
-        <div class="calendar-grid">
-          <!-- Days Header -->
+        <div v-if="viewMode === 'month'" class="calendar-grid">
           <div class="calendar-header-row">
             <div v-for="day in weekDays" :key="day" class="day-header">
               {{ day }}
             </div>
           </div>
 
-          <!-- Calendar Days -->
           <div class="calendar-body">
             <div 
               v-for="date in calendarDates" 
@@ -176,7 +147,6 @@
             >
               <div class="day-number">{{ date.day }}</div>
               
-              <!-- Tasks for this day -->
               <div class="day-tasks">
                 <div 
                   v-for="task in getTasksForDate(date.dateKey)" 
@@ -203,8 +173,179 @@
             </div>
           </div>
         </div>
+
+        <div v-else-if="viewMode === 'week'" class="weekly-view">
+          <div class="week-container">
+            <div 
+              v-for="date in weekDates" 
+              :key="date.dateKey"
+              class="week-day-column"
+              :class="{ 'today-column': date.isToday, 'weekend-column': date.isWeekend }"
+            >
+              <div class="week-day-header">
+                <div class="day-name">{{ date.dayName }}</div>
+                <div class="day-number" :class="{ 'today-number': date.isToday }">{{ date.day }}</div>
+              </div>
+
+              <div class="week-day-tasks">
+                <div 
+                  v-for="task in getTasksForDate(date.dateKey)" 
+                  :key="task.id"
+                  class="week-task-item"
+                  :class="getTaskStatusClass(task.status)"
+                  @click="viewTaskDetails(task)"
+                >
+                  <div class="week-task-content">
+                    <div class="week-task-title">{{ task.isSubtask ? `${task.title} (${task.parentTask.title})` : task.title }}</div>
+                    <div class="week-task-meta">
+                      <v-chip 
+                        :color="getStatusColor(task.status)" 
+                        size="x-small"
+                        rounded="lg"
+                      >
+                        {{ task.status }}
+                      </v-chip>
+                      <span v-if="task.startTime" class="task-time">{{ formatTime(task.startTime) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="add-task-day">
+                  <v-btn 
+                    variant="text" 
+                    size="small" 
+                    prepend-icon="mdi-plus"
+                    @click="addTaskForDate(date.dateKey)"
+                    class="add-task-btn"
+                    rounded="lg"
+                  >
+                    Add task
+                  </v-btn>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Date Details Dialog -->
+    <v-dialog v-model="showDateDetailsDialog" max-width="900px">
+      <v-card v-if="selectedDate" class="date-details-card" rounded="xl">
+        <v-card-title class="date-details-header">
+          <div class="header-content">
+            <div class="date-info">
+              <h2>{{ selectedDate.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) }}</h2>
+              <v-chip 
+                v-if="selectedDate.isToday" 
+                color="primary" 
+                size="small"
+                rounded="lg"
+              >
+                Today
+              </v-chip>
+            </div>
+            <v-btn icon="mdi-close" variant="text" @click="showDateDetailsDialog = false" />
+          </div>
+        </v-card-title>
+
+        <v-card-text class="date-details-content">
+          <div v-if="getTasksForSelectedDate().length === 0" class="no-tasks-section">
+            <v-icon size="64" color="grey-lighten-1">mdi-calendar-blank-outline</v-icon>
+            <h3>No tasks today</h3>
+            <p>Get started by adding a task for this date</p>
+            <v-btn 
+              color="primary" 
+              prepend-icon="mdi-plus" 
+              @click="addTaskForSelectedDate"
+              rounded="lg"
+              class="mt-4"
+            >
+              Add Task
+            </v-btn>
+          </div>
+
+          <div v-else class="tasks-section">
+            <div class="section-header">
+              <h3>Tasks ({{ getTasksForSelectedDate().length }})</h3>
+              <v-btn 
+                color="primary" 
+                size="small"
+                prepend-icon="mdi-plus" 
+                @click="addTaskForSelectedDate"
+                rounded="lg"
+              >
+                Add Task
+              </v-btn>
+            </div>
+
+            <div class="task-cards-list">
+              <v-card 
+                v-for="task in getTasksForSelectedDate()" 
+                :key="task.id"
+                class="task-card-item"
+                :class="getTaskStatusClass(task.status)"
+                @click="viewTaskDetails(task)"
+                rounded="lg"
+                elevation="1"
+              >
+                <div class="task-card-content">
+                  <div class="task-card-header">
+                    <div class="task-title-section">
+                      <h4>{{ task.title }}</h4>
+                      <div class="task-badges">
+                        <v-chip 
+                          :color="getStatusColor(task.status)" 
+                          size="small"
+                          rounded="lg"
+                        >
+                          {{ task.status }}
+                        </v-chip>
+                        <v-chip
+                          v-if="task.isSubtask"
+                          color="secondary"
+                          size="small"
+                          rounded="lg"
+                        >
+                          Subtask
+                        </v-chip>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="task-card-details">
+                    <div class="detail-row" v-if="task.description">
+                      <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                      <span class="detail-text">{{ task.description }}</span>
+                    </div>
+
+                    <div class="detail-row" v-if="task.startTime">
+                      <v-icon size="small" class="detail-icon">mdi-clock-outline</v-icon>
+                      <span class="detail-text">{{ formatTime(task.startTime) }}</span>
+                    </div>
+
+                    <div class="detail-row" v-if="task.assignedTo">
+                      <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+                      <span class="detail-text">{{ task.assignedTo }}</span>
+                    </div>
+
+                    <div class="detail-row" v-if="task.isSubtask && task.parentTask">
+                      <v-icon size="small" class="detail-icon">mdi-file-tree</v-icon>
+                      <span class="detail-text">Parent: {{ task.parentTask.title }}</span>
+                    </div>
+
+                    <div class="detail-row" v-if="task.attachments && task.attachments.length > 0">
+                      <v-icon size="small" class="detail-icon">mdi-paperclip</v-icon>
+                      <span class="detail-text">{{ task.attachments.length }} attachment(s)</span>
+                    </div>
+                  </div>
+                </div>
+              </v-card>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <!-- Task Details Dialog -->
     <v-dialog v-model="showDetailsDialog" max-width="800px">
@@ -221,7 +362,6 @@
                 >
                   {{ selectedTask.status }}
                 </v-chip>
-                <!-- Type indicator chip -->
                 <v-chip
                   v-if="selectedTask.isSubtask"
                   color="secondary"
@@ -317,16 +457,15 @@
       </v-card>
     </v-dialog>
 
-        <!-- Create Task Dialog -->
-        <v-dialog v-model="showCreateDialog" max-width="700px">
-          <v-card class="create-task-card" rounded="xl">
+    <!-- Create Task Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="700px">
+      <v-card class="create-task-card" rounded="xl">
         <v-card-title class="d-flex justify-space-between align-center">
           <span>{{ isEditing ? 'Edit Task' : 'Create New Task' }}</span>
           <v-btn icon="mdi-close" variant="text" @click="cancelCreate" />
         </v-card-title>
         <v-card-text>
           <v-form ref="taskForm" v-model="formValid">
-            <!-- Title -->
             <v-text-field
               v-model="newTask.title"
               label="Title *"
@@ -336,7 +475,6 @@
               class="mb-4"
             />
             
-            <!-- Description -->
             <v-textarea
               v-model="newTask.description"
               label="Description"
@@ -346,7 +484,6 @@
               class="mb-4"
             />
             
-            <!-- Row 1: Type and Status -->
             <div class="d-flex ga-4 mb-4">
               <v-select
                 v-model="newTask.type"
@@ -364,7 +501,6 @@
               />
             </div>
             
-            <!-- Row 2: Priority and Project -->
             <div class="d-flex ga-4 mb-4">
               <v-select
                 v-model="newTask.priority"
@@ -383,7 +519,6 @@
               />
             </div>
             
-            <!-- Row 3: Assignee and Start Time -->
             <div class="d-flex ga-4 mb-4">
               <v-select
                 v-model="newTask.assignedTo"
@@ -402,7 +537,6 @@
               />
             </div>
             
-            <!-- Row 4: End Time and Due Date -->
             <div class="d-flex ga-4 mb-4">
               <v-text-field
                 v-model="newTask.endTime"
@@ -418,9 +552,8 @@
                 variant="outlined"
                 class="flex-1"
               />
-              </div>
+            </div>
 
-            <!-- Attachments -->
             <div class="mb-4">
               <v-file-input
                 v-model="newTask.attachments"
@@ -434,9 +567,6 @@
               />
             </div>
 
-            <!-- Row 4: Add Subtasks -->
-
-            <!-- Subtask Button -->
             <div class="d-flex justify-center mb-4">
               <v-btn
                 variant="text"
@@ -449,12 +579,10 @@
               </v-btn>
             </div>
 
-            <!-- Dynamic Subtask Forms -->
             <div v-for="(subtask, index) in subtasks" :key="index" class="subtask-section mb-4">
               <v-divider class="mb-4"></v-divider>
               <h5 class="mb-3">Subtask {{ index + 1 }}</h5>
 
-              <!-- Subtask Title -->
               <v-text-field
                 v-model="subtask.title"
                 label="Subtask Title *"
@@ -464,7 +592,6 @@
                 class="mb-3"
               />
 
-              <!-- Subtask Description -->
               <v-textarea
                 v-model="subtask.description"
                 label="Subtask Description"
@@ -474,7 +601,6 @@
                 class="mb-3"
               />
 
-              <!-- Subtask Assignee and Start Time -->
               <div class="d-flex ga-4 mb-3">
                 <v-select
                   v-model="subtask.assignedTo"
@@ -493,7 +619,6 @@
                 />
               </div>
 
-              <!-- Subtask End Time and Due Date -->
               <div class="d-flex ga-4 mb-3">
                 <v-text-field
                   v-model="subtask.endTime"
@@ -511,7 +636,6 @@
                 />
               </div>
 
-              <!-- Subtask Attachments -->
               <div class="mb-3">
                 <v-file-input
                   v-model="subtask.attachments"
@@ -526,7 +650,6 @@
                 />
               </div>
 
-              <!-- Remove Subtask Button -->
               <v-btn
                 variant="outlined"
                 color="error"
@@ -537,9 +660,8 @@
               >
                 Remove Subtask
               </v-btn>
-
-          </div>
-        </v-form>
+            </div>
+          </v-form>
         </v-card-text>
         
         <v-card-actions class="px-6 pb-6">
@@ -547,11 +669,9 @@
           <v-btn variant="text" @click="cancelCreate" class="mr-2" rounded="lg">Cancel</v-btn>
           <v-btn color="secondary" @click="createTask" rounded="lg">{{ isEditing ? 'Update' : 'Save' }}</v-btn>
         </v-card-actions>
-        
-        </v-card>
+      </v-card>
     </v-dialog>
 
-    <!-- Snackbar for notifications -->
     <v-snackbar
       v-model="showSnackbar"
       :color="snackbarColor"
@@ -567,42 +687,44 @@ import { ref, computed, onMounted } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 
-// Reactive data
 const viewMode = ref('month')
 const currentDate = ref(new Date())
 const selectedTask = ref(null)
+const selectedDate = ref(null)
 const upcomingSidebarOpen = ref(true)
 
-// Dialog states
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
+const showDateDetailsDialog = ref(false)
 const isEditing = ref(false)
 
-// Form states
 const formValid = ref(false)
 const showSnackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
-// Sample data
 const tasks = ref([])
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
 
-// Form data
 const newTask = ref({
   title: '',
   description: '',
   dueDate: '',
   assignedTo: '',
   status: 'To Do',
-  attachments: []
+  attachments: [],
+  startTime: '',
+  endTime: ''
 })
 
-// Subtask data
+const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
+const taskStatuses = ['To Do', 'In Progress', 'Done']
+const priorities = ['Low', 'Medium', 'High', 'Urgent']
+const projects = ['Project Alpha', 'Project Beta', 'General', 'Research']
+
 const subtasks = ref([])
 
-// Computed properties
 const calendarDates = computed(() => {
   const dates = []
   const year = currentDate.value.getFullYear()
@@ -626,6 +748,34 @@ const calendarDates = computed(() => {
       dateKey: date.toISOString().split('T')[0],
       isToday: date.toDateString() === today.toDateString(),
       isOtherMonth: date.getMonth() !== month,
+      isWeekend: date.getDay() === 0 || date.getDay() === 6
+    })
+  }
+  
+  return dates
+})
+
+const weekDates = computed(() => {
+  const dates = []
+  const referenceDate = new Date(currentDate.value)
+  const currentDay = referenceDate.getDay()
+  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay
+  const monday = new Date(referenceDate)
+  monday.setDate(referenceDate.getDate() + mondayOffset)
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + i)
+    
+    const today = new Date()
+    dates.push({
+      date: date,
+      day: date.getDate(),
+      month: date.getMonth(),
+      year: date.getFullYear(),
+      dateKey: date.toISOString().split('T')[0],
+      dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
+      isToday: date.toDateString() === today.toDateString(),
       isWeekend: date.getDay() === 0 || date.getDay() === 6
     })
   }
@@ -657,7 +807,6 @@ const overdueTasks = computed(() => {
   })
 })
 
-// Methods
 const toggleUpcomingSidebar = () => {
   upcomingSidebarOpen.value = !upcomingSidebarOpen.value
 }
@@ -675,40 +824,72 @@ const formatShortDate = (dateString) => {
 }
 
 const getCurrentPeriodTitle = () => {
+  if (viewMode.value === 'week') {
+    const startOfWeek = weekDates.value[0]?.date
+    const endOfWeek = weekDates.value[6]?.date
+    if (startOfWeek && endOfWeek) {
+      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    }
+  }
   return currentDate.value.toLocaleString('default', { month: 'long', year: 'numeric' })
 }
 
 const previousPeriod = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
+  if (viewMode.value === 'week') {
+    currentDate.value = new Date(currentDate.value.getTime() - 7 * 24 * 60 * 60 * 1000)
+  } else {
+    currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
+  }
 }
 
 const nextPeriod = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
+  if (viewMode.value === 'week') {
+    currentDate.value = new Date(currentDate.value.getTime() + 7 * 24 * 60 * 60 * 1000)
+  } else {
+    currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
+  }
 }
 
 const selectDate = (date) => {
-  console.log('Selected date:', date)
+  selectedDate.value = date
+  showDateDetailsDialog.value = true
+}
+
+const getTasksForSelectedDate = () => {
+  if (!selectedDate.value) return []
+  return getTasksForDate(selectedDate.value.dateKey)
+}
+
+const addTaskForSelectedDate = () => {
+  if (selectedDate.value) {
+    newTask.value.dueDate = selectedDate.value.dateKey
+    showCreateDialog.value = true
+    showDateDetailsDialog.value = false
+  }
+}
+
+const addTaskForDate = (dateKey) => {
+  newTask.value.dueDate = dateKey
+  showCreateDialog.value = true
 }
 
 const getTasksForDate = (dateKey) => {
   const items = []
   tasks.value.forEach(task => {
     if (task.subtasks && task.subtasks.length > 0) {
-      // add subtasks that match the date
       task.subtasks.forEach((subtask, index) => {
         const subtaskDate = subtask.dueDate.split('T')[0]
         if (subtaskDate === dateKey) {
           items.push({
             ...subtask,
             id: `${task.id}-subtask-${index}`,
-            status: task.status, // inherit status from parent
+            status: task.status,
             isSubtask: true,
             parentTask: task
           })
         }
       })
     } else {
-      // add the task if it matches
       if (task.dueDate === dateKey) {
         items.push(task)
       }
@@ -742,6 +923,7 @@ const formatDate = (dateString) => {
 const viewTaskDetails = (task) => {
   selectedTask.value = task
   showDetailsDialog.value = true
+  showDateDetailsDialog.value = false
 }
 
 const openAttachment = (url) => {
@@ -754,17 +936,12 @@ const editTask = (task) => {
   isEditing.value = true
   showCreateDialog.value = true
   showDetailsDialog.value = false
-  // Note: For editing, attachments are already URLs, so v-file-input won't show them.
-  // In a real app, you'd need to handle displaying existing attachments separately.
 }
 
 const createTask = async () => {
   try {
-    // Upload main task attachments
-    //const mainAttachments = await uploadFiles(newTask.value.attachments)
-    const mainAttachments = [] //temporary
+    const mainAttachments = []
 
-    // Upload subtask attachments
     const processedSubtasks = await Promise.all(subtasks.value.map(async (subtask) => ({
       ...subtask,
       attachments: await uploadFiles(subtask.attachments)
@@ -781,14 +958,12 @@ const createTask = async () => {
     }
 
     if (newTask.value.id) {
-      // Update existing task
       const index = tasks.value.findIndex(t => t.id === task.id)
       if (index !== -1) {
         tasks.value[index] = task
         showMessage('Task updated successfully!', 'success')
       }
     } else {
-      // Create new task
       tasks.value.unshift(task)
       showMessage('Task created successfully!', 'success')
     }
@@ -819,9 +994,11 @@ const resetForm = () => {
     dueDate: '',
     assignedTo: '',
     status: 'To Do',
-    attachments: []
+    attachments: [],
+    startTime: '',
+    endTime: ''
   }
-  subtasks.value = [] //to reset subtasks
+  subtasks.value = []
   isEditing.value = false
 }
 
@@ -861,7 +1038,6 @@ const uploadFiles = async (files) => {
   return urls
 }
 
-// Sample data initialization
 onMounted(() => {
   tasks.value = [
     {
@@ -871,7 +1047,8 @@ onMounted(() => {
       status: 'Done',
       dueDate: '2025-09-25',
       assignedTo: 'John Doe',
-      createdAt: '2025-09-22T10:00:00Z'
+      createdAt: '2025-09-22T10:00:00Z',
+      startTime: '2025-09-25T09:00:00'
     },
     {
       id: '2',
@@ -881,24 +1058,51 @@ onMounted(() => {
       dueDate: '2025-09-27',
       assignedTo: 'Jane Smith',
       createdAt: '2025-09-24T11:00:00Z',
+      startTime: '2025-09-27T10:00:00',
       subtasks: [
         {
           title: 'Create form layout',
           description: 'Design the basic layout for the task creation form.',
           assignedTo: 'Jane Smith',
-          dueDate: '2025-09-26T10:00:00Z'
-        },
-        // {
-        //   title: 'Add validation',
-        //   description: 'Implement form validation for required fields.',
-        //   assignedTo: 'Alice Johnson',
-        //   dueDate: '2025-09-27T10:00:00Z'
-        // }
+          dueDate: '2025-09-26T10:00:00Z',
+          startTime: '2025-09-26T10:00:00'
+        }
       ]
+    },
+    {
+      id: '3',
+      title: 'reflection survey',
+      description: 'Complete the reflection survey for the education project.',
+      status: 'To Do',
+      dueDate: '2025-09-28',
+      assignedTo: 'John Doe',
+      createdAt: '2025-09-28T08:00:00Z',
+      startTime: '2025-09-28T14:00:00'
+    },
+    {
+      id: '4',
+      title: 'proj proposal draft',
+      description: 'Draft the project proposal for the new initiative.',
+      status: 'To Do',
+      dueDate: '2025-09-28',
+      assignedTo: 'Alice Johnson',
+      createdAt: '2025-09-28T09:00:00Z',
+      startTime: '2025-09-28T16:00:00'
+    },
+    {
+      id: '5',
+      title: 'Team Meeting',
+      description: 'Quarterly team sync and planning session',
+      status: 'To Do',
+      dueDate: '2025-10-03',
+      assignedTo: 'John Doe',
+      createdAt: '2025-09-29T08:00:00Z',
+      startTime: '2025-10-03T10:00:00'
     }
   ]
 })
 </script>
+
 
 <style scoped>
 .tasks-container {
@@ -915,7 +1119,6 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* Upcoming Tasks Sidebar */
 .upcoming-sidebar {
   width: 320px;
   background: white;
@@ -1031,7 +1234,6 @@ onMounted(() => {
   color: #7f8c8d;
 }
 
-/* Calendar Area */
 .calendar-area {
   flex: 1;
   display: flex;
@@ -1076,10 +1278,25 @@ onMounted(() => {
   border-bottom: 1px solid #e0e0e0;
 }
 
-.project-info {
-  display: flex;
-  align-items: center;
+.view-toggle {
   gap: 8px;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.view-btn {
+  margin: 0 4px !important;
+  transition: all 0.3s ease !important;
+}
+
+.view-toggle .v-btn--active {
+  background: #5a6c5a !important;
+  color: white !important;
+}
+
+.view-toggle .v-btn:not(.v-btn--active) {
+  background: #d4e4d4 !important;
+  color: #5a6c5a !important;
 }
 
 .action-controls {
@@ -1167,7 +1384,7 @@ onMounted(() => {
 .day-number {
   font-weight: 600;
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .day-tasks {
@@ -1234,7 +1451,317 @@ onMounted(() => {
   height: 14px !important;
 }
 
-/* Dialog Styles */
+.weekly-view {
+  flex: 1;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.week-container {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  height: 100%;
+  gap: 1px;
+  background: #e0e0e0;
+}
+
+.week-day-column {
+  background: white;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.today-column {
+  background: #f3f7ff;
+}
+
+.weekend-column {
+  background: #fafafa;
+}
+
+.week-day-header {
+  padding: 16px 12px;
+  border-bottom: 2px solid #e0e0e0;
+  text-align: center;
+  background: #f8f9fa;
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.today-column .week-day-header {
+  background: #e3f2fd;
+  border-bottom-color: #2196f3;
+}
+
+.day-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.week-day-header .day-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.today-number {
+  color: #2196f3;
+  background: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.week-day-tasks {
+  flex: 1;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.week-task-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid #ccc;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.week-task-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+.week-task-item.task-todo {
+  border-left-color: #ff9800;
+  background: #fff8e1;
+}
+
+.week-task-item.task-progress {
+  border-left-color: #2196f3;
+  background: #e3f2fd;
+}
+
+.week-task-item.task-done {
+  border-left-color: #4caf50;
+  background: #e8f5e8;
+  opacity: 0.8;
+}
+
+.week-task-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.week-task-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: #2c3e50;
+  line-height: 1.3;
+}
+
+.week-task-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-time {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.add-task-day {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.add-task-btn {
+  width: 100%;
+  font-size: 12px !important;
+  height: 32px !important;
+  color: #7f8c8d !important;
+  border: 1px dashed #ccc !important;
+  background: transparent !important;
+}
+
+.add-task-btn:hover {
+  background: #f0f0f0 !important;
+  border-color: #2196f3 !important;
+  color: #2196f3 !important;
+}
+
+.date-details-card {
+  background: white !important;
+}
+
+.date-details-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-info h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.date-details-content {
+  padding: 24px;
+  min-height: 300px;
+}
+
+.no-tasks-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.no-tasks-section h3 {
+  margin: 16px 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.no-tasks-section p {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.tasks-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.task-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.task-card-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid #ccc;
+}
+
+.task-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.task-card-item.task-todo {
+  border-left-color: #ff9800;
+}
+
+.task-card-item.task-progress {
+  border-left-color: #2196f3;
+}
+
+.task-card-item.task-done {
+  border-left-color: #4caf50;
+}
+
+.task-card-content {
+  padding: 16px;
+}
+
+.task-card-header {
+  margin-bottom: 12px;
+}
+
+.task-title-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.task-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.task-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.detail-icon {
+  color: #7f8c8d;
+  margin-top: 2px;
+}
+
+.detail-text {
+  font-size: 14px;
+  color: #5a6c7d;
+  line-height: 1.4;
+  flex: 1;
+}
+
 .task-details-header {
   padding: 20px 20px 12px 20px;
   border-bottom: 1px solid #e0e0e0;
@@ -1346,255 +1873,11 @@ onMounted(() => {
   background-color: rgba(33, 150, 243, 0.1) !important;
 }
 
-.edit-parent-btn {
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
-}
-
-.edit-parent-btn:hover {
-  opacity: 1;
-}
-
 .parent-controls {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
-.rotated {
-  transform: rotate(180deg);
-  transition: transform 0.3s ease;
-}
-
-.parent-details {
-  margin-top: 8px;
-  padding: 8px;
-  background: #f9f9f9;
-  border-radius: 4px;
-}
-
-.parent-section {
-  border-radius: 8px;
-  padding: 16px;
-}
-
-/* Dark mode overrides */
-[data-theme="dark"] .tasks-container {
-  background: #000000 !important;
-}
-
-[data-theme="dark"] .upcoming-sidebar {
-  background: #1a1a1a !important;
-  border-right: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .sidebar-header {
-  background: #000000 !important;
-  border-bottom: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .sidebar-header h3 {
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .upcoming-task {
-  background: #2a2a2a !important;
-  border: 1px solid #333 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .upcoming-task:hover {
-  background: #1a1a2e !important;
-  border-color: #2196f3 !important;
-}
-
-[data-theme="dark"] .upcoming-task.overdue {
-  background: #2a1a1a !important;
-  border-color: #f44336 !important;
-}
-
-[data-theme="dark"] .task-name {
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .task-time,
-[data-theme="dark"] .task-date {
-  color: #bbbbbb !important;
-}
-
-[data-theme="dark"] .upcoming-section h4 {
-  color: #bbbbbb !important;
-}
-
-[data-theme="dark"] .calendar-header {
-  background: #000000 !important;
-  border-bottom: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .header-left h1 {
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .date-subtitle {
-  color: #bbbbbb !important;
-}
-
-[data-theme="dark"] .calendar-controls {
-  background: #000000 !important;
-  border-bottom: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .calendar-nav {
-  background: #000000 !important;
-  border-bottom: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .period-title {
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .calendar-header-row {
-  background: #1a1a1a !important;
-  border-bottom: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .day-header {
-  color: #bbbbbb !important;
-}
-
-[data-theme="dark"] .calendar-day {
-  background: #000000 !important;
-  border: 1px solid #333 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .calendar-day:hover {
-  background: #1a1a1a !important;
-}
-
-[data-theme="dark"] .today {
-  background: #1a1a2e !important;
-}
-
-[data-theme="dark"] .other-month {
-  background: #0a0a0a !important;
-  color: #666 !important;
-}
-
-[data-theme="dark"] .weekend {
-  background: #0a0a0a !important;
-}
-
-[data-theme="dark"] .task-item {
-  background: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .task-todo {
-  background: #2a1f0f !important;
-}
-
-[data-theme="dark"] .task-progress {
-  background: #0f1a2a !important;
-}
-
-[data-theme="dark"] .task-done {
-  background: #0f2a0f !important;
-}
-
-[data-theme="dark"] .task-title {
-  color: #ffffff !important;
-}
-
-/* Dialog dark mode */
-[data-theme="dark"] .v-card {
-  background: #1a1a1a !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .task-details-header {
-  border-bottom: 1px solid #333 !important;
-}
-
-[data-theme="dark"] .details-title-section h2 {
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .detail-section h4 {
-  color: #bbbbbb !important;
-}
-
-[data-theme="dark"] .detail-section p {
-  color: #ffffff !important;
-}
-
-/* Make the entire calendar area dark */
-[data-theme="dark"] .calendar-area {
-  background: #000000 !important;
-}
-
-[data-theme="dark"] .calendar-grid {
-  background: #000000 !important;
-}
-
-[data-theme="dark"] .calendar-body {
-  background: #000000 !important;
-}
-
-/* Ensure all calendar cells have dark background */
-[data-theme="dark"] .calendar-day {
-  background: #1a1a1a !important;
-  border: 1px solid #333 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .calendar-day:hover {
-  background: #2a2a2a !important;
-}
-
-[data-theme="dark"] .today {
-  background: #1a1a2e !important;
-}
-
-[data-theme="dark"] .other-month {
-  background: #0f0f0f !important;
-  color: #666 !important;
-}
-
-[data-theme="dark"] .weekend {
-  background: #1a1a1a !important;
-}
-
-[data-theme="dark"] .subtask-section {
-  background: #2a2a2a !important;
-  border: 1px solid #1a1a1a !important;
-}
-
-[data-theme="dark"] .subtask-section h5 {
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .parent-details {
-  background: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .parent-title-btn {
-  color: #ffffff !important;
-  background: #2a2a2a !important;
-  border: 1px solid #555 !important;
-  box-shadow: none !important;
-}
-
-[data-theme="dark"] .parent-title-btn:hover {
-  background: rgba(33, 150, 243, 0.2) !important;
-  box-shadow: none !important;
-}
-
-[data-theme="dark"] .edit-parent-btn {
-  color: #ffffff !important;
-}
-
 
 .create-task-card {
   background: white !important;
@@ -1602,31 +1885,5 @@ onMounted(() => {
 
 .task-details-card {
   background: white !important;
-}
-
-@media (max-width: 768px) {
-  .content-layout {
-    flex-direction: column;
-  }
-  
-  .upcoming-sidebar {
-    width: 100%;
-    height: auto;
-    max-height: 150px;
-  }
-  
-  .calendar-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .calendar-controls {
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-start;
-  }
-
-  
-
 }
 </style>
