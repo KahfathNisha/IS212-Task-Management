@@ -1,101 +1,113 @@
 <template>
-  <v-container class="fill-height" fluid>
-    <v-row align="center" justify="center">
-      <v-col cols="12" sm="8" md="6" lg="4">
-        <v-card elevation="8" class="pa-4">
-          <v-card-title class="text-h4 text-center">
-            Task Management System
-          </v-card-title>
-          
-          <v-card-subtitle class="text-center mt-2">
-            Sign in to your account
-          </v-card-subtitle>
+  <div class="login-wrapper">
+    <v-container fluid class="pa-0">
+      <v-row no-gutters align="center" justify="center" class="fill-height">
+        <v-col cols="12" sm="10" md="6" lg="5" xl="4" class="px-4">
+          <v-card elevation="12" class="login-card">
+            <v-card-title class="text-h5 font-weight-bold text-center pt-8 pb-2" style="word-wrap: break-word; white-space: normal;">
+              Task Management System
+            </v-card-title>
+            
+            <v-card-subtitle class="text-center pb-6 text-medium-emphasis">
+              Sign in to your account
+            </v-card-subtitle>
 
-          <v-card-text>
-            <v-form ref="loginForm" v-model="valid" lazy-validation>
-              <!-- Email Field -->
-              <v-text-field
-                v-model="email"
-                :rules="emailRules"
-                label="Email"
-                type="email"
-                prepend-icon="mdi-email"
-                variant="outlined"
-                class="mb-3"
-                :disabled="loading"
-                @keyup.enter="handleLogin"
-                required
-              />
+            <v-card-text class="px-8 pb-8">
+              <v-form ref="loginForm" v-model="valid" lazy-validation>
+                <!-- Email Field -->
+                <v-text-field
+                  v-model="email"
+                  :rules="emailRules"
+                  label="Email"
+                  type="email"
+                  prepend-inner-icon="mdi-email"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-4"
+                  :disabled="loading"
+                  @keyup.enter="handleLogin"
+                  required
+                  hide-details="auto"
+                />
 
-              <!-- Password Field -->
-              <v-text-field
-                v-model="password"
-                :rules="passwordRules"
-                label="Password"
-                :type="showPassword ? 'text' : 'password'"
-                prepend-icon="mdi-lock"
-                :append-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
-                @click:append="showPassword = !showPassword"
-                variant="outlined"
-                class="mb-2"
-                :disabled="loading"
-                @keyup.enter="handleLogin"
-                required
-              />
+                <!-- Password Field -->
+                <v-text-field
+                  v-model="password"
+                  :rules="passwordRules"
+                  label="Password"
+                  :type="showPassword ? 'text' : 'password'"
+                  prepend-inner-icon="mdi-lock"
+                  :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                  @click:append-inner="showPassword = !showPassword"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-2"
+                  :disabled="loading"
+                  @keyup.enter="handleLogin"
+                  required
+                  hide-details="auto"
+                />
 
-              <!-- Error Alert -->
-              <v-alert
-                v-if="errorMessage"
-                type="error"
-                variant="tonal"
-                class="mb-3"
-                closable
-                @click:close="errorMessage = ''"
-              >
-                {{ errorMessage }}
-              </v-alert>
-
-              <!-- Forgot Password Link -->
-              <div class="text-right mb-4">
-                <router-link
-                  to="/forgot-password"
-                  class="text-decoration-none"
+                <!-- Error Alert -->
+                <v-alert
+                  v-if="errorMessage"
+                  type="error"
+                  variant="tonal"
+                  class="mt-4 mb-4"
+                  closable
+                  @click:close="errorMessage = ''"
+                  density="compact"
                 >
-                  Forgot Password?
-                </router-link>
+                  {{ errorMessage }}
+                </v-alert>
+
+                <!-- Forgot Password Link -->
+                <div class="text-right mt-3 mb-6">
+                  <router-link
+                    to="/forgot-password"
+                    class="text-decoration-none text-primary"
+                  >
+                    Forgot Password?
+                  </router-link>
+                </div>
+
+                <!-- Login Button -->
+                <v-btn
+                  color="primary"
+                  block
+                  size="large"
+                  :disabled="!valid || loading"
+                  :loading="loading"
+                  @click="handleLogin"
+                  elevation="2"
+                >
+                  Sign In
+                </v-btn>
+              </v-form>
+            </v-card-text>
+
+            <!-- Demo Credentials -->
+            <v-card-text class="px-8 pb-8 pt-0">
+              <v-divider class="mb-4" />
+              <div class="text-center text-caption text-medium-emphasis">
+                <div class="font-weight-bold mb-2">Demo Credentials:</div>
+                <div class="mb-1">
+                  <strong>Staff:</strong> john.doe@company.com / TestPassword123!
+                </div>
+                <div>
+                  <strong>Manager:</strong> jane.smith@company.com / AdminPass456!
+                </div>
               </div>
-
-              <!-- Login Button -->
-              <v-btn
-                color="primary"
-                block
-                size="large"
-                :disabled="!valid || loading"
-                :loading="loading"
-                @click="handleLogin"
-              >
-                Sign In
-              </v-btn>
-            </v-form>
-          </v-card-text>
-
-          <!-- Demo Credentials (Remove in production) -->
-          <v-card-text class="text-caption text-grey">
-            <v-divider class="mb-3" />
-            <div class="text-center">
-              <strong>Demo Credentials:</strong><br>
-              Staff: john.doe@company.com / TestPassword123!<br>
-              Manager: jane.smith@company.com / AdminPass456!
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </v-container>
 
     <!-- Session Expired Dialog -->
     <v-dialog v-model="sessionExpiredDialog" persistent max-width="400">
       <v-card>
-        <v-card-title class="text-h6">
+        <v-card-title class="text-h6 font-weight-bold">
           Session Expired
         </v-card-title>
         <v-card-text>
@@ -113,7 +125,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-container>
+  </div>
 </template>
 
 <script setup>
@@ -154,8 +166,6 @@ onMounted(() => {
   }
 });
 
-// --- THIS IS THE FIX ---
-// The entire login logic is simplified to a single call to the auth store.
 const handleLogin = async () => {
   const { valid } = await loginForm.value.validate();
   if (!valid) return;
@@ -164,15 +174,10 @@ const handleLogin = async () => {
   errorMessage.value = '';
 
   try {
-    // Delegate ALL logic to the auth store
     await authStore.login(email.value, password.value);
-
-    // If the store's login is successful, redirect
     const redirectTo = route.query.redirect || '/dashboard';
     router.push(redirectTo);
-
   } catch (error) {
-    // The store will throw an error on failure, which we can display here
     console.error('LoginView.vue: Login failed:', error);
     errorMessage.value = error.message || 'An unknown error occurred.';
   } finally {
@@ -181,13 +186,63 @@ const handleLogin = async () => {
 };
 </script>
 
+<style>
+/* Remove any default body/html margins and padding */
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+}
+</style>
+
 <style scoped>
-.fill-height {
+.login-wrapper {
   min-height: 100vh;
+  width: 100vw;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
-.v-card {
-  border-radius: 12px;
+.v-container {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.fill-height {
+  height: 100%;
+}
+
+.login-card {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  max-width: 100%;
+  overflow: visible;
+  width: 100%;
+}
+
+.v-card-title {
+  line-height: 1.3 !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Ensure no overflow on mobile */
+@media (max-width: 600px) {
+  .login-card {
+    border-radius: 12px;
+  }
 }
 </style>
