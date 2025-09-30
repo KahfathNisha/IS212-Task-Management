@@ -9,17 +9,21 @@ console.log('🔧 Environment variables loaded');
 console.log('🔧 Loading routes...');
 const taskRouter = require('./routes/taskRouter');
 const authRouter = require('./routes/authRouter');
+const fcmRouter = require('./routes/fcmRouter');
 
 console.log('✅ Routes loaded successfully');
 
 // Import Firebase configuration (this will initialize Firebase)
 console.log('🔧 Initializing Firebase...');
 try {
-  require('./config/firebase');
-  console.log('✅ Firebase initialized successfully');
+      require('./config/firebase');
+      console.log('✅ Firebase initialized successfully');
+    // Start the reminder cron job
+    require('./controllers/taskReminderJob'); 
+    console.log('✅ ReminderJob loaded successfully');
 } catch (error) {
-  console.error('❌ Firebase initialization failed:', error.message);
-  process.exit(1);
+      console.error('❌ Firebase initialization failed:', error.message);
+      process.exit(1);
 }
 
 const app = express();
@@ -60,6 +64,7 @@ app.use('/tasks', taskRouter);
 // --- THIS IS THE FIX ---
 // The path now correctly matches what the frontend is calling: /api/auth
 app.use('/api/auth', authRouter);
+app.use('/api/fcm', fcmRouter);
 
 console.log('✅ Routes configured');
 

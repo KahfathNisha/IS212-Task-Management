@@ -19,6 +19,9 @@ import './config/firebase';
 // Auth store
 import { useAuthStore } from './stores/auth';
 
+// Reminder store for notifications
+import { initNotifications } from './stores/reminder';
+
 // Create Vuetify instance with your custom theme
 const vuetify = createVuetify({
   components,
@@ -81,6 +84,10 @@ app.use(vuetify);
 // Initialize auth store
 const authStore = useAuthStore();
 authStore.initializeAuth();
+// Wait until user is loaded to send notifications
+if (authStore.isAuthenticated) {
+  initNotifications();
+}
 
 // Setup activity listeners for session management
 authStore.setupActivityListeners();

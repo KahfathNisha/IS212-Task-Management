@@ -6,7 +6,7 @@ const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
 
 // Initialize the Firebase Admin SDK
-if (!admin.apps.length) {
+if (!admin.apps || admin.apps.length === 0) {
   try {
     admin.initializeApp({
       // Use the credentials from your service account key file

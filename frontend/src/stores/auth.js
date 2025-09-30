@@ -10,6 +10,8 @@ import {
   verifyPasswordResetCode
 } from 'firebase/auth';
 import { auth, firestoreHelpers } from '@/config/firebase';
+// updated fcm token everytime user logs in
+import { initNotifications } from './reminder';
 
 // Use absolute URL for API calls
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -49,6 +51,9 @@ export const useAuthStore = defineStore('auth', () => {
             userData.value = userDoc;
             // Update last login
             await firestoreHelpers.updateLastLogin(firebaseUser.email);
+
+            await initNotifications();
+            console.log('✅ Notifications initialized for user');
           }
         } catch (err) {
           console.error('Error fetching user data:', err);

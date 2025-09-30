@@ -4,6 +4,7 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,12 +22,14 @@ console.log('🔥 Initializing Firebase with config:', {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
 
 // Initialize Firebase services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
+export { messaging, getToken, onMessage };
 
 // Log successful initialization
 console.log('✅ Firebase initialized successfully');
