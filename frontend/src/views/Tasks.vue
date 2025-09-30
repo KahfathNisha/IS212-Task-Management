@@ -351,7 +351,6 @@
     <v-dialog v-model="showDetailsDialog" max-width="800px">
       <v-card v-if="selectedTask" class="task-details-card" rounded="xl">
         <v-card-title class="task-details-header">
-          <v-btn icon="mdi-close" variant="text" @click="showDetailsDialog = false" />
           <div class="details-title-section">
             <h2>{{ selectedTask.title }}</h2>
             <div class="title-chips">
@@ -380,6 +379,7 @@
                 </v-chip>
               </div>
           </div>
+          <v-btn icon="mdi-close" class="close-btn" variant="text" @click="showDetailsDialog = false" />
         </v-card-title>
 
         <v-card-text class="task-details-content">
@@ -414,25 +414,51 @@
             </div>
           </div>
 
-          <v-divider class="my-4"></v-divider>
+          <!-- Status History: show for all tasks -->
+          <div class="detail-section"
+            v-if="selectedTask.statusHistory && selectedTask.statusHistory.length">
+            <h4>Status Updates</h4>
+            <div class="status-updates">
+              <div class="status-entry">
+                <div class="status-dot" :style="{ backgroundColor: getStatusColor('To Do') }"></div>
+                <!-- <div class="status-info">
+                  <div class="status-description">Created as <v-chip size="x-small" color="orange">To Do</v-chip></div>
+                  <div class="status-timestamp">{{ formatDateTime(selectedTask.createdAt) }}</div>
+                </div> -->
+              </div>
+              <div v-for="(entry, idx) in selectedTask.statusHistory" :key="idx" class="status-entry">
+                <div class="status-dot" :style="{ backgroundColor: getStatusColor(entry.newStatus) }"></div>
+                <div class="status-info">
+                  <div class="status-description">
+                    Status changed to <v-chip size="x-small" :color="getStatusColor(entry.newStatus)">{{ entry.newStatus }}</v-chip>
+                  </div>
+                  <div class="status-timestamp">{{ formatDateTime(entry.timestamp) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Parent Task section with NO status history -->
           <div class="detail-section" v-if="selectedTask.isSubtask">
-           <h4>Parent Task</h4>
-           <div class="parent-summary">
-             <div class="parent-title-section">
-               <v-btn
-                 variant="text"
-                 size="small"
-                 class="parent-title-btn"
-                 @click="viewTaskDetails(selectedTask.parentTask)"
-                 title="View task details"
-               >
-                 {{ selectedTask.parentTask.title }}
-               </v-btn>
-             </div>
-             <div class="parent-controls">
-               <v-chip :color="getStatusColor(selectedTask.parentTask.status)" size="small">{{ selectedTask.parentTask.status }}</v-chip>
-             </div>
-           </div>
+            <h4>Parent Task</h4>
+            <div class="parent-summary">
+              <div class="parent-title-section">
+                <v-btn
+                  variant="text"
+                  size="small"
+                  class="parent-title-btn"
+                  @click="viewTaskDetails(selectedTask.parentTask)"
+                  title="View task details"
+                >
+                  {{ selectedTask.parentTask.title }}
+                </v-btn>
+              </div>
+              <!-- <div class="parent-controls">
+                <v-chip :color="getStatusColor(selectedTask.parentTask.status)" size="small">
+                  {{ selectedTask.parentTask.status }}
+                </v-chip>
+              </div> -->
+            </div>
           </div>
         </v-card-text>
 
@@ -446,13 +472,15 @@
             {{ selectedTask.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
           </v-btn>
           <v-spacer />
-          <v-btn
-            color="white"
-            @click="changeTaskStatus(selectedTask)"
-            rounded="lg"
-          >
-            Mark Complete
-          </v-btn>
+          <v-select
+            :model-value="selectedTask.status"
+            :items="taskStatuses"
+            label="Update Status"
+            variant="outlined"
+            density="compact"
+            @update:modelValue="changeTaskStatus(selectedTask, $event)"
+            style="max-width: 200px;"
+          ></v-select>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -683,7 +711,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 
@@ -703,9 +731,184 @@ const showSnackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
-const tasks = ref([])
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
+
+const tasks = ref([
+  {
+    id: '1',
+    title: 'Complete project proposal',
+    description: 'Write and finalize the Q4 project proposal for the new marketing campaign',
+    dueDate: '2025-09-27',
+    assignedTo: 'John Doe',
+    status: 'In Progress',
+    // priority: 'High',
+    // project: 'Project Alpha',
+    attachments: [],
+    startTime: '2025-09-25T14:30:00',
+    endTime: '2025-09-27T11:00:00',
+    createdAt: '2025-09-25T14:30:00',
+    updatedAt: '2025-09-26T10:15:00',
+    statusHistory: [
+      {
+        timestamp: '2025-09-25T14:30:00',
+        oldStatus: null,
+        newStatus: 'To Do'
+      },
+      {
+        timestamp: '2025-09-27T09:30:00',
+        oldStatus: 'To Do',
+        newStatus: 'In Progress'
+      }
+    ],
+    subtasks: [
+      {
+        title: 'Research market trends',
+        description: 'Gather data on current market trends',
+        assignedTo: 'Jane Smith',
+        startTime: '2025-09-27T09:00:00',
+        endTime: '2025-09-27T17:00:00',
+        dueDate: '2025-09-27',
+        status: 'In Progress',
+        createdAt: '2025-09-25T15:00:00',
+        statusHistory: [
+          {
+            timestamp: '2025-09-25T15:00:00',
+            oldStatus: null,
+            newStatus: 'To Do'
+          },
+          {
+            timestamp: '2025-09-27T16:30:00',
+            oldStatus: 'To Do',
+            newStatus: 'In Progress'
+          },
+        ],
+        attachments: []
+      },
+      {
+        title: 'Write draft proposal',
+        description: 'Create the initial draft of the proposal',
+        assignedTo: 'John Doe',
+        startTime: '2025-09-26T10:00:00',
+        endTime: '2025-09-27T11:00:00',
+        dueDate: '2025-09-27',
+        status: 'In Progress',
+        createdAt: '2025-09-26T10:00:00',
+        statusHistory: [
+          {
+            timestamp: '2025-09-26T10:00:00',
+            oldStatus: null,
+            newStatus: 'To Do'
+          },
+          {
+            timestamp: '2025-09-26T12:00:00',
+            oldStatus: 'To Do',
+            newStatus: 'In Progress'
+          },
+        ],
+        attachments: []
+      }
+    ]
+  },
+  {
+    id: '2',
+    title: 'Review quarterly reports',
+    description: 'Review and approve the quarterly financial reports',
+    dueDate: '2025-09-28',
+    assignedTo: 'Jane Smith',
+    status: 'To Do',
+    // priority: 'Medium',
+    // project: 'Project Beta',
+    attachments: [],
+    startTime: '2025-09-28T14:00:00',
+    endTime: '2025-09-28T16:00:00',
+    createdAt: '2025-09-24T11:20:00',
+    updatedAt: '2025-09-24T11:20:00',
+    statusHistory: [
+      {
+        timestamp: '2025-09-24T11:20:00',
+        oldStatus: null,
+        newStatus: 'To Do'
+      }
+    ],
+    subtasks: []
+  },
+  {
+    id: '3',
+    title: 'Update website content',
+    description: 'Update the company website with new product information',
+    dueDate: '2025-09-24',
+    assignedTo: 'Alice Johnson',
+    status: 'To Do',
+    // priority: 'Low',
+    // project: 'General',
+    attachments: [],
+    startTime: '2025-09-24T10:00:00',
+    endTime: '2025-09-24T12:00:00',
+    createdAt: '2025-09-22T16:45:00',
+    updatedAt: '2025-09-23T08:30:00',
+    statusHistory: [
+      {
+        timestamp: '2025-09-22T16:45:00',
+        oldStatus: null,
+        newStatus: 'To Do'
+      }
+    ],
+    subtasks: [
+      {
+        title: 'Design new banner',
+        description: 'Create a new banner for the homepage',
+        assignedTo: 'Alice Johnson',
+        startTime: '2025-09-24T10:00:00',
+        endTime: '2025-09-24T11:00:00',
+        dueDate: '2025-09-24',
+        status: 'To Do',
+        createdAt: '2025-09-23T09:15:00',
+        statusHistory: [
+          {
+            timestamp: '2025-09-23T09:15:00',
+            oldStatus: null,
+            newStatus: 'To Do'
+          }
+        ],
+        attachments: []
+      }
+    ]
+  },
+  {
+    id: '4',
+    title: 'Prepare presentation slides',
+    description: 'Create slides for the upcoming client presentation',
+    dueDate: '2025-10-02',
+    assignedTo: 'John Doe',
+    status: 'Done',
+    // priority: 'High',
+    // project: 'Project Alpha',
+    attachments: [],
+    startTime: '2025-10-02T13:00:00',
+    endTime: '2025-10-02T15:00:00',
+    createdAt: '2025-09-26T12:00:00',
+    updatedAt: '2025-09-29T17:30:00',
+    statusHistory: [
+      {
+        timestamp: '2025-09-26T12:00:00',
+        oldStatus: null,
+        newStatus: 'To Do'
+      },
+      {
+        timestamp: '2025-09-27T14:20:00',
+        oldStatus: 'To Do',
+        newStatus: 'In Progress'
+      },
+      {
+        timestamp: '2025-09-29T17:30:00',
+        oldStatus: 'In Progress',
+        newStatus: 'Done'
+      }
+    ],
+    subtasks: []
+  }
+])
 
 const newTask = ref({
   title: '',
@@ -720,8 +923,8 @@ const newTask = ref({
 
 const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
 const taskStatuses = ['To Do', 'In Progress', 'Done']
-const priorities = ['Low', 'Medium', 'High', 'Urgent']
-const projects = ['Project Alpha', 'Project Beta', 'General', 'Research']
+// const priorities = ['Low', 'Medium', 'High', 'Urgent']
+//const projects = ['Project Alpha', 'Project Beta', 'General', 'Research']
 
 const subtasks = ref([])
 
@@ -783,6 +986,7 @@ const weekDates = computed(() => {
   return dates
 })
 
+// Computed properties for filtered tasks
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
   return tasks.value.filter(task => task.dueDate === today && task.status !== 'Done')
@@ -792,7 +996,7 @@ const weekTasks = computed(() => {
   const today = new Date()
   const nextWeek = new Date(today)
   nextWeek.setDate(today.getDate() + 7)
-  
+
   return tasks.value.filter(task => {
     if (!task.dueDate || task.status === 'Done') return false
     const taskDate = new Date(task.dueDate)
@@ -873,17 +1077,18 @@ const addTaskForDate = (dateKey) => {
   showCreateDialog.value = true
 }
 
+// Get tasks for a specific date
 const getTasksForDate = (dateKey) => {
   const items = []
   tasks.value.forEach(task => {
     if (task.subtasks && task.subtasks.length > 0) {
       task.subtasks.forEach((subtask, index) => {
-        const subtaskDate = subtask.dueDate.split('T')[0]
+        const subtaskDate = subtask.dueDate?.split('T')[0]
         if (subtaskDate === dateKey) {
           items.push({
             ...subtask,
             id: `${task.id}-subtask-${index}`,
-            status: task.status,
+            status: subtask.status, // Subtask's own status
             isSubtask: true,
             parentTask: task
           })
@@ -920,6 +1125,11 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString()
 }
 
+const formatDateTime = (dateString) => {
+  if (!dateString) return ''
+  return new Date(dateString).toLocaleString()
+}
+
 const viewTaskDetails = (task) => {
   selectedTask.value = task
   showDetailsDialog.value = true
@@ -933,6 +1143,11 @@ const openAttachment = (url) => {
 const editTask = (task) => {
   newTask.value = { ...task }
   subtasks.value = task.subtasks ? [...task.subtasks] : []
+  // Ensure statusHistory is present for editing
+  if (!newTask.value.statusHistory) newTask.value.statusHistory = []
+  subtasks.value.forEach(subtask => {
+    if (!subtask.statusHistory) subtask.statusHistory = []
+  })
   isEditing.value = true
   showCreateDialog.value = true
   showDetailsDialog.value = false
@@ -942,29 +1157,106 @@ const createTask = async () => {
   try {
     const mainAttachments = []
 
-    const processedSubtasks = await Promise.all(subtasks.value.map(async (subtask) => ({
-      ...subtask,
-      attachments: await uploadFiles(subtask.attachments)
-    })))
+    const processedSubtasks = await Promise.all(
+      subtasks.value.map(async (subtask) => {
+      const createdAt = subtask.createdAt || new Date().toISOString()
+      const currentStatus = subtask.status || 'To Do'
+      // If statusHistory exists, keep it; otherwise, initialize
+      let statusHistory = subtask.statusHistory ? [...subtask.statusHistory] : []
+
+      // If this is a new subtask (no history), push initial state
+      if (!subtask.id && statusHistory.length === 0) {
+        statusHistory.push({
+          timestamp: createdAt,
+          oldStatus: null,
+          newStatus: currentStatus
+        })
+      } else if (subtask.id) {
+          // Editing subtask → check if status changed
+          const lastStatus = statusHistory.length > 0 ? statusHistory[statusHistory.length - 1].newStatus : null
+          if (lastStatus !== currentStatus) {
+            statusHistory.push({
+              timestamp: new Date().toISOString(),
+              oldStatus: lastStatus,
+              newStatus: currentStatus
+            })
+          }
+        }
+      
+      return {
+        ...subtask,
+        attachments: await uploadFiles(subtask.attachments),
+        status: currentStatus,
+        statusHistory,
+        createdAt
+      }
+    }))
+
+    const createdAt = newTask.value.createdAt || new Date().toISOString()
+    const currentStatus = newTask.value.status || 'To Do'
+
+    let statusHistory = newTask.value.statusHistory ? [...newTask.value.statusHistory] : []
+  
+    // For new tasks only: add initial log
+    if (!newTask.value.id && statusHistory.length === 0) {
+      statusHistory.push({
+        timestamp: createdAt,
+        oldStatus: null,
+        newStatus: currentStatus
+      })
+    } else if (newTask.value.id) {
+      // Editing task → check if status changed
+      const lastStatus = statusHistory.length > 0 ? statusHistory[statusHistory.length - 1].newStatus : null
+      if (lastStatus !== currentStatus) {
+        statusHistory.push({
+          timestamp: new Date().toISOString(),
+          oldStatus: lastStatus,
+          newStatus: currentStatus
+        })
+      } 
+    }
 
     const task = {
       id: newTask.value.id || Date.now().toString(),
       ...newTask.value,
       attachments: mainAttachments,
       subtasks: processedSubtasks,
-      status: newTask.value.status || 'To Do',
-      createdAt: newTask.value.createdAt || new Date().toISOString(),
+      status: currentStatus,
+      statusHistory,
+      createdAt,
       updatedAt: new Date().toISOString()
     }
 
+    // if (newTask.value.id) {
+    //   const index = tasks.value.findIndex(t => t.id === task.id)
+    //   if (index !== -1) {
+    //     // Check if status actually changed before logging
+    //     const lastStatus = tasks.value[index].status
+    //     if (lastStatus !== currentStatus) {
+    //       task.statusHistory.push({
+    //         timestamp: new Date().toISOString(),
+    //         oldStatus: lastStatus,
+    //         newStatus: currentStatus
+    //       })} 
+
+    //     tasks.value[index] = task
+    //     showMessage('Task updated successfully!', 'success')
+    //   }
+    // } else {
+    //   tasks.value.unshift(task)
+    //   showMessage('Task created successfully!', 'success')
+    // }
+
     if (newTask.value.id) {
+      // Editing existing task - update locally
       const index = tasks.value.findIndex(t => t.id === task.id)
       if (index !== -1) {
         tasks.value[index] = task
-        showMessage('Task updated successfully!', 'success')
       }
+      showMessage('Task updated successfully!', 'success')
     } else {
-      tasks.value.unshift(task)
+      // New task - add to local array
+      tasks.value.push(task)
       showMessage('Task created successfully!', 'success')
     }
 
@@ -976,9 +1268,67 @@ const createTask = async () => {
   }
 }
 
-const changeTaskStatus = (task) => {
-  task.status = task.status === 'Done' ? 'To Do' : 'Done'
-  showMessage('Task status updated!', 'success')
+const changeTaskStatus = async (task, newStatus) => {
+  const oldStatus = task.status
+
+  // Prevent changing to the same status
+  if (oldStatus === newStatus) {
+    showMessage(`Task is already in "${newStatus}" status.`, 'info')
+    return
+  }
+
+  try {
+    if (task.isSubtask) {
+      // Update subtask status locally
+      const parentTask = tasks.value.find(t => t.id === task.parentTask.id)
+      if (parentTask) {
+        const subtaskIndex = parentTask.subtasks.findIndex(st => st.title === task.title)
+        if (subtaskIndex !== -1) {
+          const subtask = parentTask.subtasks[subtaskIndex]
+          const subtaskHistory = [...(subtask.statusHistory || [])]
+          subtaskHistory.push({
+            timestamp: new Date().toISOString(),
+            oldStatus: oldStatus,
+            newStatus
+          })
+          parentTask.subtasks[subtaskIndex] = {
+            ...subtask,
+            status: newStatus,
+            statusHistory: subtaskHistory
+          }
+          // Update selectedTask to reflect the changes
+          selectedTask.value = {
+            ...selectedTask.value,
+            status: newStatus,
+            statusHistory: subtaskHistory
+          }
+        }
+      }
+    } else {
+      // Update task status locally
+      const taskIndex = tasks.value.findIndex(t => t.id === task.id)
+      if (taskIndex !== -1) {
+        const taskData = tasks.value[taskIndex]
+        const statusHistory = [...(taskData.statusHistory || [])]
+        statusHistory.push({
+          timestamp: new Date().toISOString(),
+          oldStatus: oldStatus,
+          newStatus
+        })
+        tasks.value[taskIndex] = {
+          ...taskData,
+          status: newStatus,
+          statusHistory
+        }
+        // Update selectedTask to point to the new object
+        selectedTask.value = tasks.value[taskIndex]
+      }
+    }
+    showMessage('Task status updated!', 'success')
+  } catch (error) {
+    console.error('Error updating task status:', error)
+    showMessage('Failed to update task status', 'error')
+  }
 }
 
 const cancelCreate = () => {
@@ -1038,69 +1388,6 @@ const uploadFiles = async (files) => {
   return urls
 }
 
-onMounted(() => {
-  tasks.value = [
-    {
-      id: '1',
-      title: 'Setup development environment',
-      description: 'Install Vue.js, configure Vuetify, and set up the project structure.',
-      status: 'Done',
-      dueDate: '2025-09-25',
-      assignedTo: 'John Doe',
-      createdAt: '2025-09-22T10:00:00Z',
-      startTime: '2025-09-25T09:00:00'
-    },
-    {
-      id: '2',
-      title: 'Design task creation form',
-      description: 'Create a user-friendly form for task creation with validation.',
-      status: 'In Progress',
-      dueDate: '2025-09-27',
-      assignedTo: 'Jane Smith',
-      createdAt: '2025-09-24T11:00:00Z',
-      startTime: '2025-09-27T10:00:00',
-      subtasks: [
-        {
-          title: 'Create form layout',
-          description: 'Design the basic layout for the task creation form.',
-          assignedTo: 'Jane Smith',
-          dueDate: '2025-09-26T10:00:00Z',
-          startTime: '2025-09-26T10:00:00'
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'reflection survey',
-      description: 'Complete the reflection survey for the education project.',
-      status: 'To Do',
-      dueDate: '2025-09-28',
-      assignedTo: 'John Doe',
-      createdAt: '2025-09-28T08:00:00Z',
-      startTime: '2025-09-28T14:00:00'
-    },
-    {
-      id: '4',
-      title: 'proj proposal draft',
-      description: 'Draft the project proposal for the new initiative.',
-      status: 'To Do',
-      dueDate: '2025-09-28',
-      assignedTo: 'Alice Johnson',
-      createdAt: '2025-09-28T09:00:00Z',
-      startTime: '2025-09-28T16:00:00'
-    },
-    {
-      id: '5',
-      title: 'Team Meeting',
-      description: 'Quarterly team sync and planning session',
-      status: 'To Do',
-      dueDate: '2025-10-03',
-      assignedTo: 'John Doe',
-      createdAt: '2025-09-29T08:00:00Z',
-      startTime: '2025-10-03T10:00:00'
-    }
-  ]
-})
 </script>
 
 
@@ -1122,31 +1409,6 @@ onMounted(() => {
 .upcoming-sidebar {
   width: 320px;
   background: white;
-  border-right: 1px solid #e0e0e0;
-  transition: width 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-}
-
-.sidebar-collapsed {
-  width: 60px;
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
-}
-
-.sidebar-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
 }
 
 .collapse-btn {
@@ -1764,7 +2026,16 @@ onMounted(() => {
 
 .task-details-header {
   padding: 20px 20px 12px 20px;
+  position: relative;
+  padding-right: 40px;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
 }
 
 .details-title-section {
@@ -1873,11 +2144,11 @@ onMounted(() => {
   background-color: rgba(33, 150, 243, 0.1) !important;
 }
 
-.parent-controls {
+/* .parent-controls {
   display: flex;
   align-items: center;
   gap: 8px;
-}
+} */
 
 .create-task-card {
   background: white !important;
@@ -1885,5 +2156,69 @@ onMounted(() => {
 
 .task-details-card {
   background: white !important;
+}
+
+.status-timeline {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.status-time {
+  font-size: 12px;
+  color: #7f8c8d;
+  white-space: nowrap;
+}
+
+.status-change-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.status-chip {
+  min-width: 70px;
+  justify-content: center;
+}
+
+.status-updates {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.status-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.status-entry:not(:last-child) {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.status-icon {
+  margin-top: 2px;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-description {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.status-timestamp {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-top: 2px;
 }
 </style>
