@@ -384,18 +384,38 @@
 
         <v-card-text class="task-details-content">
           <div class="detail-section">
-            <h4>Description</h4>
+            <div class="detail-section-icon-row">
+              <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+              <h4>Description</h4>
+            </div>
             <p>{{ selectedTask.description }}</p>
           </div>
 
           <div class="detail-section">
-            <h4>Due Date</h4>
+            <div class="detail-section-icon-row">
+              <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+              <h4>Due Date</h4>
+            </div>
             <p>{{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'No due date' }}</p>
           </div>
 
           <div class="detail-section">
-            <h4>Assigned To</h4>
+            <div class="detail-section-icon-row">
+              <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+              <h4>Assigned To</h4>
+            </div>
             <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
+          </div>
+
+          <!--progress bar based on subtask completion, shown for parent tasks-->
+          <div class="detail-section" v-if="selectedTask && selectedTask.subtasks && selectedTask.subtasks.length > 0">
+            <h4>Progress</h4>
+            <div class="progress-bar-container">
+              <div class="custom-progress-bar">
+                <div class="progress-fill" :style="{ width: parentTaskProgress + '%' }"></div>
+              </div>
+              <span class="progress-text">{{ parentTaskProgress }}%</span>
+            </div>
           </div>
 
           <div class="detail-section" v-if="selectedTask.attachments && selectedTask.attachments.length > 0">
@@ -438,7 +458,42 @@
             </div>
           </div>
 
-          <!-- Parent Task section with NO status history -->
+          <!-- Subtasks section in parent task dialog-->
+          <div class="detail-section" v-if="selectedTask && selectedTask.subtasks && selectedTask.subtasks.length > 0">
+            <h4>Subtasks</h4>
+            <div class="subtask-list">
+              <div v-for="subtask in selectedTask.subtasks" :key="subtask.id" class="subtask-item">
+                <div class="subtask-info">
+                  <div class="subtask-title">{{ subtask.title }}</div>
+                  <div class="subtask-status">
+                    <v-chip
+                      :color="getStatusColor(subtask.status)"
+                      size="small"
+                      rounded="lg"
+                    >
+                      {{ subtask.status }}
+                    </v-chip>
+                  </div>
+                </div>
+                <div class="subtask-details">
+                  <div class="detail-row" v-if="subtask.description">
+                    <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                    <p>{{ subtask.description }}</p>
+                  </div>
+                  <div class="detail-row" v-if="subtask.assignedTo">
+                    <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+                    <p>{{ subtask.assignedTo }}</p>
+                  </div>
+                  <div class="detail-row" v-if="subtask.dueDate">
+                    <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+                    <p>{{ formatDate(subtask.dueDate) }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Parent Task section in subtask dialog -->
           <div class="detail-section" v-if="selectedTask.isSubtask">
             <h4>Parent Task</h4>
             <div class="parent-summary">
@@ -932,29 +987,29 @@ const calendarDates = computed(() => {
   const dates = []
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
-  
+
   const firstDay = new Date(year, month, 1)
   const startDate = new Date(firstDay)
   const dayOfWeek = (firstDay.getDay() + 6) % 7
   startDate.setDate(firstDay.getDate() - dayOfWeek)
-  
+
   for (let i = 0; i < 42; i++) {
     const date = new Date(startDate)
     date.setDate(startDate.getDate() + i)
-    
+
     const today = new Date()
     dates.push({
       date: date,
       day: date.getDate(),
       month: date.getMonth(),
       year: date.getFullYear(),
-      dateKey: date.toISOString().split('T')[0],
+      dateKey: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`,
       isToday: date.toDateString() === today.toDateString(),
       isOtherMonth: date.getMonth() !== month,
       isWeekend: date.getDay() === 0 || date.getDay() === 6
     })
   }
-  
+
   return dates
 })
 
@@ -965,24 +1020,24 @@ const weekDates = computed(() => {
   const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay
   const monday = new Date(referenceDate)
   monday.setDate(referenceDate.getDate() + mondayOffset)
-  
+
   for (let i = 0; i < 7; i++) {
     const date = new Date(monday)
     date.setDate(monday.getDate() + i)
-    
+
     const today = new Date()
     dates.push({
       date: date,
       day: date.getDate(),
       month: date.getMonth(),
       year: date.getFullYear(),
-      dateKey: date.toISOString().split('T')[0],
+      dateKey: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`,
       dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
       isToday: date.toDateString() === today.toDateString(),
       isWeekend: date.getDay() === 0 || date.getDay() === 6
     })
   }
-  
+
   return dates
 })
 
@@ -1010,6 +1065,15 @@ const overdueTasks = computed(() => {
     return task.dueDate && task.dueDate < today && task.status !== 'Done'
   })
 })
+
+const parentTaskProgress = computed(() => {
+  const task = selectedTask.value;
+  if (!task || !task.subtasks || task.subtasks.length === 0) return 0;
+
+  const totalSubtasks = task.subtasks.length;
+  const completedSubtasks = task.subtasks.filter(subtask => subtask.status === 'Done').length;
+  return Math.round((completedSubtasks / totalSubtasks) * 100);
+});
 
 const toggleUpcomingSidebar = () => {
   upcomingSidebarOpen.value = !upcomingSidebarOpen.value
@@ -2008,13 +2072,15 @@ const uploadFiles = async (files) => {
 
 .detail-row {
   display: flex;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
   gap: 8px;
 }
 
 .detail-icon {
   color: #7f8c8d;
-  margin-top: 2px;
+  margin-top: 0;
+  align-self: center;
 }
 
 .detail-text {
@@ -2022,6 +2088,7 @@ const uploadFiles = async (files) => {
   color: #5a6c7d;
   line-height: 1.4;
   flex: 1;
+  align-self: center;
 }
 
 .task-details-header {
@@ -2060,6 +2127,16 @@ const uploadFiles = async (files) => {
 
 .detail-section {
   margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-section-icon-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 .detail-section h4 {
@@ -2220,5 +2297,73 @@ const uploadFiles = async (files) => {
   font-size: 12px;
   color: #7f8c8d;
   margin-top: 2px;
+}
+
+.progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-progress-bar {
+  flex: 1;
+  height: 20px;
+  background: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #7b92d1;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+  min-width: 0;
+}
+
+.progress-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 40px;
+}
+
+.subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.subtask-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.subtask-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.subtask-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.subtask-status {
+  flex-shrink: 0;
+}
+
+.subtask-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 </style>
