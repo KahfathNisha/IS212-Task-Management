@@ -1,6 +1,7 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth';
+import Settings from '@/views/Settings.vue';
 
 // Import views
 const LoginView = () => import('@/views/LoginView.vue');
@@ -62,6 +63,12 @@ const routes = [
     name: 'Profile',
     component: () => import('@/views/Profile.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
+    meta: { requiresAuth: true }, // Ensures only logged-in users can see it
   },
   // Catch-all route for 404s
   {

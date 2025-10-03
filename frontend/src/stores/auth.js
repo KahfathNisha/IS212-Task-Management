@@ -1,4 +1,5 @@
 // src/stores/auth.js
+import { useNotificationStore } from '@/stores/notificationStore';
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { 
@@ -11,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { auth, firestoreHelpers } from '@/config/firebase';
 // updated fcm token everytime user logs in
-import { initNotifications } from './reminder';
+import { initializeTaskListeners, cleanupTaskListeners } from '@/services/notification-service';
 
 // Use absolute URL for API calls
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -46,15 +47,15 @@ export const useAuthStore = defineStore('auth', () => {
         
         // Get user data from Firestore
         try {
-          const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email);
-          if (userDoc) {
-            userData.value = userDoc;
-            // Update last login
-            await firestoreHelpers.updateLastLogin(firebaseUser.email);
+            const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email);
+            if (userDoc) {
+              userData.value = userDoc;
+              await firestoreHelpers.updateLastLogin(firebaseUser.email);
 
-            await initNotifications();
-            console.log('✅ Notifications initialized for user');
-          }
+              // START THE REAL-TIME LISTENER FOR THIS USER
+              initializeTaskListeners(firebaseUser.email);
+              console.log('✅ Real-time task notification listeners initialized.');
+            }
         } catch (err) {
           console.error('Error fetching user data:', err);
         }
@@ -147,13 +148,13 @@ const login = async (email, password) => {
 
 // Logout
 const logout = async (reason = null) => {
-  console.log('Auth Store: Logging out, reason:', reason);
-  
+  const notificationStore = useNotificationStore(); // Get store instance
+  notificationStore.clearNotifications(); // Clear notifications on logout
   try {
-    // Sign out from Firebase
+    // STOP THE REAL-TIME LISTENER
+    cleanupTaskListeners();
+
     await signOut(auth);
-    
-    // Clear local auth data
     clearAuthData();
     
     console.log('Auth Store: Logout successful');

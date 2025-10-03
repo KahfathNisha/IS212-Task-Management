@@ -132,6 +132,7 @@
         </v-btn>
       </template>
     </v-snackbar>
+    <Notifications />
   </v-app>
 </template>
 
@@ -140,6 +141,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import NavBar from '@/components/NavBar.vue'; // Import your custom component
+import Notifications from '@/views/Notifications.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
