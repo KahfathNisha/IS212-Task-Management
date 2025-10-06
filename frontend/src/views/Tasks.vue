@@ -106,23 +106,150 @@
         </div>
 
         <div class="calendar-controls">
-          <div class="view-controls">
-            <v-btn-toggle v-model="viewMode" mandatory rounded="xl" class="view-toggle">
-              <v-btn value="month" size="small" prepend-icon="mdi-calendar" rounded="xl" class="view-btn">Month</v-btn>
-              <v-btn value="week" size="small" prepend-icon="mdi-view-week" rounded="xl" class="view-btn">Week</v-btn>
-            </v-btn-toggle>
-          </div>
+           <div class="add-task-above-filters">
+             <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg">
+               Add Task
+             </v-btn>
+           </div>
 
-          <div class="action-controls">
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg">
-              Add Task
-            </v-btn>
-          </div>
+           <div class="view-controls">
+             <div class="filter-label">Filters</div>
+             <!-- New FilterBar -->
+             <div class="filter-bar">
+               <v-btn
+                 color="primary"
+                 rounded="pill"
+                 @click.stop="togglePriorityMenu"
+                 ref="priorityBtnRef"
+                 class="filter-btn"
+               >
+                 Priority{{ selectedPriorities.length > 0 ? ` (${selectedPriorities.length})` : '' }}
+                 <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+               </v-btn>
+
+               <v-btn
+                 color="primary"
+                 rounded="pill"
+                 @click.stop="toggleAssigneeMenu"
+                 ref="assigneeBtnRef"
+                 class="filter-btn"
+               >
+                 Assignee{{ selectedAssignees.length > 0 ? ` (${selectedAssignees.length})` : '' }}
+                 <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+               </v-btn>
+
+               <v-btn
+                 variant="outlined"
+                 @click="resetFilters"
+                 class="reset-btn"
+                 :disabled="selectedPriorities.length === 0 && selectedAssignees.length === 0"
+               >
+                 Reset filters
+               </v-btn>
+             </div>
+
+             <!-- Priority Dropdown -->
+             <div
+               v-show="priorityMenuOpen"
+               class="custom-filter-dropdown"
+               :style="{ top: priorityDropdownTop + 'px', left: priorityDropdownLeft + 'px' }"
+               ref="priorityDropdownRef"
+             >
+               <!-- <div class="dropdown-header">
+                 <span class="dropdown-title">Select Priorities</span>
+               </div> -->
+               <div class="dropdown-body">
+                 <input
+                   v-model="searchPriority"
+                   type="text"
+                   placeholder="Search priorities"
+                   class="search-input"
+                 />
+                 <div class="filter-options-list">
+                   <label
+                     v-for="option in filteredPriorityOptions"
+                     :key="option.value"
+                     class="filter-option-item"
+                   >
+                     <input
+                       type="checkbox"
+                       :checked="tempSelectedPriorities.includes(option.value)"
+                       @change="togglePriority(option.value)"
+                       class="custom-checkbox"
+                     />
+                     <span class="option-text">{{ option.title }}</span>
+                   </label>
+                 </div>
+               </div>
+               <div class="dropdown-footer">
+                 <v-btn @click="closePriorityMenu" variant="outlined">Close</v-btn>
+                 <v-btn @click="applyPriorityFilter" color="primary">Apply</v-btn>
+               </div>
+             </div>
+
+             <!-- Assignee Dropdown -->
+             <div
+               v-show="assigneeMenuOpen"
+               class="custom-filter-dropdown"
+               :style="{ top: assigneeDropdownTop + 'px', left: assigneeDropdownLeft + 'px' }"
+               ref="assigneeDropdownRef"
+             >
+               <!-- <div class="dropdown-header">
+                 <span class="dropdown-title">Select Assignees</span>
+               </div> -->
+               <div class="dropdown-body">
+                 <input
+                   v-model="searchAssignee"
+                   type="text"
+                   placeholder="Search assignees"
+                   class="search-input"
+                 />
+                 <div class="filter-options-list">
+                   <label
+                     v-for="option in filteredAssigneeOptions"
+                     :key="option.value"
+                     class="filter-option-item"
+                   >
+                     <input
+                       type="checkbox"
+                       :checked="tempSelectedAssignees.includes(option.value)"
+                       @change="toggleAssignee(option.value)"
+                       class="custom-checkbox"
+                     />
+                     <span class="option-text">{{ option.title }}</span>
+                   </label>
+                 </div>
+               </div>
+               <div class="dropdown-footer">
+                 <v-btn @click="closeAssigneeMenu" variant="outlined">Close</v-btn>
+                 <v-btn @click="applyAssigneeFilter" color="primary">Apply</v-btn>
+               </div>
+             </div>
+           </div>
+         </div>
+
+        <!-- Filter Chips -->
+        <div class="filter-chips" v-if="selectedFilters.length > 0">
+          <v-chip
+            v-for="filter in selectedFilters"
+            :key="filter.key"
+            closable
+            @click:close="removeFilter(filter)"
+            class="filter-chip"
+          >
+            {{ filter.label }}
+          </v-chip>
         </div>
 
         <div class="calendar-nav">
           <v-btn icon="mdi-chevron-left" variant="text" @click="previousPeriod" rounded="lg"></v-btn>
-          <h2 class="period-title">{{ getCurrentPeriodTitle() }}</h2>
+          <div class="nav-center">
+            <h2 class="period-title">{{ getCurrentPeriodTitle() }}</h2>
+            <v-btn-toggle v-model="viewMode" mandatory rounded="xl" class="view-toggle">
+              <v-btn value="month" size="x-small" prepend-icon="mdi-calendar" rounded="xl" class="view-btn">Month</v-btn>
+              <v-btn value="week" size="x-small" prepend-icon="mdi-view-week" rounded="xl" class="view-btn">Week</v-btn>
+            </v-btn-toggle>
+          </div>
           <v-btn icon="mdi-chevron-right" variant="text" @click="nextPeriod" rounded="lg"></v-btn>
         </div>
 
@@ -383,29 +510,57 @@
         </v-card-title>
 
         <v-card-text class="task-details-content">
-          <div class="detail-section">
-            <div class="detail-section-icon-row">
-              <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-              <h4>Description</h4>
-            </div>
-            <p>{{ selectedTask.description }}</p>
-          </div>
-
-          <div class="detail-section">
-            <div class="detail-section-icon-row">
-              <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-              <h4>Due Date</h4>
-            </div>
-            <p>{{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'No due date' }}</p>
-          </div>
-
-          <div class="detail-section">
-            <div class="detail-section-icon-row">
-              <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-              <h4>Assigned To</h4>
-            </div>
-            <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
-          </div>
+          <v-row>
+            <v-col cols="6">
+              <div class="detail-section">
+                <div class="detail-section-icon-row">
+                  <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                  <h4>Description</h4>
+                </div>
+                <p>{{ selectedTask.description || "No description" }}</p>
+              </div>
+            </v-col>
+            <v-col cols="6">
+              <div class="detail-section">
+                <div class="detail-section-icon-row">
+                  <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+                  <h4>Due Date</h4>
+                </div>
+                <p>{{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'No due date' }}</p>
+              </div>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col cols="6">
+              <div class="detail-section">
+                <div class="detail-section-icon-row">
+                  <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+                  <h4>Assigned To</h4>
+                </div>
+                <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
+              </div>
+            </v-col>
+            <v-col cols="6">
+              <div class="detail-section">
+                <div class="detail-section-icon-row">
+                  <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
+                  <h4>Priority</h4>
+                </div>
+                <p>{{ selectedTask.priority || 'Not set' }}</p>
+              </div>
+            </v-col>
+          </v-row>
+          <v-row v-if="selectedTask.collaborators && selectedTask.collaborators.length > 0">
+            <v-col cols="12">
+              <div class="detail-section">
+                <div class="detail-section-icon-row">
+                  <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
+                  <h4>Collaborators</h4>
+                </div>
+                <p>{{ selectedTask.collaborators.join(', ') }}</p>
+              </div>
+            </v-col>
+          </v-row>
 
           <!--progress bar based on subtask completion, shown for parent tasks-->
           <div class="detail-section" v-if="selectedTask && selectedTask.subtasks && selectedTask.subtasks.length > 0">
@@ -476,18 +631,42 @@
                   </div>
                 </div>
                 <div class="subtask-details">
-                  <div class="detail-row" v-if="subtask.description">
-                    <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                    <p>{{ subtask.description }}</p>
-                  </div>
-                  <div class="detail-row" v-if="subtask.assignedTo">
-                    <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                    <p>{{ subtask.assignedTo }}</p>
-                  </div>
-                  <div class="detail-row" v-if="subtask.dueDate">
-                    <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-                    <p>{{ formatDate(subtask.dueDate) }}</p>
-                  </div>
+                  <v-row>
+                    <v-col cols="6">
+                      <div class="detail-row" v-if="subtask.description">
+                        <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                        <p>{{ subtask.description }}</p>
+                      </div>
+                    </v-col>
+                    <v-col cols="6">
+                      <div class="detail-row" v-if="subtask.priority">
+                        <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
+                        <p>Priority: {{ subtask.priority }}</p>
+                      </div>
+                    </v-col>
+                  </v-row>
+                  <v-row>
+                    <v-col cols="6">
+                      <div class="detail-row" v-if="subtask.assignedTo">
+                        <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+                        <p>{{ subtask.assignedTo }}</p>
+                      </div>
+                    </v-col>
+                    <v-col cols="6">
+                      <div class="detail-row" v-if="subtask.collaborators && subtask.collaborators.length > 0">
+                        <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
+                        <p>{{ subtask.collaborators.join(', ') }}</p>
+                      </div>
+                    </v-col>
+                  </v-row>
+                  <v-row>
+                    <v-col cols="6">
+                      <div class="detail-row" v-if="subtask.dueDate">
+                        <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+                        <p>{{ formatDate(subtask.dueDate) }}</p>
+                      </div>
+                    </v-col>
+                  </v-row>
                 </div>
               </div>
             </div>
@@ -601,16 +780,18 @@
                 class="flex-1"
               />
             </div>
-            
-            <div class="d-flex ga-4 mb-4">
-              <v-select
-                v-model="newTask.assignedTo"
-                label="Assignee"
-                :items="teamMembers"
-                placeholder="Select assignee"
+
+            <div class="d-flex mb-4">
+              <v-text-field
+                v-model="newTask.dueDate"
+                label="Due Date"
+                type="date"
                 variant="outlined"
                 class="flex-1"
               />
+            </div>
+
+             <div class="d-flex ga-4 mb-4">
               <v-text-field
                 v-model="newTask.startTime"
                 label="Start Time"
@@ -618,9 +799,6 @@
                 variant="outlined"
                 class="flex-1"
               />
-            </div>
-            
-            <div class="d-flex ga-4 mb-4">
               <v-text-field
                 v-model="newTask.endTime"
                 label="End Time"
@@ -628,11 +806,25 @@
                 variant="outlined"
                 class="flex-1"
               />
-              <v-text-field
-                v-model="newTask.dueDate"
-                label="Due Date"
-                type="date"
+            </div>
+            
+            <div class="d-flex ga-4 mb-4">
+              <v-select
+                v-model="newTask.assignedTo"
+                label="Assignee"
+                :items="teamMembers.filter(member => !newTask.collaborators.includes(member))"
+                placeholder="Select assignee"
                 variant="outlined"
+                class="flex-1"
+              />
+              <v-select
+                v-model="newTask.collaborators"
+                label="Collaborators"
+                :items="teamMembers.filter(member => member !== newTask.assignedTo)"
+                placeholder="Select collaborators"
+                variant="outlined"
+                multiple
+                chips
                 class="flex-1"
               />
             </div>
@@ -686,17 +878,26 @@
 
               <div class="d-flex ga-4 mb-3">
                 <v-select
-                  v-model="subtask.assignedTo"
-                  label="Assignee"
-                  :items="teamMembers"
-                  placeholder="Select assignee"
+                  v-model="subtask.status"
+                  label="Status"
+                  :items="taskStatuses"
                   variant="outlined"
                   class="flex-1"
                 />
+                <v-select
+                  v-model="subtask.priority"
+                  label="Priority"
+                  :items="priorities"
+                  variant="outlined"
+                  class="flex-1"
+                />
+              </div>
+              
+              <div class="d-flex mb-3">
                 <v-text-field
-                  v-model="subtask.startTime"
-                  label="Start Time"
-                  type="datetime-local"
+                  v-model="subtask.dueDate"
+                  label="Due Date"
+                  type="date"
                   variant="outlined"
                   class="flex-1"
                 />
@@ -704,17 +905,39 @@
 
               <div class="d-flex ga-4 mb-3">
                 <v-text-field
+                  v-model="subtask.startTime"
+                  label="Start Time"
+                  type="datetime-local"
+                  variant="outlined"
+                  class="flex-1"
+                />
+                <v-text-field
                   v-model="subtask.endTime"
                   label="End Time"
                   type="datetime-local"
                   variant="outlined"
                   class="flex-1"
                 />
-                <v-text-field
-                  v-model="subtask.dueDate"
-                  label="Due Date"
-                  type="date"
+              </div>
+
+
+              <div class="d-flex ga-4 mb-3">
+                <v-select
+                  v-model="subtask.assignedTo"
+                  label="Assignee"
+                  :items="teamMembers.filter(member => !subtask.collaborators.includes(member))"
+                  placeholder="Select assignee"
                   variant="outlined"
+                  class="flex-1"
+                />
+                <v-select
+                  v-model="subtask.collaborators"
+                  label="Collaborators"
+                  :items="teamMembers.filter(member => member !== subtask.assignedTo)"
+                  placeholder="Select collaborators"
+                  variant="outlined"
+                  multiple
+                  chips
                   class="flex-1"
                 />
               </div>
@@ -766,7 +989,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 
@@ -775,6 +998,23 @@ const currentDate = ref(new Date())
 const selectedTask = ref(null)
 const selectedDate = ref(null)
 const upcomingSidebarOpen = ref(true)
+const selectedPriorities = ref([])
+const selectedAssignees = ref([])
+const tempSelectedPriorities = ref([])
+const tempSelectedAssignees = ref([])
+const searchPriority = ref('')
+const searchAssignee = ref('')
+const priorityMenuOpen = ref(false)
+const assigneeMenuOpen = ref(false)
+const priorityDropdownTop = ref(0)
+const priorityDropdownLeft = ref(0)
+const assigneeDropdownTop = ref(0)
+const assigneeDropdownLeft = ref(0)
+const priorityBtnRef = ref(null)
+const assigneeBtnRef = ref(null)
+const priorityDropdownRef = ref(null)
+const assigneeDropdownRef = ref(null)
+const showFilterDialog = ref(false)
 
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
@@ -789,6 +1029,7 @@ const snackbarColor = ref('success')
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
 
+
 const tasks = ref([
   {
     id: '1',
@@ -797,7 +1038,7 @@ const tasks = ref([
     dueDate: '2025-09-27',
     assignedTo: 'John Doe',
     status: 'In Progress',
-    // priority: 'High',
+    priority: 1,
     // project: 'Project Alpha',
     attachments: [],
     startTime: '2025-09-25T14:30:00',
@@ -825,6 +1066,7 @@ const tasks = ref([
         endTime: '2025-09-27T17:00:00',
         dueDate: '2025-09-27',
         status: 'In Progress',
+        priority: 2,
         createdAt: '2025-09-25T15:00:00',
         statusHistory: [
           {
@@ -848,6 +1090,7 @@ const tasks = ref([
         endTime: '2025-09-27T11:00:00',
         dueDate: '2025-09-27',
         status: 'In Progress',
+        priority: 2,
         createdAt: '2025-09-26T10:00:00',
         statusHistory: [
           {
@@ -872,7 +1115,7 @@ const tasks = ref([
     dueDate: '2025-09-28',
     assignedTo: 'Jane Smith',
     status: 'To Do',
-    // priority: 'Medium',
+    priority: 7,
     // project: 'Project Beta',
     attachments: [],
     startTime: '2025-09-28T14:00:00',
@@ -895,7 +1138,7 @@ const tasks = ref([
     dueDate: '2025-09-24',
     assignedTo: 'Alice Johnson',
     status: 'To Do',
-    // priority: 'Low',
+    priority: 6,
     // project: 'General',
     attachments: [],
     startTime: '2025-09-24T10:00:00',
@@ -918,6 +1161,7 @@ const tasks = ref([
         endTime: '2025-09-24T11:00:00',
         dueDate: '2025-09-24',
         status: 'To Do',
+        priority: 5,
         createdAt: '2025-09-23T09:15:00',
         statusHistory: [
           {
@@ -937,7 +1181,7 @@ const tasks = ref([
     dueDate: '2025-10-02',
     assignedTo: 'John Doe',
     status: 'Done',
-    // priority: 'High',
+    priority: 2,
     // project: 'Project Alpha',
     attachments: [],
     startTime: '2025-10-02T13:00:00',
@@ -970,6 +1214,7 @@ const newTask = ref({
   description: '',
   dueDate: '',
   assignedTo: '',
+  collaborators: [],
   status: 'To Do',
   attachments: [],
   startTime: '',
@@ -978,7 +1223,27 @@ const newTask = ref({
 
 const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
 const taskStatuses = ['To Do', 'In Progress', 'Done']
-// const priorities = ['Low', 'Medium', 'High', 'Urgent']
+const priorities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+const priorityFilterOptions = [
+  { title: 'Priority 1', value: 1 },
+  { title: 'Priority 2', value: 2 },
+  { title: 'Priority 3', value: 3 },
+  { title: 'Priority 4', value: 4 },
+  { title: 'Priority 5', value: 5 },
+  { title: 'Priority 6', value: 6 },
+  { title: 'Priority 7', value: 7 },
+  { title: 'Priority 8', value: 8 },
+  { title: 'Priority 9', value: 9 },
+  { title: 'Priority 10', value: 10 }
+]
+
+const assigneeFilterOptions = [
+  { title: 'John Doe', value: 'John Doe' },
+  { title: 'Jane Smith', value: 'Jane Smith' },
+  { title: 'Alice Johnson', value: 'Alice Johnson' }
+]
+
+
 //const projects = ['Project Alpha', 'Project Beta', 'General', 'Research']
 
 const subtasks = ref([])
@@ -1044,7 +1309,17 @@ const weekDates = computed(() => {
 // Computed properties for filtered tasks
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
-  return tasks.value.filter(task => task.dueDate === today && task.status !== 'Done')
+  let filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Done')
+
+  // Apply filters
+  if (selectedPriorities.value.length > 0) {
+    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
+  }
+  if (selectedAssignees.value.length > 0) {
+    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
+  }
+
+  return filtered
 })
 
 const weekTasks = computed(() => {
@@ -1052,18 +1327,38 @@ const weekTasks = computed(() => {
   const nextWeek = new Date(today)
   nextWeek.setDate(today.getDate() + 7)
 
-  return tasks.value.filter(task => {
+  let filtered = tasks.value.filter(task => {
     if (!task.dueDate || task.status === 'Done') return false
     const taskDate = new Date(task.dueDate)
     return taskDate > today && taskDate <= nextWeek
   })
+
+  // Apply filters
+  if (selectedPriorities.value.length > 0) {
+    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
+  }
+  if (selectedAssignees.value.length > 0) {
+    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
+  }
+
+  return filtered
 })
 
 const overdueTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
-  return tasks.value.filter(task => {
+  let filtered = tasks.value.filter(task => {
     return task.dueDate && task.dueDate < today && task.status !== 'Done'
   })
+
+  // Apply filters
+  if (selectedPriorities.value.length > 0) {
+    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
+  }
+  if (selectedAssignees.value.length > 0) {
+    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
+  }
+
+  return filtered
 })
 
 const parentTaskProgress = computed(() => {
@@ -1074,6 +1369,21 @@ const parentTaskProgress = computed(() => {
   const completedSubtasks = task.subtasks.filter(subtask => subtask.status === 'Done').length;
   return Math.round((completedSubtasks / totalSubtasks) * 100);
 });
+
+const filteredPriorityOptions = computed(() => {
+  return priorityFilterOptions.filter(opt => opt.title.toLowerCase().includes(searchPriority.value.toLowerCase()))
+})
+
+const filteredAssigneeOptions = computed(() => {
+  return assigneeFilterOptions.filter(opt => opt.title.toLowerCase().includes(searchAssignee.value.toLowerCase()))
+})
+
+const selectedFilters = computed(() => {
+  return [
+    ...selectedPriorities.value.map(p => ({ key: `priority-${p}`, label: priorityFilterOptions.find(o => o.value === p)?.title || p, type: 'priority', value: p })),
+    ...selectedAssignees.value.map(a => ({ key: `assignee-${a}`, label: assigneeFilterOptions.find(o => o.value === a)?.title || a, type: 'assignee', value: a }))
+  ]
+})
 
 const toggleUpcomingSidebar = () => {
   upcomingSidebarOpen.value = !upcomingSidebarOpen.value
@@ -1123,6 +1433,7 @@ const selectDate = (date) => {
   showDateDetailsDialog.value = true
 }
 
+
 const getTasksForSelectedDate = () => {
   if (!selectedDate.value) return []
   return getTasksForDate(selectedDate.value.dateKey)
@@ -1143,7 +1454,7 @@ const addTaskForDate = (dateKey) => {
 
 // Get tasks for a specific date
 const getTasksForDate = (dateKey) => {
-  const items = []
+  let items = []
   tasks.value.forEach(task => {
     if (task.subtasks && task.subtasks.length > 0) {
       task.subtasks.forEach((subtask, index) => {
@@ -1152,7 +1463,7 @@ const getTasksForDate = (dateKey) => {
           items.push({
             ...subtask,
             id: `${task.id}-subtask-${index}`,
-            status: subtask.status, // Subtask's own status
+            status: subtask.status,
             isSubtask: true,
             parentTask: task
           })
@@ -1164,6 +1475,16 @@ const getTasksForDate = (dateKey) => {
       }
     }
   })
+
+  // Apply filters
+  if (selectedPriorities.value.length > 0) {
+    items = items.filter(task => selectedPriorities.value.includes(task.priority))
+  }
+
+  if (selectedAssignees.value.length > 0) {
+    items = items.filter(task => selectedAssignees.value.includes(task.assignedTo))
+  }
+
   return items
 }
 
@@ -1206,11 +1527,17 @@ const openAttachment = (url) => {
 
 const editTask = (task) => {
   newTask.value = { ...task }
+  // Ensure all required properties are initialized
+  newTask.value.collaborators = newTask.value.collaborators || []
+  newTask.value.attachments = newTask.value.attachments || []
+  newTask.value.status = newTask.value.status || 'To Do'
   subtasks.value = task.subtasks ? [...task.subtasks] : []
   // Ensure statusHistory is present for editing
   if (!newTask.value.statusHistory) newTask.value.statusHistory = []
   subtasks.value.forEach(subtask => {
     if (!subtask.statusHistory) subtask.statusHistory = []
+    subtask.collaborators = subtask.collaborators || []
+    subtask.attachments = subtask.attachments || []
   })
   isEditing.value = true
   showCreateDialog.value = true
@@ -1291,33 +1618,23 @@ const createTask = async () => {
       updatedAt: new Date().toISOString()
     }
 
-    // if (newTask.value.id) {
-    //   const index = tasks.value.findIndex(t => t.id === task.id)
-    //   if (index !== -1) {
-    //     // Check if status actually changed before logging
-    //     const lastStatus = tasks.value[index].status
-    //     if (lastStatus !== currentStatus) {
-    //       task.statusHistory.push({
-    //         timestamp: new Date().toISOString(),
-    //         oldStatus: lastStatus,
-    //         newStatus: currentStatus
-    //       })} 
-
-    //     tasks.value[index] = task
-    //     showMessage('Task updated successfully!', 'success')
-    //   }
-    // } else {
-    //   tasks.value.unshift(task)
-    //   showMessage('Task created successfully!', 'success')
-    // }
-
-    if (newTask.value.id) {
-      // Editing existing task - update locally
+    if (task.parentTask) {
+      // Update subtask in parent task
+      const parent = tasks.value.find(t => t.id === task.parentTask.id)
+      if (parent) {
+        const subIndex = parent.subtasks.findIndex(st => st.title === task.title)
+        if (subIndex !== -1) {
+          parent.subtasks[subIndex] = { ...task, parentTask: undefined, isSubtask: true }
+          showMessage('Subtask updated successfully!', 'success')
+        }
+      }
+    } else if (newTask.value.id) {
+      // Update existing task
       const index = tasks.value.findIndex(t => t.id === task.id)
       if (index !== -1) {
         tasks.value[index] = task
+        showMessage('Task updated successfully!', 'success')
       }
-      showMessage('Task updated successfully!', 'success')
     } else {
       // New task - add to local array
       tasks.value.push(task)
@@ -1407,6 +1724,7 @@ const resetForm = () => {
     description: '',
     dueDate: '',
     assignedTo: '',
+    collaborators: [],
     status: 'To Do',
     attachments: [],
     startTime: '',
@@ -1420,7 +1738,10 @@ const addSubtask = () => {
   subtasks.value.push({
     title: '',
     description: '',
+    status: 'To Do',
+    priority: 1,
     assignedTo: '',
+    collaborators: [],
     startTime: '',
     endTime: '',
     dueDate: '',
@@ -1432,6 +1753,127 @@ const showMessage = (message, color = 'success') => {
   snackbarMessage.value = message
   snackbarColor.value = color
   showSnackbar.value = true
+}
+
+const togglePriorityMenu = () => {
+  if (priorityMenuOpen.value) {
+    closePriorityMenu()
+  } else {
+    closeAssigneeMenu() // Close other dropdown
+    openPriorityMenu()
+  }
+}
+
+const openPriorityMenu = () => {
+  tempSelectedPriorities.value = [...selectedPriorities.value]
+  searchPriority.value = ''
+
+  // Calculate position
+  nextTick(() => {
+    if (priorityBtnRef.value) {
+      const rect = priorityBtnRef.value.$el.getBoundingClientRect()
+      priorityDropdownTop.value = rect.bottom + 4
+      priorityDropdownLeft.value = rect.left
+    }
+  })
+
+  priorityMenuOpen.value = true
+
+  // Add click outside listener
+  nextTick(() => {
+    document.addEventListener('click', handlePriorityClickOutside)
+  })
+}
+
+const closePriorityMenu = () => {
+  priorityMenuOpen.value = false
+  document.removeEventListener('click', handlePriorityClickOutside)
+}
+
+const handlePriorityClickOutside = (event) => {
+  if (priorityDropdownRef.value && !priorityDropdownRef.value.contains(event.target)) {
+    closePriorityMenu()
+  }
+}
+
+const applyPriorityFilter = () => {
+  selectedPriorities.value = [...tempSelectedPriorities.value]
+  closePriorityMenu()
+}
+
+const togglePriority = (value) => {
+  if (tempSelectedPriorities.value.includes(value)) {
+    tempSelectedPriorities.value = tempSelectedPriorities.value.filter(v => v !== value)
+  } else {
+    tempSelectedPriorities.value.push(value)
+  }
+}
+
+const toggleAssigneeMenu = () => {
+  if (assigneeMenuOpen.value) {
+    closeAssigneeMenu()
+  } else {
+    closePriorityMenu() // Close other dropdown
+    openAssigneeMenu()
+  }
+}
+
+const openAssigneeMenu = () => {
+  tempSelectedAssignees.value = [...selectedAssignees.value]
+  searchAssignee.value = ''
+
+  // Calculate position
+  nextTick(() => {
+    if (assigneeBtnRef.value) {
+      const rect = assigneeBtnRef.value.$el.getBoundingClientRect()
+      assigneeDropdownTop.value = rect.bottom + 4
+      assigneeDropdownLeft.value = rect.left
+    }
+  })
+
+  assigneeMenuOpen.value = true
+
+  // Add click outside listener
+  nextTick(() => {
+    document.addEventListener('click', handleAssigneeClickOutside)
+  })
+}
+
+const closeAssigneeMenu = () => {
+  assigneeMenuOpen.value = false
+  document.removeEventListener('click', handleAssigneeClickOutside)
+}
+
+const handleAssigneeClickOutside = (event) => {
+  if (assigneeDropdownRef.value && !assigneeDropdownRef.value.contains(event.target)) {
+    closeAssigneeMenu()
+  }
+}
+
+const applyAssigneeFilter = () => {
+  selectedAssignees.value = [...tempSelectedAssignees.value]
+  closeAssigneeMenu()
+}
+
+const toggleAssignee = (value) => {
+  if (tempSelectedAssignees.value.includes(value)) {
+    tempSelectedAssignees.value = tempSelectedAssignees.value.filter(v => v !== value)
+  } else {
+    tempSelectedAssignees.value.push(value)
+  }
+}
+
+const removeFilter = (filter) => {
+  if (filter.type === 'priority') {
+    selectedPriorities.value = selectedPriorities.value.filter(p => p !== filter.value)
+  } else {
+    selectedAssignees.value = selectedAssignees.value.filter(a => a !== filter.value)
+  }
+}
+
+const resetFilters = () => {
+  selectedPriorities.value = []
+  selectedAssignees.value = []
 }
 
 const uploadFiles = async (files) => {
@@ -1473,6 +1915,13 @@ const uploadFiles = async (files) => {
 .upcoming-sidebar {
   width: 320px;
   background: white;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
 }
 
 .collapse-btn {
@@ -1597,8 +2046,8 @@ const uploadFiles = async (files) => {
 
 .calendar-controls {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
   padding: 12px 24px;
   background: white;
   border-bottom: 1px solid #e0e0e0;
@@ -1611,7 +2060,10 @@ const uploadFiles = async (files) => {
 }
 
 .view-btn {
-  margin: 0 4px !important;
+  margin: 0 2px !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  height: 28px !important;
   transition: all 0.3s ease !important;
 }
 
@@ -1630,6 +2082,122 @@ const uploadFiles = async (files) => {
   gap: 8px;
 }
 
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-btn {
+  min-width: 100px;
+}
+
+.reset-btn {
+  color: #666;
+  
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.filter-chip {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.custom-filter-dropdown {
+  position: fixed;
+  z-index: 1000;
+  min-width: 250px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.dropdown-header {
+  padding: 16px 20px 12px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dropdown-body {
+  padding: 8px 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.filter-options-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.filter-option-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.filter-option-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.custom-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #1976d2;
+}
+
+.option-text {
+  flex: 1;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.dropdown-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
 .calendar-nav {
   display: flex;
   justify-content: center;
@@ -1641,12 +2209,19 @@ const uploadFiles = async (files) => {
 }
 
 .period-title {
-  margin: 0;
+  margin: 0 0 4px 0;
   font-size: 18px;
   font-weight: 600;
   color: #2c3e50;
-  min-width: 180px;
   text-align: center;
+}
+
+.nav-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
 }
 
 .calendar-grid {
@@ -2366,4 +2941,223 @@ const uploadFiles = async (files) => {
   flex-direction: column;
   gap: 6px;
 }
+
+.filter-categories-list {
+  padding: 8px 0;
+}
+
+.filter-category-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  gap: 12px;
+  user-select: none;
+}
+
+.filter-category-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.category-icon {
+  flex-shrink: 0;
+  width: 20px;
+}
+
+.category-text {
+  flex: 1;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.category-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.custom-filter-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.custom-dropdown-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 250px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.dropdown-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-header {
+  padding: 16px 20px 12px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #e0e0e0;
+}
+
+.dropdown-body {
+  padding: 8px 0;
+}
+
+.dropdown-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.footer-btn {
+  min-width: auto !important;
+}
+
+.filter-options-list {
+  padding: 5px 0;
+  margin-right: 2px ;
+}
+
+.scrollable-submenu {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.filter-option-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.filter-option-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.option-text {
+  flex: 1;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.87);
+  margin-left: 2px;
+}
+
+.submenu-dropdown {
+  min-width: 200px;
+}
+
+.floating-submenu {
+  position: fixed;
+  z-index: 9999;
+  transition: opacity 0.15s ease;
+}
+
+/* Custom checkbox styling */
+.custom-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 5px;
+  padding: 0;
+  cursor: pointer;
+  accent-color: #1976d2;
+  flex-shrink: 0;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .custom-dropdown-menu {
+  background: #3d3d3d !important;
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] .dropdown-header,
+[data-theme="dark"] .dropdown-title {
+  color: #f5f4f2 !important;
+}
+
+[data-theme="dark"] .dropdown-divider {
+  background: #555 !important;
+}
+
+[data-theme="dark"] .filter-category-item,
+[data-theme="dark"] .filter-option-item {
+  color: #f5f4f2 !important;
+}
+
+[data-theme="dark"] .filter-category-item:hover,
+[data-theme="dark"] .filter-option-item:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .custom-checkbox {
+  accent-color: #7b92d1;
+  filter: invert(1);
+}
+
+[data-theme="dark"] .footer-btn {
+  color: #f5f4f2 !important;
+}
+
+/* Dialog backgrounds for dark mode */
+[data-theme="dark"] .create-task-card,
+[data-theme="dark"] .task-details-card,
+[data-theme="dark"] .date-details-card {
+  background: #3d3d3d !important;
+  color: #f5f4f2 !important;
+}
+
+/* Ensure submenu backgrounds are dark */
+[data-theme="dark"] .floating-submenu .custom-dropdown-menu {
+  background: #3d3d3d !important;
+  border-color: #555 !important;
+}
+
+/* Form fields in dark mode */
+[data-theme="dark"] .v-field {
+  background: #555 !important;
+  color: #f5f4f2 !important;
+}
+
+[data-theme="dark"] .v-field input,
+[data-theme="dark"] .v-field textarea,
+[data-theme="dark"] .v-field select {
+  color: #f5f4f2 !important;
+}
+
+[data-theme="dark"] .v-field__outline {
+  border-color: #777 !important;
+}
+
+/* Ensure all text in filter menus and submenus is light
+[data-theme="dark"] .option-text {
+  color: #f5f4f2 !important;
+}
+
+[data-theme="dark"] .dropdown-body .filter-options-list .filter-option-item {
+  color: #f5f4f2 !important;
+}
+
+/* Ensure category text is light */
+/* [data-theme="dark"] .category-text {
+  color: #f5f4f2 !important;
+} */
+
 </style>
