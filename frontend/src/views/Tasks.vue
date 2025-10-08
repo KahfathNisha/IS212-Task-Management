@@ -98,6 +98,14 @@
           </div>
           
           <div class="header-right">
+            <v-btn-toggle v-model="viewType" mandatory class="view-type-toggle">
+              <v-btn value="calendar" size="small" prepend-icon="mdi-calendar" rounded="lg">
+                Calendar
+              </v-btn>
+              <v-btn value="list" size="small" prepend-icon="mdi-format-list-bulleted" rounded="lg">
+                List
+              </v-btn>
+            </v-btn-toggle>
             <v-btn variant="outlined" size="small" prepend-icon="mdi-bell" rounded="lg">
             </v-btn>
             <v-btn variant="outlined" size="small" prepend-icon="mdi-cog" rounded="lg">
@@ -106,47 +114,45 @@
         </div>
 
         <div class="calendar-controls">
-           <div class="add-task-above-filters">
-             <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg">
-               Add Task
-             </v-btn>
-           </div>
+          <div class="controls-row">
+            <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg">
+              Add Task
+            </v-btn>
 
-           <div class="view-controls">
-             <div class="filter-label">Filters</div>
-             <!-- New FilterBar -->
-             <div class="filter-bar">
-               <v-btn
-                 color="primary"
-                 rounded="pill"
-                 @click.stop="togglePriorityMenu"
-                 ref="priorityBtnRef"
-                 class="filter-btn"
-               >
-                 Priority{{ selectedPriorities.length > 0 ? ` (${selectedPriorities.length})` : '' }}
-                 <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
-               </v-btn>
+            <div class="filters-right">
+              <div class="filter-label">Filters</div>
+              
+              <v-btn
+                color="primary"
+                rounded="pill"
+                @click.stop="togglePriorityMenu"
+                ref="priorityBtnRef"
+                class="filter-btn"
+              >
+                Priority{{ selectedPriorities.length > 0 ? ` (${selectedPriorities.length})` : '' }}
+                <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+              </v-btn>
 
-               <v-btn
-                 color="primary"
-                 rounded="pill"
-                 @click.stop="toggleAssigneeMenu"
-                 ref="assigneeBtnRef"
-                 class="filter-btn"
-               >
-                 Assignee{{ selectedAssignees.length > 0 ? ` (${selectedAssignees.length})` : '' }}
-                 <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
-               </v-btn>
+              <v-btn
+                color="primary"
+                rounded="pill"
+                @click.stop="toggleAssigneeMenu"
+                ref="assigneeBtnRef"
+                class="filter-btn"
+              >
+                Assignee{{ selectedAssignees.length > 0 ? ` (${selectedAssignees.length})` : '' }}
+                <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+              </v-btn>
 
-               <v-btn
-                 variant="outlined"
-                 @click="resetFilters"
-                 class="reset-btn"
-                 :disabled="selectedPriorities.length === 0 && selectedAssignees.length === 0"
-               >
-                 Reset filters
-               </v-btn>
-             </div>
+              <v-btn
+                variant="outlined"
+                @click="resetFilters"
+                class="reset-btn"
+                :disabled="selectedPriorities.length === 0 && selectedAssignees.length === 0"
+              >
+                Reset filters
+              </v-btn>
+            </div>
 
              <!-- Priority Dropdown -->
              <div
@@ -241,19 +247,22 @@
           </v-chip>
         </div>
 
-        <div class="calendar-nav">
-          <v-btn icon="mdi-chevron-left" variant="text" @click="previousPeriod" rounded="lg"></v-btn>
-          <div class="nav-center">
-            <h2 class="period-title">{{ getCurrentPeriodTitle() }}</h2>
-            <v-btn-toggle v-model="viewMode" mandatory rounded="xl" class="view-toggle">
-              <v-btn value="month" size="x-small" prepend-icon="mdi-calendar" rounded="xl" class="view-btn">Month</v-btn>
-              <v-btn value="week" size="x-small" prepend-icon="mdi-view-week" rounded="xl" class="view-btn">Week</v-btn>
-            </v-btn-toggle>
+        <!-- Calendar View -->
+        <div v-if="viewType === 'calendar'">
+          <div class="calendar-nav">
+            <v-btn icon="mdi-chevron-left" variant="text" @click="previousPeriod" rounded="lg"></v-btn>
+            <div class="nav-center">
+              <h2 class="period-title">{{ getCurrentPeriodTitle() }}</h2>
+              <v-btn-toggle v-model="viewMode" mandatory rounded="xl" class="view-toggle">
+                <v-btn value="month" size="x-small" prepend-icon="mdi-calendar" rounded="xl" class="view-btn">Month</v-btn>
+                <v-btn value="week" size="x-small" prepend-icon="mdi-view-week" rounded="xl" class="view-btn">Week</v-btn>
+              </v-btn-toggle>
+            </div>
+            <v-btn icon="mdi-chevron-right" variant="text" @click="nextPeriod" rounded="lg"></v-btn>
           </div>
-          <v-btn icon="mdi-chevron-right" variant="text" @click="nextPeriod" rounded="lg"></v-btn>
-        </div>
+        
 
-        <div v-if="viewMode === 'month'" class="calendar-grid">
+          <div v-if="viewMode === 'month'" class="calendar-grid">
           <div class="calendar-header-row">
             <div v-for="day in weekDays" :key="day" class="day-header">
               {{ day }}
@@ -283,7 +292,7 @@
                   @click.stop="viewTaskDetails(task)"
                 >
                   <div class="task-content">
-                    <span class="task-title">{{ task.isSubtask ? `${task.title} (${task.parentTask.title})` : task.title }}</span>
+                    <span class="task-title">{{ truncateTaskTitle(task.isSubtask ? `${task.title} (${task.parentTask.title})` : task.title) }}</span>
                     <div class="task-meta">
                       <v-chip 
                         :color="getStatusColor(task.status)" 
@@ -349,6 +358,245 @@
                     Add task
                   </v-btn>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- List View -->
+    <div v-if="viewType === 'list'" class="list-view">
+        <!-- Left side: Task list -->
+        <div class="task-list-panel">
+          <div class="list-header">
+            <h3>All Tasks ({{ filteredTasksList.length }})</h3>
+            <v-select
+              v-model="listSortBy"
+              :items="sortOptions"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 150px;"
+            ></v-select>
+          </div>
+
+          <div class="tasks-list-scroll">
+            <div 
+              v-for="task in filteredTasksList" 
+              :key="task.id"
+              class="task-list-card"
+              :class="{ 'active': selectedListTask?.id === task.id }"
+              @click="selectListTask(task)"
+            >
+              <div class="task-list-header">
+                <h4 class="task-list-title">{{ task.title }}</h4>
+                <v-chip 
+                  :color="getStatusColor(task.status)" 
+                  size="small"
+                  rounded="lg"
+                >
+                  {{ task.status }}
+                </v-chip>
+              </div>
+
+              <div class="task-list-meta">
+                <div class="meta-item" v-if="task.dueDate">
+                  <v-icon size="small">mdi-calendar</v-icon>
+                  <span>{{ formatDate(task.dueDate) }}</span>
+                </div>
+                <div class="meta-item" v-if="task.assignedTo">
+                  <v-icon size="small">mdi-account</v-icon>
+                  <span>{{ task.assignedTo }}</span>
+                </div>
+                <div class="meta-item" v-if="task.priority">
+                  <v-icon size="small">mdi-flag</v-icon>
+                  <span>Priority {{ task.priority }}</span>
+                </div>
+              </div>
+
+              <p class="task-list-description" v-if="task.description">
+                {{ task.description.substring(0, 100) }}{{ task.description.length > 100 ? '...' : '' }}
+              </p>
+
+              <div class="task-subtasks-indicator" v-if="task.subtasks && task.subtasks.length > 0">
+                <v-icon size="small">mdi-file-tree</v-icon>
+                <span>{{ task.subtasks.length }} subtask(s)</span>
+              </div>
+            </div>
+
+            <div v-if="filteredTasksList.length === 0" class="no-tasks-message">
+              <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
+              <p>No tasks found</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right side: Task details -->
+        <div class="task-detail-panel">
+          <div v-if="!selectedListTask" class="no-selection">
+            <v-icon size="80" color="grey-lighten-2">mdi-clipboard-text-search-outline</v-icon>
+            <h3>Select a task to view details</h3>
+            <p>Click on any task from the list to see its full details here</p>
+          </div>
+
+          <div v-else class="task-detail-content">
+            <div class="detail-header">
+              <div class="detail-title-section">
+                <h2>{{ selectedListTask.title }}</h2>
+                <div class="detail-chips">
+                  <v-chip
+                    :color="getStatusColor(selectedListTask.status)"
+                    size="small"
+                    rounded="lg"
+                  >
+                    {{ selectedListTask.status }}
+                  </v-chip>
+                  <v-chip
+                    v-if="selectedListTask.isSubtask"
+                    color="secondary"
+                    size="small"
+                    rounded="lg"
+                  >
+                    Subtask
+                  </v-chip>
+                  <v-chip
+                    v-else
+                    color="primary"
+                    size="small"
+                    rounded="lg"
+                  >
+                    Task
+                  </v-chip>
+                </div>
+              </div>
+
+              <v-btn
+                color="primary"
+                @click="editTask(selectedListTask)"
+                prepend-icon="mdi-pencil"
+                rounded="lg"
+              >
+                Edit
+              </v-btn>
+            </div>
+
+            <v-divider class="my-4"></v-divider>
+
+            <div class="detail-body">
+              <v-row>
+                <v-col cols="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                      <h4>Description</h4>
+                    </div>
+                    <p>{{ selectedListTask.description || "No description" }}</p>
+                  </div>
+                </v-col>
+                <v-col cols="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+                      <h4>Due Date</h4>
+                    </div>
+                    <p>{{ selectedListTask.dueDate ? formatDate(selectedListTask.dueDate) : 'No due date' }}</p>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <v-row>
+                <v-col cols="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+                      <h4>Assigned To</h4>
+                    </div>
+                    <p>{{ selectedListTask.assignedTo || 'Unassigned' }}</p>
+                  </div>
+                </v-col>
+                <v-col cols="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
+                      <h4>Priority</h4>
+                    </div>
+                    <p>{{ selectedListTask.priority || 'Not set' }}</p>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <v-row v-if="selectedListTask.collaborators && selectedListTask.collaborators.length > 0">
+                <v-col cols="12">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
+                      <h4>Collaborators</h4>
+                    </div>
+                    <p>{{ selectedListTask.collaborators.join(', ') }}</p>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <div class="detail-section" v-if="selectedListTask && selectedListTask.subtasks && selectedListTask.subtasks.length > 0">
+                <h4>Progress</h4>
+                <div class="progress-bar-container">
+                  <div class="custom-progress-bar">
+                    <div class="progress-fill" :style="{ width: calculateProgress(selectedListTask) + '%' }"></div>
+                  </div>
+                  <span class="progress-text">{{ calculateProgress(selectedListTask) }}%</span>
+                </div>
+              </div>
+
+              <div class="detail-section" v-if="selectedListTask.attachments && selectedListTask.attachments.length > 0">
+                <h4>Attachments</h4>
+                <div class="attachments-list">
+                  <v-chip
+                    v-for="attachment in selectedListTask.attachments"
+                    :key="attachment.url"
+                    variant="outlined"
+                    class="attachment-chip"
+                    @click="openAttachment(attachment.url)"
+                  >
+                    <v-icon start>mdi-paperclip</v-icon>
+                    {{ attachment.name }}
+                  </v-chip>
+                </div>
+              </div>
+
+              <div class="detail-section" v-if="selectedListTask && selectedListTask.subtasks && selectedListTask.subtasks.length > 0">
+                <h4>Subtasks ({{ selectedListTask.subtasks.length }})</h4>
+                <div class="subtask-list">
+                  <div v-for="subtask in selectedListTask.subtasks" :key="subtask.id" class="subtask-item">
+                    <div class="subtask-info">
+                      <div class="subtask-title">{{ subtask.title }}</div>
+                      <div class="subtask-status">
+                        <v-chip
+                          :color="getStatusColor(subtask.status)"
+                          size="small"
+                          rounded="lg"
+                        >
+                          {{ subtask.status }}
+                        </v-chip>
+                      </div>
+                    </div>
+                    <div class="subtask-meta">
+                      <span v-if="subtask.assignedTo">{{ subtask.assignedTo }}</span>
+                      <span v-if="subtask.dueDate">{{ formatDate(subtask.dueDate) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-actions">
+                <v-select
+                  :model-value="selectedListTask.status"
+                  :items="taskStatuses"
+                  label="Update Status"
+                  variant="outlined"
+                  density="comfortable"
+                  @update:modelValue="changeTaskStatus(selectedListTask, $event)"
+                  style="max-width: 250px;"
+                ></v-select>
               </div>
             </div>
           </div>
@@ -985,6 +1233,7 @@
     >
       {{ snackbarMessage }}
     </v-snackbar>
+
   </div>
 </template>
 
@@ -995,6 +1244,7 @@ import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage
 
 const viewMode = ref('month')
 const currentDate = ref(new Date())
+const viewType = ref('calendar') // calendar view
 const selectedTask = ref(null)
 const selectedDate = ref(null)
 const upcomingSidebarOpen = ref(true)
@@ -1015,6 +1265,10 @@ const assigneeBtnRef = ref(null)
 const priorityDropdownRef = ref(null)
 const assigneeDropdownRef = ref(null)
 const showFilterDialog = ref(false)
+const selectedListTask = ref(null)
+const listSortBy = ref('dueDate')
+const sortOptions = ['Due Date', 'Priority', 'Status', 'Assignee']
+
 
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
@@ -1208,6 +1462,7 @@ const tasks = ref([
     subtasks: []
   }
 ])
+
 
 const newTask = ref({
   title: '',
@@ -1451,6 +1706,49 @@ const addTaskForDate = (dateKey) => {
   newTask.value.dueDate = dateKey
   showCreateDialog.value = true
 }
+
+const filteredTasksList = computed(() => {
+  let allTasks = []
+  
+  // Flatten tasks and subtasks
+  tasks.value.forEach(task => {
+    allTasks.push(task)
+    if (task.subtasks && task.subtasks.length > 0) {
+      task.subtasks.forEach((subtask, index) => {
+        allTasks.push({
+          ...subtask,
+          id: `${task.id}-subtask-${index}`,
+          isSubtask: true,
+          parentTask: task
+        })
+      })
+    }
+  })
+
+  // Apply filters
+  if (selectedPriorities.value.length > 0) {
+    allTasks = allTasks.filter(task => selectedPriorities.value.includes(task.priority))
+  }
+  if (selectedAssignees.value.length > 0) {
+    allTasks = allTasks.filter(task => selectedAssignees.value.includes(task.assignedTo))
+  }
+
+  // Sort
+  allTasks.sort((a, b) => {
+    if (listSortBy.value === 'Due Date') {
+      return new Date(a.dueDate || '9999-12-31') - new Date(b.dueDate || '9999-12-31')
+    } else if (listSortBy.value === 'Priority') {
+      return (a.priority || 10) - (b.priority || 10)
+    } else if (listSortBy.value === 'Status') {
+      return (a.status || '').localeCompare(b.status || '')
+    } else if (listSortBy.value === 'Assignee') {
+      return (a.assignedTo || '').localeCompare(b.assignedTo || '')
+    }
+    return 0
+  })
+
+  return allTasks
+})
 
 // Get tasks for a specific date
 const getTasksForDate = (dateKey) => {
@@ -1894,6 +2192,25 @@ const uploadFiles = async (files) => {
   return urls
 }
 
+const truncateTaskTitle = (title) => {
+  if (title.length > 20) {
+    return title.substring(0, 20) + '...'
+  }
+  return title
+}
+
+
+const selectListTask = (task) => {
+  selectedListTask.value = task
+}
+
+const calculateProgress = (task) => {
+  if (!task || !task.subtasks || task.subtasks.length === 0) return 0
+  const totalSubtasks = task.subtasks.length
+  const completedSubtasks = task.subtasks.filter(subtask => subtask.status === 'Done').length
+  return Math.round((completedSubtasks / totalSubtasks) * 100)
+}
+
 </script>
 
 
@@ -2045,12 +2362,22 @@ const uploadFiles = async (files) => {
 }
 
 .calendar-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   padding: 12px 24px;
   background: white;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.filters-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .view-toggle {
@@ -2088,14 +2415,10 @@ const uploadFiles = async (files) => {
   color: #7f8c8d;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-right: 8px;
 }
 
-.filter-bar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
+
 
 .filter-btn {
   min-width: 100px;
@@ -2298,12 +2621,15 @@ const uploadFiles = async (files) => {
 
 .task-item {
   background: #f0f0f0;
-  border-radius: 8px;
-  padding: 4px 6px;
+  border-radius: 6px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   border-left: 3px solid #ccc;
-  font-size: 10px;
+  font-size: 11px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
 }
 
 .task-item:hover {
@@ -3069,6 +3395,18 @@ const uploadFiles = async (files) => {
   position: fixed;
   z-index: 9999;
   transition: opacity 0.15s ease;
+}
+
+.view-type-toggle {
+  margin-right: 12px;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.view-type-toggle .v-btn {
+  text-transform: none;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* Custom checkbox styling */
