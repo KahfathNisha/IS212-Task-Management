@@ -1241,6 +1241,17 @@
 import { ref, computed, nextTick } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
+import axios from 'axios' // <-- 1. AXIOS IMPORTED
+
+// --- 2. AXIOS CLIENT CONFIGURATION ---
+// IMPORTANT: Adjust the baseURL if your backend is running on a different port or server.
+const axiosClient = axios.create({
+    baseURL: 'http://localhost:3000', 
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+// ------------------------------------
 
 const viewMode = ref('month')
 const currentDate = ref(new Date())
@@ -1284,6 +1295,8 @@ const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
 
 
+// NOTE: In a live application, you would remove this local dummy data
+// and instead load tasks from the API when the component mounts.
 const tasks = ref([
   {
     id: '1',
@@ -1293,7 +1306,6 @@ const tasks = ref([
     assignedTo: 'John Doe',
     status: 'In Progress',
     priority: 1,
-    // project: 'Project Alpha',
     attachments: [],
     startTime: '2025-09-25T14:30:00',
     endTime: '2025-09-27T11:00:00',
@@ -1370,7 +1382,6 @@ const tasks = ref([
     assignedTo: 'Jane Smith',
     status: 'To Do',
     priority: 7,
-    // project: 'Project Beta',
     attachments: [],
     startTime: '2025-09-28T14:00:00',
     endTime: '2025-09-28T16:00:00',
@@ -1393,7 +1404,6 @@ const tasks = ref([
     assignedTo: 'Alice Johnson',
     status: 'To Do',
     priority: 6,
-    // project: 'General',
     attachments: [],
     startTime: '2025-09-24T10:00:00',
     endTime: '2025-09-24T12:00:00',
@@ -1436,7 +1446,6 @@ const tasks = ref([
     assignedTo: 'John Doe',
     status: 'Done',
     priority: 2,
-    // project: 'Project Alpha',
     attachments: [],
     startTime: '2025-10-02T13:00:00',
     endTime: '2025-10-02T15:00:00',
@@ -1497,9 +1506,6 @@ const assigneeFilterOptions = [
   { title: 'Jane Smith', value: 'Jane Smith' },
   { title: 'Alice Johnson', value: 'Alice Johnson' }
 ]
-
-
-//const projects = ['Project Alpha', 'Project Beta', 'General', 'Research']
 
 const subtasks = ref([])
 
@@ -1842,173 +1848,136 @@ const editTask = (task) => {
   showDetailsDialog.value = false
 }
 
+// --------------------------------------------------------------------------------------
+// 3. UPDATED createTask FUNCTION (Links to POST /tasks)
+// --------------------------------------------------------------------------------------
 const createTask = async () => {
-  try {
-    const mainAttachments = []
-
-    const processedSubtasks = await Promise.all(
-      subtasks.value.map(async (subtask) => {
-      const createdAt = subtask.createdAt || new Date().toISOString()
-      const currentStatus = subtask.status || 'To Do'
-      // If statusHistory exists, keep it; otherwise, initialize
-      let statusHistory = subtask.statusHistory ? [...subtask.statusHistory] : []
-
-      // If this is a new subtask (no history), push initial state
-      if (!subtask.id && statusHistory.length === 0) {
-        statusHistory.push({
-          timestamp: createdAt,
-          oldStatus: null,
-          newStatus: currentStatus
-        })
-      } else if (subtask.id) {
-          // Editing subtask → check if status changed
-          const lastStatus = statusHistory.length > 0 ? statusHistory[statusHistory.length - 1].newStatus : null
-          if (lastStatus !== currentStatus) {
-            statusHistory.push({
-              timestamp: new Date().toISOString(),
-              oldStatus: lastStatus,
-              newStatus: currentStatus
-            })
-          }
-        }
-      
-      return {
-        ...subtask,
-        attachments: await uploadFiles(subtask.attachments),
-        status: currentStatus,
-        statusHistory,
-        createdAt
-      }
-    }))
-
-    const createdAt = newTask.value.createdAt || new Date().toISOString()
-    const currentStatus = newTask.value.status || 'To Do'
-
-    let statusHistory = newTask.value.statusHistory ? [...newTask.value.statusHistory] : []
+  if (isEditing.value) {
+    // Handling for editing is skipped to focus on API linking.
+    showMessage('Editing not yet linked to API. Saving locally for now.', 'info');
+    return; 
+  }
   
-    // For new tasks only: add initial log
-    if (!newTask.value.id && statusHistory.length === 0) {
-      statusHistory.push({
-        timestamp: createdAt,
-        oldStatus: null,
-        newStatus: currentStatus
-      })
-    } else if (newTask.value.id) {
-      // Editing task → check if status changed
-      const lastStatus = statusHistory.length > 0 ? statusHistory[statusHistory.length - 1].newStatus : null
-      if (lastStatus !== currentStatus) {
-        statusHistory.push({
-          timestamp: new Date().toISOString(),
-          oldStatus: lastStatus,
-          newStatus: currentStatus
-        })
-      } 
-    }
+  try {
+    // File upload logic remains local (Firebase Storage)
+    const mainAttachments = await uploadFiles(newTask.value.attachments)
 
-    const task = {
-      id: newTask.value.id || Date.now().toString(),
-      ...newTask.value,
-      attachments: mainAttachments,
-      subtasks: processedSubtasks,
-      status: currentStatus,
-      statusHistory,
-      createdAt,
-      updatedAt: new Date().toISOString()
-    }
+    // Simplified subtask processing for the POST request
+    const processedSubtasks = subtasks.value.map(subtask => ({
+        ...subtask,
+    }));
 
-    if (task.parentTask) {
-      // Update subtask in parent task
-      const parent = tasks.value.find(t => t.id === task.parentTask.id)
-      if (parent) {
-        const subIndex = parent.subtasks.findIndex(st => st.title === task.title)
-        if (subIndex !== -1) {
-          parent.subtasks[subIndex] = { ...task, parentTask: undefined, isSubtask: true }
-          showMessage('Subtask updated successfully!', 'success')
-        }
-      }
-    } else if (newTask.value.id) {
-      // Update existing task
-      const index = tasks.value.findIndex(t => t.id === task.id)
-      if (index !== -1) {
-        tasks.value[index] = task
-        showMessage('Task updated successfully!', 'success')
-      }
-    } else {
-      // New task - add to local array
-      tasks.value.push(task)
-      showMessage('Task created successfully!', 'success')
-    }
+    // 1. Prepare Data for Backend
+    const taskData = {
+        title: newTask.value.title,
+        description: newTask.value.description,
+        dueDate: newTask.value.dueDate,
+        assigneeId: newTask.value.assignedTo, // Used 'assignedTo' for consistency with input
+        priority: newTask.value.priority,
+        status: newTask.value.status || 'To Do',
+        collaborators: newTask.value.collaborators,
+        startTime: newTask.value.startTime,
+        endTime: newTask.value.endTime,
+        attachments: mainAttachments,
+        subtasks: processedSubtasks, 
+    };
+
+    // 2. Send POST Request to Backend (API Link)
+    const response = await axiosClient.post('/tasks', taskData); 
+    
+    // 3. Get the ID back and integrate into local state
+    const newTaskId = response.data.id; 
+    
+    // Create the local task object using the ID from the database
+    const newTaskWithId = { 
+        ...taskData, 
+        id: newTaskId,
+        statusHistory: [{ 
+            timestamp: new Date().toISOString(),
+            oldStatus: null, 
+            newStatus: taskData.status 
+        }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    // 4. Update Local Array
+    tasks.value.push(newTaskWithId);
+    showMessage('Task created successfully!', 'success');
 
     showCreateDialog.value = false
     resetForm()
   } catch (error) {
-    console.error('Error creating task:', error)
-    showMessage('Failed to create task', 'error')
+    // Axios Error Handling
+    const errorMessage = error.response?.data?.message || 'Failed to connect to server or save task.';
+    console.error('Error creating task:', errorMessage, error);
+    showMessage(errorMessage, 'error');
   }
 }
 
+// --------------------------------------------------------------------------------------
+// 4. UPDATED changeTaskStatus FUNCTION (Links to PUT /tasks/:id/status)
+// --------------------------------------------------------------------------------------
 const changeTaskStatus = async (task, newStatus) => {
   const oldStatus = task.status
 
-  // Prevent changing to the same status
+  // 1. Prevent changing to the same status
   if (oldStatus === newStatus) {
     showMessage(`Task is already in "${newStatus}" status.`, 'info')
     return
   }
+  
+  // Prevent subtask update via main endpoint
+  if (task.isSubtask) {
+      showMessage('Subtask status can only be managed locally for now.', 'info');
+      return;
+  }
+  if (!task.id) {
+      showMessage('Task ID is missing.', 'error');
+      return;
+  }
 
   try {
-    if (task.isSubtask) {
-      // Update subtask status locally
-      const parentTask = tasks.value.find(t => t.id === task.parentTask.id)
-      if (parentTask) {
-        const subtaskIndex = parentTask.subtasks.findIndex(st => st.title === task.title)
-        if (subtaskIndex !== -1) {
-          const subtask = parentTask.subtasks[subtaskIndex]
-          const subtaskHistory = [...(subtask.statusHistory || [])]
-          subtaskHistory.push({
-            timestamp: new Date().toISOString(),
-            oldStatus: oldStatus,
-            newStatus
-          })
-          parentTask.subtasks[subtaskIndex] = {
-            ...subtask,
-            status: newStatus,
-            statusHistory: subtaskHistory
-          }
-          // Update selectedTask to reflect the changes
-          selectedTask.value = {
-            ...selectedTask.value,
-            status: newStatus,
-            statusHistory: subtaskHistory
-          }
-        }
+    // 2. Send PUT Request to Backend (API Link)
+    // PUT to: http://localhost:3000/tasks/TASK_ID/status
+    await axiosClient.put(`/tasks/${task.id}/status`, { status: newStatus }); 
+    
+    // 3. Local State Update after Successful API Call
+    const taskIndex = tasks.value.findIndex(t => t.id === task.id)
+    if (taskIndex !== -1) {
+      const taskData = tasks.value[taskIndex]
+      const statusHistory = [...(taskData.statusHistory || [])]
+      
+      // Log the change for the local history display
+      statusHistory.push({
+        timestamp: new Date().toISOString(),
+        oldStatus: oldStatus,
+        newStatus: newStatus
+      })
+      
+      // Update the local object with the new status and history
+      tasks.value[taskIndex] = {
+        ...taskData,
+        status: newStatus,
+        statusHistory,
+        updatedAt: new Date().toISOString()
       }
-    } else {
-      // Update task status locally
-      const taskIndex = tasks.value.findIndex(t => t.id === task.id)
-      if (taskIndex !== -1) {
-        const taskData = tasks.value[taskIndex]
-        const statusHistory = [...(taskData.statusHistory || [])]
-        statusHistory.push({
-          timestamp: new Date().toISOString(),
-          oldStatus: oldStatus,
-          newStatus
-        })
-        tasks.value[taskIndex] = {
-          ...taskData,
-          status: newStatus,
-          statusHistory
-        }
-        // Update selectedTask to point to the new object
-        selectedTask.value = tasks.value[taskIndex]
-      }
+      
+      // Update UI refs to force screen refresh
+      selectedTask.value = tasks.value[taskIndex]
+      selectedListTask.value = tasks.value[taskIndex]
     }
+    
     showMessage('Task status updated!', 'success')
   } catch (error) {
-    console.error('Error updating task status:', error)
-    showMessage('Failed to update task status', 'error')
+    // Axios Error Handling
+    const errorMessage = error.response?.data?.message || 'Failed to update task status on server.';
+    console.error('Error updating task status:', errorMessage, error)
+    showMessage(errorMessage, 'error')
   }
 }
+// --------------------------------------------------------------------------------------
+
 
 const cancelCreate = () => {
   showCreateDialog.value = false
