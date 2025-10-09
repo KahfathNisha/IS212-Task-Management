@@ -1034,6 +1034,7 @@
                 v-model="newTask.dueDate"
                 label="Due Date"
                 type="date"
+                :min="todayDate"
                 variant="outlined"
                 class="flex-1"
               />
@@ -1051,6 +1052,7 @@
                 v-model="newTask.endTime"
                 label="End Time"
                 type="datetime-local"
+                :min="newTask.startTime || (newTask.dueDate ? newTask.dueDate + 'T00:00' : '')"
                 variant="outlined"
                 class="flex-1"
               />
@@ -1146,6 +1148,7 @@
                   v-model="subtask.dueDate"
                   label="Due Date"
                   type="date"
+                  :min="todayDate"
                   variant="outlined"
                   class="flex-1"
                 />
@@ -1163,6 +1166,7 @@
                   v-model="subtask.endTime"
                   label="End Time"
                   type="datetime-local"
+                  :min="newTask.startTime || (newTask.dueDate ? newTask.dueDate + 'T00:00' : '')"
                   variant="outlined"
                   class="flex-1"
                 />
@@ -1241,21 +1245,19 @@
 import { ref, computed, nextTick } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
-import axios from 'axios' // <-- 1. AXIOS IMPORTED
+import axios from 'axios'
 
-// --- 2. AXIOS CLIENT CONFIGURATION ---
-// IMPORTANT: Adjust the baseURL if your backend is running on a different port or server.
+// Axios client configuration
 const axiosClient = axios.create({
     baseURL: 'http://localhost:3000', 
     headers: {
         'Content-Type': 'application/json',
     },
 });
-// ------------------------------------
 
 const viewMode = ref('month')
 const currentDate = ref(new Date())
-const viewType = ref('calendar') // calendar view
+const viewType = ref('calendar')
 const selectedTask = ref(null)
 const selectedDate = ref(null)
 const upcomingSidebarOpen = ref(true)
@@ -1280,7 +1282,6 @@ const selectedListTask = ref(null)
 const listSortBy = ref('dueDate')
 const sortOptions = ['Due Date', 'Priority', 'Status', 'Assignee']
 
-
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
 const showDateDetailsDialog = ref(false)
@@ -1294,9 +1295,6 @@ const snackbarColor = ref('success')
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
 
-
-// NOTE: In a live application, you would remove this local dummy data
-// and instead load tasks from the API when the component mounts.
 const tasks = ref([
   {
     id: '1',
@@ -1472,7 +1470,6 @@ const tasks = ref([
   }
 ])
 
-
 const newTask = ref({
   title: '',
   description: '',
@@ -1508,6 +1505,11 @@ const assigneeFilterOptions = [
 ]
 
 const subtasks = ref([])
+
+// Get today's date in YYYY-MM-DD format for min date validation
+const todayDate = computed(() => {
+  return new Date().toISOString().split('T')[0]
+})
 
 const calendarDates = computed(() => {
   const dates = []
@@ -1567,12 +1569,10 @@ const weekDates = computed(() => {
   return dates
 })
 
-// Computed properties for filtered tasks
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
   let filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Done')
 
-  // Apply filters
   if (selectedPriorities.value.length > 0) {
     filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
   }
@@ -1582,6 +1582,41 @@ const todayTasks = computed(() => {
 
   return filtered
 })
+
+// Validate start and end times
+const validateTaskTimes = () => {
+  // If both start and end times are provided
+  if (newTask.value.startTime && newTask.value.endTime) {
+    const start = new Date(newTask.value.startTime);
+    const end = new Date(newTask.value.endTime);
+    
+    if (end <= start) {
+      showMessage('End time must be after start time', 'error');
+      return false;
+    }
+  }
+  
+  // If start or end time is provided, due date must be set
+  if ((newTask.value.startTime || newTask.value.endTime) && !newTask.value.dueDate) {
+    showMessage('Please set a due date before adding time slots', 'error');
+    return false;
+  }
+  
+  // Validate that END time is on or before the due date
+  if (newTask.value.dueDate && newTask.value.endTime) {
+    const dueDate = new Date(newTask.value.dueDate);
+    const endTime = new Date(newTask.value.endTime);
+    
+    dueDate.setHours(23, 59, 59, 999); // End of due date
+    
+    if (endTime > dueDate) {
+      showMessage('End time cannot be after the due date', 'error');
+      return false;
+    }
+  }
+  
+  return true;
+}
 
 const weekTasks = computed(() => {
   const today = new Date()
@@ -1594,7 +1629,6 @@ const weekTasks = computed(() => {
     return taskDate > today && taskDate <= nextWeek
   })
 
-  // Apply filters
   if (selectedPriorities.value.length > 0) {
     filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
   }
@@ -1611,7 +1645,6 @@ const overdueTasks = computed(() => {
     return task.dueDate && task.dueDate < today && task.status !== 'Done'
   })
 
-  // Apply filters
   if (selectedPriorities.value.length > 0) {
     filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
   }
@@ -1645,6 +1678,238 @@ const selectedFilters = computed(() => {
     ...selectedAssignees.value.map(a => ({ key: `assignee-${a}`, label: assigneeFilterOptions.find(o => o.value === a)?.title || a, type: 'assignee', value: a }))
   ]
 })
+
+const filteredTasksList = computed(() => {
+  let allTasks = []
+  
+  tasks.value.forEach(task => {
+    allTasks.push(task)
+    if (task.subtasks && task.subtasks.length > 0) {
+      task.subtasks.forEach((subtask, index) => {
+        allTasks.push({
+          ...subtask,
+          id: `${task.id}-subtask-${index}`,
+          isSubtask: true,
+          parentTask: task
+        })
+      })
+    }
+  })
+
+  if (selectedPriorities.value.length > 0) {
+    allTasks = allTasks.filter(task => selectedPriorities.value.includes(task.priority))
+  }
+  if (selectedAssignees.value.length > 0) {
+    allTasks = allTasks.filter(task => selectedAssignees.value.includes(task.assignedTo))
+  }
+
+  allTasks.sort((a, b) => {
+    if (listSortBy.value === 'Due Date') {
+      return new Date(a.dueDate || '9999-12-31') - new Date(b.dueDate || '9999-12-31')
+    } else if (listSortBy.value === 'Priority') {
+      return (a.priority || 10) - (b.priority || 10)
+    } else if (listSortBy.value === 'Status') {
+      return (a.status || '').localeCompare(b.status || '')
+    } else if (listSortBy.value === 'Assignee') {
+      return (a.assignedTo || '').localeCompare(b.assignedTo || '')
+    }
+    return 0
+  })
+
+  return allTasks
+})
+
+// Validate if date is in the past
+const validateDueDate = (dateString) => {
+  if (!dateString) return true; // Allow empty dates
+  
+  const selectedDate = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time to compare dates only
+  
+  return selectedDate >= today;
+}
+
+// Update Task Function
+const updateTask = async (taskId, updatedData) => {
+  try {
+    // Validate due date isn't in the past
+    if (updatedData.dueDate && !validateDueDate(updatedData.dueDate)) {
+      showMessage('Cannot set due date in the past', 'error');
+      return false;
+    }
+
+    // Upload attachments if any
+    if (updatedData.attachments && updatedData.attachments.length > 0) {
+      updatedData.attachments = await uploadFiles(updatedData.attachments);
+    }
+
+    // Send update request to backend
+    await axiosClient.put(`/tasks/${taskId}`, updatedData);
+    
+    // Update local state
+    const taskIndex = tasks.value.findIndex(t => t.id === taskId);
+    if (taskIndex !== -1) {
+      tasks.value[taskIndex] = {
+        ...tasks.value[taskIndex],
+        ...updatedData,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Update refs if the task is currently selected
+      if (selectedTask.value?.id === taskId) {
+        selectedTask.value = tasks.value[taskIndex];
+      }
+      if (selectedListTask.value?.id === taskId) {
+        selectedListTask.value = tasks.value[taskIndex];
+      }
+    }
+    
+    showMessage('Task updated successfully!', 'success');
+    return true;
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Failed to update task';
+    console.error('Error updating task:', errorMessage, error);
+    showMessage(errorMessage, 'error');
+    return false;
+  }
+};
+
+// Create Task Function (updated to handle both create and edit)
+const createTask = async () => {
+  // Handle Edit Mode
+  if (isEditing.value) {
+    const mainAttachments = await uploadFiles(newTask.value.attachments);
+    
+    const updatedData = {
+      title: newTask.value.title,
+      description: newTask.value.description,
+      dueDate: newTask.value.dueDate,
+      assignedTo: newTask.value.assignedTo,
+      priority: newTask.value.priority,
+      status: newTask.value.status,
+      collaborators: newTask.value.collaborators,
+      startTime: newTask.value.startTime,
+      endTime: newTask.value.endTime,
+      attachments: mainAttachments.length > 0 ? mainAttachments : newTask.value.attachments,
+      subtasks: subtasks.value
+    };
+    
+    const success = await updateTask(newTask.value.id, updatedData);
+    
+    if (success) {
+      showCreateDialog.value = false;
+      resetForm();
+    }
+    return;
+  }
+  
+  // Handle Create Mode
+  try {
+    // Validate due date
+    if (newTask.value.dueDate && !validateDueDate(newTask.value.dueDate)) {
+      showMessage('Cannot set due date in the past', 'error');
+      return;
+    }
+
+    // File upload logic
+    const mainAttachments = await uploadFiles(newTask.value.attachments);
+
+    const processedSubtasks = subtasks.value.map(subtask => ({
+        ...subtask,
+    }));
+
+    const taskData = {
+        title: newTask.value.title,
+        description: newTask.value.description,
+        dueDate: newTask.value.dueDate,
+        assigneeId: newTask.value.assignedTo,
+        priority: newTask.value.priority,
+        status: newTask.value.status || 'To Do',
+        collaborators: newTask.value.collaborators,
+        startTime: newTask.value.startTime,
+        endTime: newTask.value.endTime,
+        attachments: mainAttachments,
+        subtasks: processedSubtasks, 
+    };
+
+    const response = await axiosClient.post('/tasks', taskData); 
+    const newTaskId = response.data.id; 
+    
+    const newTaskWithId = { 
+        ...taskData, 
+        id: newTaskId,
+        statusHistory: [{ 
+            timestamp: new Date().toISOString(),
+            oldStatus: null, 
+            newStatus: taskData.status 
+        }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    tasks.value.push(newTaskWithId);
+    showMessage('Task created successfully!', 'success');
+
+    showCreateDialog.value = false;
+    resetForm();
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Failed to connect to server or save task.';
+    console.error('Error creating task:', errorMessage, error);
+    showMessage(errorMessage, 'error');
+  }
+}
+
+// Change Task Status Function
+const changeTaskStatus = async (task, newStatus) => {
+  const oldStatus = task.status
+
+  if (oldStatus === newStatus) {
+    showMessage(`Task is already in "${newStatus}" status.`, 'info')
+    return
+  }
+  
+  if (task.isSubtask) {
+      showMessage('Subtask status can only be managed locally for now.', 'info');
+      return;
+  }
+  if (!task.id) {
+      showMessage('Task ID is missing.', 'error');
+      return;
+  }
+
+  try {
+    await axiosClient.put(`/tasks/${task.id}/status`, { status: newStatus }); 
+    
+    const taskIndex = tasks.value.findIndex(t => t.id === task.id)
+    if (taskIndex !== -1) {
+      const taskData = tasks.value[taskIndex]
+      const statusHistory = [...(taskData.statusHistory || [])]
+      
+      statusHistory.push({
+        timestamp: new Date().toISOString(),
+        oldStatus: oldStatus,
+        newStatus: newStatus
+      })
+      
+      tasks.value[taskIndex] = {
+        ...taskData,
+        status: newStatus,
+        statusHistory,
+        updatedAt: new Date().toISOString()
+      }
+      
+      selectedTask.value = tasks.value[taskIndex]
+      selectedListTask.value = tasks.value[taskIndex]
+    }
+    
+    showMessage('Task status updated!', 'success')
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Failed to update task status on server.';
+    console.error('Error updating task status:', errorMessage, error)
+    showMessage(errorMessage, 'error')
+  }
+}
 
 const toggleUpcomingSidebar = () => {
   upcomingSidebarOpen.value = !upcomingSidebarOpen.value
@@ -1694,7 +1959,6 @@ const selectDate = (date) => {
   showDateDetailsDialog.value = true
 }
 
-
 const getTasksForSelectedDate = () => {
   if (!selectedDate.value) return []
   return getTasksForDate(selectedDate.value.dateKey)
@@ -1713,50 +1977,6 @@ const addTaskForDate = (dateKey) => {
   showCreateDialog.value = true
 }
 
-const filteredTasksList = computed(() => {
-  let allTasks = []
-  
-  // Flatten tasks and subtasks
-  tasks.value.forEach(task => {
-    allTasks.push(task)
-    if (task.subtasks && task.subtasks.length > 0) {
-      task.subtasks.forEach((subtask, index) => {
-        allTasks.push({
-          ...subtask,
-          id: `${task.id}-subtask-${index}`,
-          isSubtask: true,
-          parentTask: task
-        })
-      })
-    }
-  })
-
-  // Apply filters
-  if (selectedPriorities.value.length > 0) {
-    allTasks = allTasks.filter(task => selectedPriorities.value.includes(task.priority))
-  }
-  if (selectedAssignees.value.length > 0) {
-    allTasks = allTasks.filter(task => selectedAssignees.value.includes(task.assignedTo))
-  }
-
-  // Sort
-  allTasks.sort((a, b) => {
-    if (listSortBy.value === 'Due Date') {
-      return new Date(a.dueDate || '9999-12-31') - new Date(b.dueDate || '9999-12-31')
-    } else if (listSortBy.value === 'Priority') {
-      return (a.priority || 10) - (b.priority || 10)
-    } else if (listSortBy.value === 'Status') {
-      return (a.status || '').localeCompare(b.status || '')
-    } else if (listSortBy.value === 'Assignee') {
-      return (a.assignedTo || '').localeCompare(b.assignedTo || '')
-    }
-    return 0
-  })
-
-  return allTasks
-})
-
-// Get tasks for a specific date
 const getTasksForDate = (dateKey) => {
   let items = []
   tasks.value.forEach(task => {
@@ -1780,7 +2000,6 @@ const getTasksForDate = (dateKey) => {
     }
   })
 
-  // Apply filters
   if (selectedPriorities.value.length > 0) {
     items = items.filter(task => selectedPriorities.value.includes(task.priority))
   }
@@ -1831,12 +2050,10 @@ const openAttachment = (url) => {
 
 const editTask = (task) => {
   newTask.value = { ...task }
-  // Ensure all required properties are initialized
   newTask.value.collaborators = newTask.value.collaborators || []
   newTask.value.attachments = newTask.value.attachments || []
   newTask.value.status = newTask.value.status || 'To Do'
   subtasks.value = task.subtasks ? [...task.subtasks] : []
-  // Ensure statusHistory is present for editing
   if (!newTask.value.statusHistory) newTask.value.statusHistory = []
   subtasks.value.forEach(subtask => {
     if (!subtask.statusHistory) subtask.statusHistory = []
@@ -1847,137 +2064,6 @@ const editTask = (task) => {
   showCreateDialog.value = true
   showDetailsDialog.value = false
 }
-
-// --------------------------------------------------------------------------------------
-// 3. UPDATED createTask FUNCTION (Links to POST /tasks)
-// --------------------------------------------------------------------------------------
-const createTask = async () => {
-  if (isEditing.value) {
-    // Handling for editing is skipped to focus on API linking.
-    showMessage('Editing not yet linked to API. Saving locally for now.', 'info');
-    return; 
-  }
-  
-  try {
-    // File upload logic remains local (Firebase Storage)
-    const mainAttachments = await uploadFiles(newTask.value.attachments)
-
-    // Simplified subtask processing for the POST request
-    const processedSubtasks = subtasks.value.map(subtask => ({
-        ...subtask,
-    }));
-
-    // 1. Prepare Data for Backend
-    const taskData = {
-        title: newTask.value.title,
-        description: newTask.value.description,
-        dueDate: newTask.value.dueDate,
-        assigneeId: newTask.value.assignedTo, // Used 'assignedTo' for consistency with input
-        priority: newTask.value.priority,
-        status: newTask.value.status || 'To Do',
-        collaborators: newTask.value.collaborators,
-        startTime: newTask.value.startTime,
-        endTime: newTask.value.endTime,
-        attachments: mainAttachments,
-        subtasks: processedSubtasks, 
-    };
-
-    // 2. Send POST Request to Backend (API Link)
-    const response = await axiosClient.post('/tasks', taskData); 
-    
-    // 3. Get the ID back and integrate into local state
-    const newTaskId = response.data.id; 
-    
-    // Create the local task object using the ID from the database
-    const newTaskWithId = { 
-        ...taskData, 
-        id: newTaskId,
-        statusHistory: [{ 
-            timestamp: new Date().toISOString(),
-            oldStatus: null, 
-            newStatus: taskData.status 
-        }],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    };
-
-    // 4. Update Local Array
-    tasks.value.push(newTaskWithId);
-    showMessage('Task created successfully!', 'success');
-
-    showCreateDialog.value = false
-    resetForm()
-  } catch (error) {
-    // Axios Error Handling
-    const errorMessage = error.response?.data?.message || 'Failed to connect to server or save task.';
-    console.error('Error creating task:', errorMessage, error);
-    showMessage(errorMessage, 'error');
-  }
-}
-
-// --------------------------------------------------------------------------------------
-// 4. UPDATED changeTaskStatus FUNCTION (Links to PUT /tasks/:id/status)
-// --------------------------------------------------------------------------------------
-const changeTaskStatus = async (task, newStatus) => {
-  const oldStatus = task.status
-
-  // 1. Prevent changing to the same status
-  if (oldStatus === newStatus) {
-    showMessage(`Task is already in "${newStatus}" status.`, 'info')
-    return
-  }
-  
-  // Prevent subtask update via main endpoint
-  if (task.isSubtask) {
-      showMessage('Subtask status can only be managed locally for now.', 'info');
-      return;
-  }
-  if (!task.id) {
-      showMessage('Task ID is missing.', 'error');
-      return;
-  }
-
-  try {
-    // 2. Send PUT Request to Backend (API Link)
-    // PUT to: http://localhost:3000/tasks/TASK_ID/status
-    await axiosClient.put(`/tasks/${task.id}/status`, { status: newStatus }); 
-    
-    // 3. Local State Update after Successful API Call
-    const taskIndex = tasks.value.findIndex(t => t.id === task.id)
-    if (taskIndex !== -1) {
-      const taskData = tasks.value[taskIndex]
-      const statusHistory = [...(taskData.statusHistory || [])]
-      
-      // Log the change for the local history display
-      statusHistory.push({
-        timestamp: new Date().toISOString(),
-        oldStatus: oldStatus,
-        newStatus: newStatus
-      })
-      
-      // Update the local object with the new status and history
-      tasks.value[taskIndex] = {
-        ...taskData,
-        status: newStatus,
-        statusHistory,
-        updatedAt: new Date().toISOString()
-      }
-      
-      // Update UI refs to force screen refresh
-      selectedTask.value = tasks.value[taskIndex]
-      selectedListTask.value = tasks.value[taskIndex]
-    }
-    
-    showMessage('Task status updated!', 'success')
-  } catch (error) {
-    // Axios Error Handling
-    const errorMessage = error.response?.data?.message || 'Failed to update task status on server.';
-    console.error('Error updating task status:', errorMessage, error)
-    showMessage(errorMessage, 'error')
-  }
-}
-// --------------------------------------------------------------------------------------
-
 
 const cancelCreate = () => {
   showCreateDialog.value = false
@@ -2026,7 +2112,7 @@ const togglePriorityMenu = () => {
   if (priorityMenuOpen.value) {
     closePriorityMenu()
   } else {
-    closeAssigneeMenu() // Close other dropdown
+    closeAssigneeMenu()
     openPriorityMenu()
   }
 }
@@ -2035,7 +2121,6 @@ const openPriorityMenu = () => {
   tempSelectedPriorities.value = [...selectedPriorities.value]
   searchPriority.value = ''
 
-  // Calculate position
   nextTick(() => {
     if (priorityBtnRef.value) {
       const rect = priorityBtnRef.value.$el.getBoundingClientRect()
@@ -2046,7 +2131,6 @@ const openPriorityMenu = () => {
 
   priorityMenuOpen.value = true
 
-  // Add click outside listener
   nextTick(() => {
     document.addEventListener('click', handlePriorityClickOutside)
   })
@@ -2080,7 +2164,7 @@ const toggleAssigneeMenu = () => {
   if (assigneeMenuOpen.value) {
     closeAssigneeMenu()
   } else {
-    closePriorityMenu() // Close other dropdown
+    closePriorityMenu()
     openAssigneeMenu()
   }
 }
@@ -2089,7 +2173,6 @@ const openAssigneeMenu = () => {
   tempSelectedAssignees.value = [...selectedAssignees.value]
   searchAssignee.value = ''
 
-  // Calculate position
   nextTick(() => {
     if (assigneeBtnRef.value) {
       const rect = assigneeBtnRef.value.$el.getBoundingClientRect()
@@ -2100,7 +2183,6 @@ const openAssigneeMenu = () => {
 
   assigneeMenuOpen.value = true
 
-  // Add click outside listener
   nextTick(() => {
     document.addEventListener('click', handleAssigneeClickOutside)
   })
@@ -2167,7 +2249,6 @@ const truncateTaskTitle = (title) => {
   }
   return title
 }
-
 
 const selectListTask = (task) => {
   selectedListTask.value = task

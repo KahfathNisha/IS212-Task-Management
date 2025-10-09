@@ -17,6 +17,11 @@ router.put('/:id/assign', taskController.assignTask);
 // Archive (soft-delete) a task
 router.put('/:id/archive', taskController.archiveTask);
 
+// Add this line to your routes file
+router.put('/:id', taskController.updateTask);
+
 module.exports = router;
+
+
 
 
