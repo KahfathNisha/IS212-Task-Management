@@ -363,7 +363,7 @@
           </div>
         </div>
       </div>
-    </div>
+      </div>
     <!-- List View -->
     <div v-if="viewType === 'list'" class="list-view">
         <!-- Left side: Task list -->
@@ -723,513 +723,32 @@
     </v-dialog>
 
     <!-- Task Details Dialog -->
-    <v-dialog v-model="showDetailsDialog" max-width="800px">
-      <v-card v-if="selectedTask" class="task-details-card" rounded="xl">
-        <v-card-title class="task-details-header">
-          <div class="details-title-section">
-            <h2>{{ selectedTask.title }}</h2>
-            <div class="title-chips">
-                <v-chip
-                  :color="getStatusColor(selectedTask.status)"
-                  size="small"
-                  rounded="lg"
-                >
-                  {{ selectedTask.status }}
-                </v-chip>
-                <v-chip
-                  v-if="selectedTask.isSubtask"
-                  color="secondary"
-                  size="small"
-                  rounded="lg"
-                >
-                  Subtask
-                </v-chip>
-                <v-chip
-                  v-else
-                  color="primary"
-                  size="small"
-                  rounded="lg"
-                >
-                  Task
-                </v-chip>
-              </div>
-          </div>
-          <v-btn icon="mdi-close" class="close-btn" variant="text" @click="showDetailsDialog = false" />
-        </v-card-title>
+    <TaskDetailsDialog
+      v-model:show="showDetailsDialog"
+      :model="selectedTask"
+      :taskStatuses="taskStatuses"
+      :parentTaskProgress="parentTaskProgress"
+      @edit="editTask"
+      @change-status="changeTaskStatus"
+      @view-parent="viewTaskDetails"
+      @open-attachment="openAttachment" 
+    />
 
-        <v-card-text class="task-details-content">
-          <v-row>
-            <v-col cols="6">
-              <div class="detail-section">
-                <div class="detail-section-icon-row">
-                  <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                  <h4>Description</h4>
-                </div>
-                <p>{{ selectedTask.description || "No description" }}</p>
-              </div>
-            </v-col>
-            <v-col cols="6">
-              <div class="detail-section">
-                <div class="detail-section-icon-row">
-                  <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-                  <h4>Due Date</h4>
-                </div>
-                <p>{{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'No due date' }}</p>
-              </div>
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col cols="6">
-              <div class="detail-section">
-                <div class="detail-section-icon-row">
-                  <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                  <h4>Assigned To</h4>
-                </div>
-                <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
-              </div>
-            </v-col>
-            <v-col cols="6">
-              <div class="detail-section">
-                <div class="detail-section-icon-row">
-                  <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
-                  <h4>Priority</h4>
-                </div>
-                <p>{{ selectedTask.priority || 'Not set' }}</p>
-              </div>
-            </v-col>
-          </v-row>
-          <v-row v-if="selectedTask.collaborators && selectedTask.collaborators.length > 0">
-            <v-col cols="12">
-              <div class="detail-section">
-                <div class="detail-section-icon-row">
-                  <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                  <h4>Collaborators</h4>
-                </div>
-                <p>{{ selectedTask.collaborators.join(', ') }}</p>
-              </div>
-            </v-col>
-          </v-row>
-
-          <!--progress bar based on subtask completion, shown for parent tasks-->
-          <div class="detail-section" v-if="selectedTask && selectedTask.subtasks && selectedTask.subtasks.length > 0">
-            <h4>Progress</h4>
-            <div class="progress-bar-container">
-              <div class="custom-progress-bar">
-                <div class="progress-fill" :style="{ width: parentTaskProgress + '%' }"></div>
-              </div>
-              <span class="progress-text">{{ parentTaskProgress }}%</span>
-            </div>
-          </div>
-
-          <div class="detail-section" v-if="selectedTask.attachments && selectedTask.attachments.length > 0">
-            <h4>Attachments</h4>
-            <div class="attachments-list">
-              <v-chip
-                v-for="attachment in selectedTask.attachments"
-                :key="attachment.url"
-                variant="outlined"
-                class="attachment-chip"
-                @click="openAttachment(attachment.url)"
-              >
-                <v-icon start>mdi-paperclip</v-icon>
-                {{ attachment.name }}
-              </v-chip>
-            </div>
-          </div>
-
-          <!-- Status History: show for all tasks -->
-          <div class="detail-section"
-            v-if="selectedTask.statusHistory && selectedTask.statusHistory.length">
-            <h4>Status Updates</h4>
-            <div class="status-updates">
-              <div class="status-entry">
-                <div class="status-dot" :style="{ backgroundColor: getStatusColor('To Do') }"></div>
-                <!-- <div class="status-info">
-                  <div class="status-description">Created as <v-chip size="x-small" color="orange">To Do</v-chip></div>
-                  <div class="status-timestamp">{{ formatDateTime(selectedTask.createdAt) }}</div>
-                </div> -->
-              </div>
-              <div v-for="(entry, idx) in selectedTask.statusHistory" :key="idx" class="status-entry">
-                <div class="status-dot" :style="{ backgroundColor: getStatusColor(entry.newStatus) }"></div>
-                <div class="status-info">
-                  <div class="status-description">
-                    Status changed to <v-chip size="x-small" :color="getStatusColor(entry.newStatus)">{{ entry.newStatus }}</v-chip>
-                  </div>
-                  <div class="status-timestamp">{{ formatDateTime(entry.timestamp) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Subtasks section in parent task dialog-->
-          <div class="detail-section" v-if="selectedTask && selectedTask.subtasks && selectedTask.subtasks.length > 0">
-            <h4>Subtasks</h4>
-            <div class="subtask-list">
-              <div v-for="subtask in selectedTask.subtasks" :key="subtask.id" class="subtask-item">
-                <div class="subtask-info">
-                  <div class="subtask-title">{{ subtask.title }}</div>
-                  <div class="subtask-status">
-                    <v-chip
-                      :color="getStatusColor(subtask.status)"
-                      size="small"
-                      rounded="lg"
-                    >
-                      {{ subtask.status }}
-                    </v-chip>
-                  </div>
-                </div>
-                <div class="subtask-details">
-                  <v-row>
-                    <v-col cols="6">
-                      <div class="detail-row" v-if="subtask.description">
-                        <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                        <p>{{ subtask.description }}</p>
-                      </div>
-                    </v-col>
-                    <v-col cols="6">
-                      <div class="detail-row" v-if="subtask.priority">
-                        <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
-                        <p>Priority: {{ subtask.priority }}</p>
-                      </div>
-                    </v-col>
-                  </v-row>
-                  <v-row>
-                    <v-col cols="6">
-                      <div class="detail-row" v-if="subtask.assignedTo">
-                        <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                        <p>{{ subtask.assignedTo }}</p>
-                      </div>
-                    </v-col>
-                    <v-col cols="6">
-                      <div class="detail-row" v-if="subtask.collaborators && subtask.collaborators.length > 0">
-                        <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                        <p>{{ subtask.collaborators.join(', ') }}</p>
-                      </div>
-                    </v-col>
-                  </v-row>
-                  <v-row>
-                    <v-col cols="6">
-                      <div class="detail-row" v-if="subtask.dueDate">
-                        <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-                        <p>{{ formatDate(subtask.dueDate) }}</p>
-                      </div>
-                    </v-col>
-                  </v-row>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Parent Task section in subtask dialog -->
-          <div class="detail-section" v-if="selectedTask.isSubtask">
-            <h4>Parent Task</h4>
-            <div class="parent-summary">
-              <div class="parent-title-section">
-                <v-btn
-                  variant="text"
-                  size="small"
-                  class="parent-title-btn"
-                  @click="viewTaskDetails(selectedTask.parentTask)"
-                  title="View task details"
-                >
-                  {{ selectedTask.parentTask.title }}
-                </v-btn>
-              </div>
-              <!-- <div class="parent-controls">
-                <v-chip :color="getStatusColor(selectedTask.parentTask.status)" size="small">
-                  {{ selectedTask.parentTask.status }}
-                </v-chip>
-              </div> -->
-            </div>
-          </div>
-        </v-card-text>
-
-        <v-card-actions>
-          <v-btn
-            color="white"
-            @click="editTask(selectedTask)"
-            prepend-icon="mdi-pencil"
-            rounded="lg"
-          >
-            {{ selectedTask.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
-          </v-btn>
-          <v-spacer />
-          <v-select
-            :model-value="selectedTask.status"
-            :items="taskStatuses"
-            label="Update Status"
-            variant="outlined"
-            density="compact"
-            @update:modelValue="changeTaskStatus(selectedTask, $event)"
-            style="max-width: 200px;"
-          ></v-select>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
     <!-- Create Task Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="700px">
-      <v-card class="create-task-card" rounded="xl">
-        <v-card-title class="d-flex justify-space-between align-center">
-          <span>{{ isEditing ? 'Edit Task' : 'Create New Task' }}</span>
-          <v-btn icon="mdi-close" variant="text" @click="cancelCreate" />
-        </v-card-title>
-        <v-card-text>
-          <v-form ref="taskForm" v-model="formValid">
-            <v-text-field
-              v-model="newTask.title"
-              label="Title *"
-              placeholder="Enter task title"
-              required
-              variant="outlined"
-              class="mb-4"
-            />
-            
-            <v-textarea
-              v-model="newTask.description"
-              label="Description"
-              placeholder="Enter task description"
-              variant="outlined"
-              rows="3"
-              class="mb-4"
-            />
-            
-            <div class="d-flex ga-4 mb-4">
-              <v-select
-                v-model="newTask.type"
-                label="Type"
-                :items="taskTypes"
-                variant="outlined"
-                class="flex-1"
-              />
-              <v-select
-                v-model="newTask.status"
-                label="Status"
-                :items="taskStatuses"
-                variant="outlined"
-                class="flex-1"
-              />
-            </div>
-            
-            <div class="d-flex ga-4 mb-4">
-              <v-select
-                v-model="newTask.priority"
-                label="Priority"
-                :items="priorities"
-                variant="outlined"
-                class="flex-1"
-              />
-              <v-select
-                v-model="newTask.project"
-                label="Project"
-                :items="projects"
-                placeholder="Select project"
-                variant="outlined"
-                class="flex-1"
-              />
-            </div>
-
-            <div class="d-flex mb-4">
-              <v-text-field
-                v-model="newTask.dueDate"
-                label="Due Date"
-                type="date"
-                :min="todayDate"
-                variant="outlined"
-                class="flex-1"
-              />
-            </div>
-
-             <div class="d-flex ga-4 mb-4">
-              <v-text-field
-                v-model="newTask.startTime"
-                label="Start Time"
-                type="datetime-local"
-                variant="outlined"
-                class="flex-1"
-              />
-              <v-text-field
-                v-model="newTask.endTime"
-                label="End Time"
-                type="datetime-local"
-                :min="newTask.startTime || (newTask.dueDate ? newTask.dueDate + 'T00:00' : '')"
-                variant="outlined"
-                class="flex-1"
-              />
-            </div>
-            
-            <div class="d-flex ga-4 mb-4">
-              <v-select
-                v-model="newTask.assignedTo"
-                label="Assignee"
-                :items="teamMembers.filter(member => !newTask.collaborators.includes(member))"
-                placeholder="Select assignee"
-                variant="outlined"
-                class="flex-1"
-              />
-              <v-select
-                v-model="newTask.collaborators"
-                label="Collaborators"
-                :items="teamMembers.filter(member => member !== newTask.assignedTo)"
-                placeholder="Select collaborators"
-                variant="outlined"
-                multiple
-                chips
-                class="flex-1"
-              />
-            </div>
-
-            <div class="mb-4">
-              <v-file-input
-                v-model="newTask.attachments"
-                label="Attach Documents"
-                accept=".pdf"
-                multiple
-                variant="outlined"
-                prepend-icon="mdi-paperclip"
-                show-size
-                chips
-              />
-            </div>
-
-            <div class="d-flex justify-center mb-4">
-              <v-btn
-                variant="text"
-                prepend-icon="mdi-plus"
-                @click="addSubtask"
-                color="primary"
-                rounded="lg"
-              >
-                Add Subtask
-              </v-btn>
-            </div>
-
-            <div v-for="(subtask, index) in subtasks" :key="index" class="subtask-section mb-4">
-              <v-divider class="mb-4"></v-divider>
-              <h5 class="mb-3">Subtask {{ index + 1 }}</h5>
-
-              <v-text-field
-                v-model="subtask.title"
-                label="Subtask Title *"
-                placeholder="Enter subtask title"
-                required
-                variant="outlined"
-                class="mb-3"
-              />
-
-              <v-textarea
-                v-model="subtask.description"
-                label="Subtask Description"
-                placeholder="Enter subtask description"
-                variant="outlined"
-                rows="2"
-                class="mb-3"
-              />
-
-              <div class="d-flex ga-4 mb-3">
-                <v-select
-                  v-model="subtask.status"
-                  label="Status"
-                  :items="taskStatuses"
-                  variant="outlined"
-                  class="flex-1"
-                />
-                <v-select
-                  v-model="subtask.priority"
-                  label="Priority"
-                  :items="priorities"
-                  variant="outlined"
-                  class="flex-1"
-                />
-              </div>
-              
-              <div class="d-flex mb-3">
-                <v-text-field
-                  v-model="subtask.dueDate"
-                  label="Due Date"
-                  type="date"
-                  :min="todayDate"
-                  variant="outlined"
-                  class="flex-1"
-                />
-              </div>
-
-              <div class="d-flex ga-4 mb-3">
-                <v-text-field
-                  v-model="subtask.startTime"
-                  label="Start Time"
-                  type="datetime-local"
-                  variant="outlined"
-                  class="flex-1"
-                />
-                <v-text-field
-                  v-model="subtask.endTime"
-                  label="End Time"
-                  type="datetime-local"
-                  :min="newTask.startTime || (newTask.dueDate ? newTask.dueDate + 'T00:00' : '')"
-                  variant="outlined"
-                  class="flex-1"
-                />
-              </div>
-
-
-              <div class="d-flex ga-4 mb-3">
-                <v-select
-                  v-model="subtask.assignedTo"
-                  label="Assignee"
-                  :items="teamMembers.filter(member => !subtask.collaborators.includes(member))"
-                  placeholder="Select assignee"
-                  variant="outlined"
-                  class="flex-1"
-                />
-                <v-select
-                  v-model="subtask.collaborators"
-                  label="Collaborators"
-                  :items="teamMembers.filter(member => member !== subtask.assignedTo)"
-                  placeholder="Select collaborators"
-                  variant="outlined"
-                  multiple
-                  chips
-                  class="flex-1"
-                />
-              </div>
-
-              <div class="mb-3">
-                <v-file-input
-                  v-model="subtask.attachments"
-                  label="Attach Documents/PDFs"
-                  accept=".pdf,.doc,.docx,.txt"
-                  multiple
-                  variant="outlined"
-                  prepend-icon="mdi-paperclip"
-                  show-size
-                  chips
-                  small-chips
-                />
-              </div>
-
-              <v-btn
-                variant="outlined"
-                color="error"
-                size="small"
-                @click="subtasks.splice(index, 1)"
-                prepend-icon="mdi-delete"
-                rounded="lg"
-              >
-                Remove Subtask
-              </v-btn>
-            </div>
-          </v-form>
-        </v-card-text>
-        
-        <v-card-actions class="px-6 pb-6">
-          <v-spacer />
-          <v-btn variant="text" @click="cancelCreate" class="mr-2" rounded="lg">Cancel</v-btn>
-          <v-btn color="secondary" @click="createTask" rounded="lg">{{ isEditing ? 'Update' : 'Save' }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
+    <CreateTaskDialogue
+      v-model:show="showCreateDialog"
+      :model="newTask"
+      :isEditing="isEditing"
+      :taskTypes="taskTypes"
+      :taskStatuses="taskStatuses"
+      :priorities="priorities"
+      :projects="projects"
+      :teamMembers="teamMembers"
+      :todayDate="todayDate"
+      @save="handleCreateSave"
+      @cancel="cancelCreate"
+    />
     <v-snackbar
       v-model="showSnackbar"
       :color="snackbarColor"
@@ -1246,6 +765,9 @@ import { ref, computed, nextTick } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 import axios from 'axios'
+import '../assets/styles.css';
+import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
+import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -2263,9 +1785,8 @@ const calculateProgress = (task) => {
 
 </script>
 
-
 <style scoped>
-.tasks-container {
+  .tasks-container {
   width: 100%;
   height: 100vh;
   display: flex;
@@ -2366,7 +1887,7 @@ const calculateProgress = (task) => {
   font-weight: 500;
   font-size: 14px;
   color: #2c3e50;
-  flex: 1;
+  flex:  1;
   margin-right: 8px;
 }
 

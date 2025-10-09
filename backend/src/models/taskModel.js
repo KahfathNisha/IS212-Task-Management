@@ -2,12 +2,15 @@
 const taskModel = {
   title: "",                          // Task name
   description: "",                    // Details
-  dueDate: new Date(),                // One official due date
-  status: "Unassigned",               // Default
+  type: "",                           // Task Meeting etc
+  status: "To Do",                    // Default
   priority: 1,                        // Priority level 1-10, default 1
+  projectId: null,                    // One project or standalone
+  dueDate: new Date(),                // One official due date
+  startTime: new Date(),              // Start time
+  endTime: new Date(),                // End time
   ownerId: "",                        // Creator
   assigneeId: null,                   // Single assignee or null
-  projectId: null,                    // One project or standalone
   collaborators: [],                  // Extra participants
   attachments: [],                    // PDF URLs
   subtasks: [],                       // Array of subtasks
