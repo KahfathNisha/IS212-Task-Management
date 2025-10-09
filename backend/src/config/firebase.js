@@ -24,6 +24,7 @@ if (!admin.apps || admin.apps.length === 0) {
 // Export the initialized services for use in other parts of your app
 const auth = admin.auth();
 const db = admin.firestore();
+db.settings({ ignoreUndefinedProperties: true });
 
 module.exports = {
   admin,

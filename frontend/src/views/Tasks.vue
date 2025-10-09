@@ -743,7 +743,6 @@
       :taskTypes="taskTypes"
       :taskStatuses="taskStatuses"
       :priorities="priorities"
-      :projects="projects"
       :teamMembers="teamMembers"
       :todayDate="todayDate"
       @save="handleCreateSave"
@@ -1252,6 +1251,21 @@ const validateDueDate = (dateString) => {
   return selectedDate >= today;
 }
 
+// Add Task Function
+const handleCreateSave = async (taskData) => {
+  try {
+    await axios.post('http://localhost:3000/tasks', taskData);
+    // Optionally update your local tasks list here
+    showSnackbar.value = true;
+    snackbarMessage.value = 'Task created successfully!';
+    snackbarColor.value = 'success';
+  } catch (error) {
+    showSnackbar.value = true;
+    snackbarMessage.value = 'Failed to create task.';
+    snackbarColor.value = 'error';
+  }
+};
+
 // Update Task Function
 const updateTask = async (taskId, updatedData) => {
   try {
@@ -1342,17 +1356,18 @@ const createTask = async () => {
     }));
 
     const taskData = {
-        title: newTask.value.title,
-        description: newTask.value.description,
-        dueDate: newTask.value.dueDate,
-        assigneeId: newTask.value.assignedTo,
-        priority: newTask.value.priority,
-        status: newTask.value.status || 'To Do',
-        collaborators: newTask.value.collaborators,
-        startTime: newTask.value.startTime,
-        endTime: newTask.value.endTime,
-        attachments: mainAttachments,
-        subtasks: processedSubtasks, 
+      title: newTask.value.title,
+      description: newTask.value.description || '',
+      dueDate: newTask.value.dueDate || null,
+      assigneeId: newTask.value.assignedTo || null,
+      priority: newTask.value.priority || 1,
+      status: newTask.value.status || 'To Do',
+      collaborators: Array.isArray(newTask.value.collaborators) ? newTask.value.collaborators : [],
+      startTime: newTask.value.startTime || null,
+      endTime: newTask.value.endTime || null,
+      attachments: mainAttachments || [],
+      subtasks: processedSubtasks || [], 
+      projectId: newTask.value.projectId || null
     };
 
     const response = await axiosClient.post('/tasks', taskData); 

@@ -37,7 +37,7 @@ const validateTimes = (dueDate, startTime, endTime) => {
 // Create Task
 exports.createTask = async (req, res) => {
     try {
-        const { dueDate, assigneeId, title, startTime, endTime } = req.body;
+        const { dueDate, assigneeId, title, startTime, endTime} = req.body;
 
         if (!dueDate) {
             return res.status(400).json({ message: "dueDate is required" });
@@ -48,7 +48,6 @@ exports.createTask = async (req, res) => {
             return res.status(400).json({ message: "Invalid dueDate" });
         }
 
-        // Validate start and end times
         const timeValidation = validateTimes(dueDate, startTime, endTime);
         if (!timeValidation.valid) {
             return res.status(400).json({ message: timeValidation.message });
@@ -60,11 +59,11 @@ exports.createTask = async (req, res) => {
             dueDate: admin.firestore.Timestamp.fromDate(due),
             createdAt: admin.firestore.Timestamp.now(),
             updatedAt: admin.firestore.Timestamp.now(),
-            status: 'Unassigned',
+            status: req.body.status || 'Unassigned',
+            projectId: req.body.projectId || null,
             archived: false
         };
 
-        // Convert startTime and endTime to Timestamps if provided
         if (startTime) {
             task.startTime = admin.firestore.Timestamp.fromDate(new Date(startTime));
         }
@@ -90,8 +89,15 @@ exports.createTask = async (req, res) => {
 
         await Promise.all(reminderPromises);
 
+        Object.keys(task).forEach(key => {
+        if (task[key] === undefined) {
+            delete task[key];
+        }
+        });
+
         res.status(201).json({ id: docRef.id, message: 'Task created successfully' });
     } catch (err) {
+        console.error('Create task error:', err);
         res.status(500).json({ error: err.message });
     }
 };

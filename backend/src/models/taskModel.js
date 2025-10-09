@@ -1,22 +1,28 @@
 // models/Task.js
 const taskModel = {
-  title: "",                          // Task name
-  description: "",                    // Details
-  type: "",                           // Task Meeting etc
-  status: "To Do",                    // Default
-  priority: 1,                        // Priority level 1-10, default 1
-  projectId: null,                    // One project or standalone
-  dueDate: new Date(),                // One official due date
-  startTime: new Date(),              // Start time
-  endTime: new Date(),                // End time
-  ownerId: "",                        // Creator
-  assigneeId: null,                   // Single assignee or null
-  collaborators: [],                  // Extra participants
-  attachments: [],                    // PDF URLs
-  subtasks: [],                       // Array of subtasks
-  archived: false,                    // Soft delete flag
-  createdAt: new Date(),
-  updatedAt: new Date()
+  title: "",
+  description: "",
+  type: "",
+  status: "",
+  priority: 1,
+  projectId: null,
+  dueDate: null,
+  startTime: null,
+  endTime: null,
+  assigneeId: null,
+  collaborators: [],
+  attachments: [],
+  subtasks: [],
+  archived: false,
+  createdAt: null,
+  updatedAt: null
 };
+
+// Remove undefined fields (Firestore does not allow them)
+Object.keys(taskModel).forEach(key => {
+  if (taskModel[key] === undefined) {
+    delete taskModel[key];
+  }
+});
 
 module.exports = taskModel;
