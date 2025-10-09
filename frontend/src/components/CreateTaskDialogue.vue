@@ -135,6 +135,27 @@
             </v-btn>
           </div>
 
+          <div class="d-flex justify-center mb-4">
+            <v-btn
+              variant="outlined"
+              color="primary"
+              prepend-icon="mdi-repeat"
+              @click="showRecurrence = !showRecurrence"
+              rounded="lg"
+              class="mb-4"
+            >
+              {{ showRecurrence ? 'Disable Recurrence' : 'Set Recurrence' }}
+            </v-btn>
+            <v-icon v-if="localTask.recurrence?.enabled" color="primary" class="ml-2">mdi-repeat</v-icon>
+          </div>
+          <RecurrenceOptions
+            v-if="showRecurrence"
+            v-model="localTask.recurrence"
+            :min-date="localTask.dueDate || todayDate"
+            @stop="stopRecurrence"
+          />
+
+
           <div v-for="(subtask, index) in subtasks" :key="index" class="subtask-section mb-4">
             <v-divider class="mb-4"></v-divider>
             <h5 class="mb-3">Subtask {{ index + 1 }}</h5>
@@ -265,6 +286,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import '../assets/styles.css';
+import RecurrenceOptions from './RecurrenceOptions.vue'
 
 const props = defineProps({
   model: { type: Object, default: () => ({}) },
@@ -292,6 +314,20 @@ const taskForm = ref(null)
 
 watch(() => props.model, (v) => { localTask.value = { ...v }; subtasks.value = v?.subtasks ? [...v.subtasks] : [] }, { immediate: true })
 
+const showRecurrence = ref(false);
+
+// Ensure localTask.recurrence always exists and is reactive
+watch(localTask, (val) => {
+  if (!val.recurrence) {
+    val.recurrence = { enabled: false, type: '', interval: 1, endDate: '' }
+  }
+}, { immediate: true, deep: true })
+
+const stopRecurrence = () => {
+  showRecurrence.value = false;
+  localTask.value.recurrence = { enabled: false, type: '', interval: 1, endDate: '' }
+}
+
 const addSubtask = () => {
   subtasks.value.push({ title: '', description: '', status: props.taskStatuses[0] || 'To Do', priority: props.priorities[0] || 1, dueDate: '', startTime: '', endTime: '', assignedTo: null, collaborators: [], attachments: [] })
 }
@@ -302,6 +338,12 @@ const onCancel = () => {
 }
 
 const onSave = () => {
+  // Ensure recurrence.enabled is set correctly
+  if (localTask.value.recurrence && localTask.value.recurrence.type) {
+    localTask.value.recurrence.enabled = true
+  } else {
+    localTask.value.recurrence = { enabled: false, type: '', interval: 1, startDate: '', endDate: '' }
+  }
   // merge subtasks into task before emitting
   const payload = { ...localTask.value, subtasks: subtasks.value }
   emit('save', payload)

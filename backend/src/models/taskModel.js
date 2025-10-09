@@ -15,7 +15,14 @@ const taskModel = {
   subtasks: [],
   archived: false,
   createdAt: null,
-  updatedAt: null
+  updatedAt: null,
+  recurrence: {
+    enabled: false,
+    type: '',      // 'daily', 'weekly', 'monthly', 'custom'
+    interval: 1,   // for custom, in days
+    startDate: null, // ISO string or null
+    endDate: null, // ISO string or null
+  }
 };
 
 // Remove undefined fields (Firestore does not allow them)

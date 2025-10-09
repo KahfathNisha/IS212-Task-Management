@@ -1366,8 +1366,9 @@ const createTask = async () => {
       startTime: newTask.value.startTime || null,
       endTime: newTask.value.endTime || null,
       attachments: mainAttachments || [],
-      subtasks: processedSubtasks || [], 
-      projectId: newTask.value.projectId || null
+      subtasks: processedSubtasks || [],
+      projectId: newTask.value.projectId || null,
+      recurrence: newTask.value.recurrence || { enabled: false, type: '', interval: 1, startDate: null, endDate: null }
     };
 
     const response = await axiosClient.post('/tasks', taskData); 
