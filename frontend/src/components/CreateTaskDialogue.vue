@@ -27,16 +27,18 @@
           
           <div class="d-flex ga-4 mb-4">
             <v-select
-              v-model="localTask.type"
-              label="Type"
-              :items="taskTypes"
-              variant="outlined"
-              class="flex-1"
-            />
-            <v-select
               v-model="localTask.status"
               label="Status"
               :items="taskStatuses"
+              variant="outlined"
+              class="flex-1"
+            />
+            <v-text-field
+              v-model="localTask.dueDate"
+              label="Due Date"
+              type="date"
+              required
+              :min="todayDate"
               variant="outlined"
               class="flex-1"
             />
@@ -55,35 +57,6 @@
               label="Project"
               :items="projects"
               placeholder="Select project"
-              variant="outlined"
-              class="flex-1"
-            />
-          </div>
-
-          <div class="d-flex mb-4">
-            <v-text-field
-              v-model="localTask.dueDate"
-              label="Due Date"
-              type="date"
-              :min="todayDate"
-              variant="outlined"
-              class="flex-1"
-            />
-          </div>
-
-           <div class="d-flex ga-4 mb-4">
-            <v-text-field
-              v-model="localTask.startTime"
-              label="Start Time"
-              type="datetime-local"
-              variant="outlined"
-              class="flex-1"
-            />
-            <v-text-field
-              v-model="localTask.endTime"
-              label="End Time"
-              type="datetime-local"
-              :min="localTask.startTime || (localTask.dueDate ? localTask.dueDate + 'T00:00' : '')"
               variant="outlined"
               class="flex-1"
             />
@@ -206,24 +179,6 @@
               />
             </div>
 
-            <div class="d-flex ga-4 mb-3">
-              <v-text-field
-                v-model="subtask.startTime"
-                label="Start Time"
-                type="datetime-local"
-                variant="outlined"
-                class="flex-1"
-              />
-              <v-text-field
-                v-model="subtask.endTime"
-                label="End Time"
-                type="datetime-local"
-                :min="newTask.startTime || (newTask.dueDate ? newTask.dueDate + 'T00:00' : '')"
-                variant="outlined"
-                class="flex-1"
-              />
-            </div>
-
 
             <div class="d-flex ga-4 mb-3">
               <v-select
@@ -292,7 +247,6 @@ const props = defineProps({
   model: { type: Object, default: () => ({}) },
   show: { type: Boolean, default: false },
   isEditing: { type: Boolean, default: false },
-  taskTypes: { type: Array, default: () => [] },
   taskStatuses: { type: Array, default: () => [] },
   priorities: { type: Array, default: () => [] },
   projects: { type: Array, default: () => [] },
@@ -329,7 +283,7 @@ const stopRecurrence = () => {
 }
 
 const addSubtask = () => {
-  subtasks.value.push({ title: '', description: '', status: props.taskStatuses[0] || 'To Do', priority: props.priorities[0] || 1, dueDate: '', startTime: '', endTime: '', assignedTo: null, collaborators: [], attachments: [] })
+  subtasks.value.push({ title: '', description: '', status: props.taskStatuses[0] || 'To Do', priority: props.priorities[0] || 1, dueDate: '', assignedTo: null, collaborators: [], attachments: [] })
 }
 
 const onCancel = () => {

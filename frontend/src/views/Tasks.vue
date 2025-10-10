@@ -740,7 +740,6 @@
       v-model:show="showCreateDialog"
       :model="newTask"
       :isEditing="isEditing"
-      :taskTypes="taskTypes"
       :taskStatuses="taskStatuses"
       :priorities="priorities"
       :teamMembers="teamMembers"
@@ -1104,41 +1103,6 @@ const todayTasks = computed(() => {
   return filtered
 })
 
-// Validate start and end times
-const validateTaskTimes = () => {
-  // If both start and end times are provided
-  if (newTask.value.startTime && newTask.value.endTime) {
-    const start = new Date(newTask.value.startTime);
-    const end = new Date(newTask.value.endTime);
-    
-    if (end <= start) {
-      showMessage('End time must be after start time', 'error');
-      return false;
-    }
-  }
-  
-  // If start or end time is provided, due date must be set
-  if ((newTask.value.startTime || newTask.value.endTime) && !newTask.value.dueDate) {
-    showMessage('Please set a due date before adding time slots', 'error');
-    return false;
-  }
-  
-  // Validate that END time is on or before the due date
-  if (newTask.value.dueDate && newTask.value.endTime) {
-    const dueDate = new Date(newTask.value.dueDate);
-    const endTime = new Date(newTask.value.endTime);
-    
-    dueDate.setHours(23, 59, 59, 999); // End of due date
-    
-    if (endTime > dueDate) {
-      showMessage('End time cannot be after the due date', 'error');
-      return false;
-    }
-  }
-  
-  return true;
-}
-
 const weekTasks = computed(() => {
   const today = new Date()
   const nextWeek = new Date(today)
@@ -1325,8 +1289,6 @@ const createTask = async () => {
       priority: newTask.value.priority,
       status: newTask.value.status,
       collaborators: newTask.value.collaborators,
-      startTime: newTask.value.startTime,
-      endTime: newTask.value.endTime,
       attachments: mainAttachments.length > 0 ? mainAttachments : newTask.value.attachments,
       subtasks: subtasks.value
     };
@@ -1363,8 +1325,6 @@ const createTask = async () => {
       priority: newTask.value.priority || 1,
       status: newTask.value.status || 'To Do',
       collaborators: Array.isArray(newTask.value.collaborators) ? newTask.value.collaborators : [],
-      startTime: newTask.value.startTime || null,
-      endTime: newTask.value.endTime || null,
       attachments: mainAttachments || [],
       subtasks: processedSubtasks || [],
       projectId: newTask.value.projectId || null,
@@ -1618,8 +1578,6 @@ const resetForm = () => {
     collaborators: [],
     status: 'To Do',
     attachments: [],
-    startTime: '',
-    endTime: ''
   }
   subtasks.value = []
   isEditing.value = false
@@ -1633,8 +1591,6 @@ const addSubtask = () => {
     priority: 1,
     assignedTo: '',
     collaborators: [],
-    startTime: '',
-    endTime: '',
     dueDate: '',
     attachments: []
   })
