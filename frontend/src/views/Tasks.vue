@@ -759,7 +759,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick , onMounted} from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 import axios from 'axios'
@@ -1025,6 +1025,14 @@ const assigneeFilterOptions = [
 ]
 
 const subtasks = ref([])
+onMounted(async () => {
+  try {
+    const response = await axiosClient.get('/tasks');
+    tasks.value = response.data;
+  } catch (error) {
+    showMessage('Failed to load tasks', 'error');
+  }
+});
 
 // Get today's date in YYYY-MM-DD format for min date validation
 const todayDate = computed(() => {
@@ -1218,8 +1226,16 @@ const validateDueDate = (dateString) => {
 // Add Task Function
 const handleCreateSave = async (taskData) => {
   try {
-    await axios.post('http://localhost:3000/tasks', taskData);
-    // Optionally update your local tasks list here
+    const response = await axios.post('http://localhost:3000/tasks', taskData);
+    const newTaskId = response.data.id;
+    const newTaskWithId = { 
+      ...taskData, 
+      id: newTaskId,
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    tasks.value.push(newTaskWithId);
     showSnackbar.value = true;
     snackbarMessage.value = 'Task created successfully!';
     snackbarColor.value = 'success';

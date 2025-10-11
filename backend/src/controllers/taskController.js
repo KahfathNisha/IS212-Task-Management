@@ -69,6 +69,25 @@ exports.getTask = async (req, res) => {
     }
 };
 
+// Get All Tasks
+exports.getAllTasks = async (req, res) => {
+try {
+    const snapshot = await db.collection('tasks').get();
+    const tasks = [];
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const dueDate = data.dueDate 
+        ? (data.dueDate.toDate ? data.dueDate.toDate().toISOString().split('T')[0] : data.dueDate) 
+        : null;
+        tasks.push({ id: doc.id, ...data, dueDate });
+    });
+    res.status(200).json(tasks);
+} catch (err) {
+    res.status(500).json({ error: err.message });
+}
+};
+   
+
 // Update entire task
 exports.updateTask = async (req, res) => {
     try {
