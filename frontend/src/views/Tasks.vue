@@ -724,7 +724,7 @@
 
     <!-- Task Details Dialog -->
     <TaskDetailsDialog
-      v-model:show="showDetailsDialog"
+      v-model="showDetailsDialog"
       :model="selectedTask"
       :taskStatuses="taskStatuses"
       :parentTaskProgress="parentTaskProgress"
@@ -737,7 +737,7 @@
 
     <!-- Create Task Dialog -->
     <CreateTaskDialogue
-      v-model:show="showCreateDialog"
+      v-model="showCreateDialog"
       :model="newTask"
       :isEditing="isEditing"
       :taskTypes="taskTypes"
