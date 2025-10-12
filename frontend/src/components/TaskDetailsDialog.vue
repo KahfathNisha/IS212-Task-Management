@@ -1,6 +1,5 @@
 <template>
-  <v-dialog v-model="localShow" max-width="800px">
-    <v-card v-if="task" class="task-details-card" rounded="xl">
+<v-dialog :model-value="show" @update:model-value="$emit('update:show', $event)" max-width="800px">    <v-card v-if="task" class="task-details-card" rounded="xl">
       <v-card-title class="task-details-header">
         <div class="details-title-section">
           <h2>{{ task.title }}</h2>
@@ -13,7 +12,7 @@
           </div>
         </div>
 
-        <v-btn icon="mdi-close" class="close-btn" variant="text" @click="localShow = false" />
+        <v-btn icon="mdi-close" class="close-btn" variant="text" @click="$emit('update:show', false)" />
       </v-card-title>
 
       <v-card-text class="task-details-content">
@@ -213,11 +212,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:show', 'edit', 'change-status', 'view-parent', 'open-attachment'])
-
-const localShow = computed({
-  get: () => props.show,
-  set: (v) => emit('update:show', v)
-})
 
 const task = computed(() => props.model)
 const parentProgress = computed(() => props.parentTaskProgress || 0)

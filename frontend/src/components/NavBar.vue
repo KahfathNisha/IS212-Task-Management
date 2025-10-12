@@ -1,14 +1,32 @@
 <template>
   <div>
-    <nav :class="{ 'nav-open': isOpen }" class="navbar">
-      <div class="nav-toggle" @click="toggleNav">
-        <div class="hamburger">
-          <span></span>
-          <span></span>
-          <span></span>
+    <!-- Thin Top Header Bar -->
+    <header class="top-header">
+      <div class="header-content">
+        <div class="header-left">
+          <!-- Hamburger Menu -->
+          <button class="icon-btn hamburger-btn" @click="toggleNav">
+            <div class="hamburger" :class="{ 'active': isOpen }">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </button>
+          
+          <h1 class="page-title">{{ pageTitle }}</h1>
+        </div>
+        
+        <div class="header-actions">
+          <!-- Theme Toggle -->
+          <button class="icon-btn" @click="toggleTheme" :title="isDarkMode ? 'Light Mode' : 'Dark Mode'">
+            <v-icon size="18">{{ isDarkMode ? 'mdi-white-balance-sunny' : 'mdi-moon-waning-crescent' }}</v-icon>
+          </button>
         </div>
       </div>
+    </header>
 
+    <!-- Sidebar Navigation -->
+    <nav :class="{ 'nav-open': isOpen }" class="navbar">
       <div class="nav-content">
         <div class="nav-header">
           <h2>Task Management</h2>
@@ -17,7 +35,7 @@
         <div class="nav-menu">
           <div v-for="item in menuItems" :key="item.path" class="nav-item">
             <router-link :to="item.path" class="nav-link" @click="closeNav">
-              <v-icon class="nav-icon">{{ item.icon }}</v-icon>
+              <v-icon class="nav-icon" size="18">{{ item.icon }}</v-icon>
               <span>{{ item.title }}</span>
             </router-link>
           </div>
@@ -38,11 +56,11 @@
               :class="{ 'active-project': selectedProject === project.id }"
               @click="selectProject(project.id)"
             >
-              <v-icon class="project-icon" size="16" :color="project.color">mdi-circle</v-icon>
+              <v-icon class="project-icon" size="14" :color="project.color">mdi-circle</v-icon>
               <span>{{ project.name }}</span>
             </div>
             <div class="project-item" @click="showProjectDialog = true">
-              <v-icon class="project-icon" size="16" color="purple">mdi-folder-plus</v-icon>
+              <v-icon class="project-icon" size="14" color="purple">mdi-folder-plus</v-icon>
               <span>Create Folder</span>
             </div>
           </div>
@@ -52,24 +70,19 @@
         <div class="nav-bottom">
           <div class="nav-item">
             <a href="#" class="nav-link" @click.prevent="handleSettings">
-              <v-icon class="nav-icon">mdi-cog</v-icon>
+              <v-icon class="nav-icon" size="18">mdi-cog</v-icon>
               <span>Settings</span>
             </a>
           </div>
           <div class="nav-item">
             <a href="#" class="nav-link" @click.prevent="handleLogout">
-              <v-icon class="nav-icon">mdi-logout</v-icon>
+              <v-icon class="nav-icon" size="18">mdi-logout</v-icon>
               <span>Logout</span>
             </a>
           </div>
         </div>
       </div>
     </nav>
-
-    <!-- Theme Toggle Button -->
-    <button class="theme-toggle" @click="toggleTheme">
-      {{ isDarkMode ? '☀️ Light' : '🌙 Dark' }}
-    </button>
 
     <!-- Overlay for mobile -->
     <div v-if="isOpen" class="overlay" @click="closeNav"></div>
@@ -101,11 +114,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUIStore } from '../stores/useUIStore'
 
 const router = useRouter()
+const route = useRoute()
 const uiStore = useUIStore()
 const isOpen = ref(false)
 const isDarkMode = ref(false)
@@ -140,6 +154,19 @@ const menuItems = [
   { title: 'Profile', path: '/profile', icon: 'mdi-account' }
 ]
 
+const pageTitle = computed(() => {
+  const titles = {
+    '/': 'Home',
+    '/tasks': 'Task Management Board',
+    '/reports': 'Reports',
+    '/dashboards': 'Dashboards',
+    '/notifications': 'Notifications',
+    '/profile': 'Profile',
+    '/settings': 'Settings'
+  }
+  return titles[route.path] || 'Task Management'
+})
+
 const toggleNav = () => {
   isOpen.value = !isOpen.value
   uiStore.setDrawer(isOpen.value)
@@ -152,7 +179,6 @@ const closeNav = () => {
 
 const selectProject = (projectId) => {
   selectedProject.value = projectId
-  // Emit event or use store to communicate with parent
 }
 
 const createProject = () => {
@@ -190,82 +216,167 @@ const toggleTheme = () => {
 </script>
 
 <style scoped>
-.navbar {
+/* Top Header Bar */
+.top-header {
   position: fixed;
   top: 0;
   left: 0;
-  height: 100vh;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  transform: translateX(-100%);
-  transition: transform 0.3s ease;
-  z-index: 1000;
-  width: 280px;
-  box-shadow: 2px 0 15px rgba(59, 89, 152, 0.2);
+  right: 0;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  z-index: 1001;
+  transition: all 0.3s ease;
 }
 
-.nav-open {
-  transform: translateX(0);
+[data-theme="dark"] .top-header {
+  background: rgba(30, 30, 40, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.nav-toggle {
-  position: absolute;
-  right: -50px;
-  top: 10px;
-  background: var(--primary);
-  padding: 12px;
-  cursor: pointer;
-  border-radius: 0 8px 8px 0;
-  box-shadow: 2px 0 10px rgba(59, 89, 152, 0.3);
+.header-content {
+  max-width: 100%;
+  height: 100%;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .page-title {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  background: none;
   border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--text-secondary, #666);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .icon-btn {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hamburger-btn {
+  padding: 8px;
 }
 
 .hamburger {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  width: 20px;
-  height: 15px;
+  width: 18px;
+  height: 14px;
 }
 
 .hamburger span {
   display: block;
   height: 2px;
   width: 100%;
-  background: white;
+  background: currentColor;
   border-radius: 2px;
   transition: all 0.3s ease;
 }
 
-.nav-open .hamburger span:nth-child(1) {
+.hamburger.active span:nth-child(1) {
   transform: rotate(45deg) translate(5px, 5px);
 }
 
-.nav-open .hamburger span:nth-child(2) {
+.hamburger.active span:nth-child(2) {
   opacity: 0;
 }
 
-.nav-open .hamburger span:nth-child(3) {
-  transform: rotate(-45deg) translate(7px, -6px);
+.hamburger.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
+/* Sidebar Navigation */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #333);
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  width: 280px;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .navbar {
+  background: #1e1e28;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.nav-open {
+  transform: translateX(0);
 }
 
 .nav-content {
-  padding: 20px;
+  padding: 70px 20px 24px 20px;
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .nav-header {
-  margin-bottom: 30px;
-  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .nav-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .nav-header h2 {
-  font-size: 1.4em;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary, #333);
   margin: 0;
+}
+
+[data-theme="dark"] .nav-header h2 {
+  color: #fff;
 }
 
 .nav-menu {
@@ -274,37 +385,52 @@ const toggleTheme = () => {
 }
 
 .nav-item {
-  margin: 8px 0;
+  margin: 4px 0;
 }
 
 .nav-link {
-  color: var(--text-primary);
+  color: var(--text-primary, #666);
   text-decoration: none;
-  font-size: 1em;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: 8px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
-.nav-link:hover,
+.nav-link:hover {
+  background: rgba(123, 146, 209, 0.1);
+  color: var(--primary, #7b92d1);
+}
+
 .router-link-active {
-  background: var(--primary);
-  color: white;
-  transform: translateX(5px);
+  background: var(--primary, #7b92d1);
+  color: white !important;
+}
+
+[data-theme="dark"] .nav-link {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .nav-link:hover {
+  background: rgba(123, 146, 209, 0.15);
 }
 
 .nav-icon {
-  width: 20px;
-  height: 20px;
   margin-right: 12px;
   color: currentColor;
 }
 
 .projects-section {
   margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .projects-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .projects-header {
@@ -312,19 +438,26 @@ const toggleTheme = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  padding: 0 4px;
 }
 
 .projects-header h3 {
-  color: var(--text-secondary);
+  color: var(--text-secondary, #999);
   margin: 0;
-  font-size: 1em;
+  font-size: 12px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+[data-theme="dark"] .projects-header h3 {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .projects-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .project-item {
@@ -334,16 +467,22 @@ const toggleTheme = () => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.9em;
+  font-size: 13px;
+  color: var(--text-primary, #666);
+}
+
+[data-theme="dark"] .project-item {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .project-item:hover {
-  background: rgba(123, 146, 209, 0.1);
+  background: rgba(123, 146, 209, 0.08);
 }
 
 .active-project {
-  background: var(--primary);
-  color: white;
+  background: rgba(123, 146, 209, 0.15);
+  color: var(--primary, #7b92d1);
+  font-weight: 500;
 }
 
 .project-icon {
@@ -351,44 +490,36 @@ const toggleTheme = () => {
 }
 
 .nav-bottom {
-  border-top: 1px solid rgba(123, 146, 209, 0.2);
-  padding-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.theme-toggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background: var(--accent-light);
-  border: none;
-  border-radius: 20px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--accent-dark);
-  transition: all 0.3s ease;
-  font-weight: 500;
-  z-index: 1001;
-}
-
-.theme-toggle:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(197, 212, 154, 0.4);
+[data-theme="dark"] .nav-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .overlay {
   position: fixed;
-  top: 0;
+  top: 50px;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 50px);
   background: rgba(0, 0, 0, 0.3);
   z-index: 999;
+  backdrop-filter: blur(2px);
 }
 
 @media (max-width: 768px) {
   .navbar {
     width: 260px;
+  }
+  
+  .page-title {
+    font-size: 13px;
+  }
+  
+  .header-content {
+    padding: 0 16px;
   }
 }
 </style>

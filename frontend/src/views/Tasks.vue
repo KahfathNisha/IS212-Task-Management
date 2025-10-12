@@ -364,367 +364,30 @@
         </div>
       </div>
       </div>
-    <!-- List View -->
-    <div v-if="viewType === 'list'" class="list-view">
-        <!-- Left side: Task list -->
-        <div class="task-list-panel">
-          <div class="list-header">
-            <h3>All Tasks ({{ filteredTasksList.length }})</h3>
-            <v-select
-              v-model="listSortBy"
-              :items="sortOptions"
-              density="compact"
-              variant="outlined"
-              hide-details
-              style="max-width: 150px;"
-            ></v-select>
-          </div>
-
-          <div class="tasks-list-scroll">
-            <div 
-              v-for="task in filteredTasksList" 
-              :key="task.id"
-              class="task-list-card"
-              :class="{ 'active': selectedListTask?.id === task.id }"
-              @click="selectListTask(task)"
-            >
-              <div class="task-list-header">
-                <h4 class="task-list-title">{{ task.title }}</h4>
-                <v-chip 
-                  :color="getStatusColor(task.status)" 
-                  size="small"
-                  rounded="lg"
-                >
-                  {{ task.status }}
-                </v-chip>
-              </div>
-
-              <div class="task-list-meta">
-                <div class="meta-item" v-if="task.dueDate">
-                  <v-icon size="small">mdi-calendar</v-icon>
-                  <span>{{ formatDate(task.dueDate) }}</span>
-                </div>
-                <div class="meta-item" v-if="task.assignedTo">
-                  <v-icon size="small">mdi-account</v-icon>
-                  <span>{{ task.assignedTo }}</span>
-                </div>
-                <div class="meta-item" v-if="task.priority">
-                  <v-icon size="small">mdi-flag</v-icon>
-                  <span>Priority {{ task.priority }}</span>
-                </div>
-              </div>
-
-              <p class="task-list-description" v-if="task.description">
-                {{ task.description.substring(0, 100) }}{{ task.description.length > 100 ? '...' : '' }}
-              </p>
-
-              <div class="task-subtasks-indicator" v-if="task.subtasks && task.subtasks.length > 0">
-                <v-icon size="small">mdi-file-tree</v-icon>
-                <span>{{ task.subtasks.length }} subtask(s)</span>
-              </div>
-            </div>
-
-            <div v-if="filteredTasksList.length === 0" class="no-tasks-message">
-              <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
-              <p>No tasks found</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right side: Task details -->
-        <div class="task-detail-panel">
-          <div v-if="!selectedListTask" class="no-selection">
-            <v-icon size="80" color="grey-lighten-2">mdi-clipboard-text-search-outline</v-icon>
-            <h3>Select a task to view details</h3>
-            <p>Click on any task from the list to see its full details here</p>
-          </div>
-
-          <div v-else class="task-detail-content">
-            <div class="detail-header">
-              <div class="detail-title-section">
-                <h2>{{ selectedListTask.title }}</h2>
-                <div class="detail-chips">
-                  <v-chip
-                    :color="getStatusColor(selectedListTask.status)"
-                    size="small"
-                    rounded="lg"
-                  >
-                    {{ selectedListTask.status }}
-                  </v-chip>
-                  <v-chip
-                    v-if="selectedListTask.isSubtask"
-                    color="secondary"
-                    size="small"
-                    rounded="lg"
-                  >
-                    Subtask
-                  </v-chip>
-                  <v-chip
-                    v-else
-                    color="primary"
-                    size="small"
-                    rounded="lg"
-                  >
-                    Task
-                  </v-chip>
-                </div>
-              </div>
-
-              <v-btn
-                color="primary"
-                @click="editTask(selectedListTask)"
-                prepend-icon="mdi-pencil"
-                rounded="lg"
-              >
-                Edit
-              </v-btn>
-            </div>
-
-            <v-divider class="my-4"></v-divider>
-
-            <div class="detail-body">
-              <v-row>
-                <v-col cols="6">
-                  <div class="detail-section">
-                    <div class="detail-section-icon-row">
-                      <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                      <h4>Description</h4>
-                    </div>
-                    <p>{{ selectedListTask.description || "No description" }}</p>
-                  </div>
-                </v-col>
-                <v-col cols="6">
-                  <div class="detail-section">
-                    <div class="detail-section-icon-row">
-                      <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-                      <h4>Due Date</h4>
-                    </div>
-                    <p>{{ selectedListTask.dueDate ? formatDate(selectedListTask.dueDate) : 'No due date' }}</p>
-                  </div>
-                </v-col>
-              </v-row>
-
-              <v-row>
-                <v-col cols="6">
-                  <div class="detail-section">
-                    <div class="detail-section-icon-row">
-                      <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                      <h4>Assigned To</h4>
-                    </div>
-                    <p>{{ selectedListTask.assignedTo || 'Unassigned' }}</p>
-                  </div>
-                </v-col>
-                <v-col cols="6">
-                  <div class="detail-section">
-                    <div class="detail-section-icon-row">
-                      <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
-                      <h4>Priority</h4>
-                    </div>
-                    <p>{{ selectedListTask.priority || 'Not set' }}</p>
-                  </div>
-                </v-col>
-              </v-row>
-
-              <v-row v-if="selectedListTask.collaborators && selectedListTask.collaborators.length > 0">
-                <v-col cols="12">
-                  <div class="detail-section">
-                    <div class="detail-section-icon-row">
-                      <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                      <h4>Collaborators</h4>
-                    </div>
-                    <p>{{ selectedListTask.collaborators.join(', ') }}</p>
-                  </div>
-                </v-col>
-              </v-row>
-
-              <div class="detail-section" v-if="selectedListTask && selectedListTask.subtasks && selectedListTask.subtasks.length > 0">
-                <h4>Progress</h4>
-                <div class="progress-bar-container">
-                  <div class="custom-progress-bar">
-                    <div class="progress-fill" :style="{ width: calculateProgress(selectedListTask) + '%' }"></div>
-                  </div>
-                  <span class="progress-text">{{ calculateProgress(selectedListTask) }}%</span>
-                </div>
-              </div>
-
-              <div class="detail-section" v-if="selectedListTask.attachments && selectedListTask.attachments.length > 0">
-                <h4>Attachments</h4>
-                <div class="attachments-list">
-                  <v-chip
-                    v-for="attachment in selectedListTask.attachments"
-                    :key="attachment.url"
-                    variant="outlined"
-                    class="attachment-chip"
-                    @click="openAttachment(attachment.url)"
-                  >
-                    <v-icon start>mdi-paperclip</v-icon>
-                    {{ attachment.name }}
-                  </v-chip>
-                </div>
-              </div>
-
-              <div class="detail-section" v-if="selectedListTask && selectedListTask.subtasks && selectedListTask.subtasks.length > 0">
-                <h4>Subtasks ({{ selectedListTask.subtasks.length }})</h4>
-                <div class="subtask-list">
-                  <div v-for="subtask in selectedListTask.subtasks" :key="subtask.id" class="subtask-item">
-                    <div class="subtask-info">
-                      <div class="subtask-title">{{ subtask.title }}</div>
-                      <div class="subtask-status">
-                        <v-chip
-                          :color="getStatusColor(subtask.status)"
-                          size="small"
-                          rounded="lg"
-                        >
-                          {{ subtask.status }}
-                        </v-chip>
-                      </div>
-                    </div>
-                    <div class="subtask-meta">
-                      <span v-if="subtask.assignedTo">{{ subtask.assignedTo }}</span>
-                      <span v-if="subtask.dueDate">{{ formatDate(subtask.dueDate) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="detail-actions">
-                <v-select
-                  :model-value="selectedListTask.status"
-                  :items="taskStatuses"
-                  label="Update Status"
-                  variant="outlined"
-                  density="comfortable"
-                  @update:modelValue="changeTaskStatus(selectedListTask, $event)"
-                  style="max-width: 250px;"
-                ></v-select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <!-- List View Component -->
+      <ListView
+        v-if="viewType === 'list'"
+        :tasks="tasks"
+        :sort-by="listSortBy"
+        @update:sort-by="listSortBy = $event"
+        :selected-task-id="selectedListTask?.id"
+        :task-statuses="taskStatuses"
+        @select-task="handleSelectTask"
+        @edit-task="editTask"
+        @change-status="handleListStatusChange"
+        @view-parent="viewTaskDetails"
+        @open-attachment="openAttachment"
+        @add-task="showCreateDialog = true"
+        @bulk-update-status="handleBulkUpdateStatus"
+        @bulk-delete="handleBulkDelete"
+      />
     </div>
-
-    <!-- Date Details Dialog -->
-    <v-dialog v-model="showDateDetailsDialog" max-width="900px">
-      <v-card v-if="selectedDate" class="date-details-card" rounded="xl">
-        <v-card-title class="date-details-header">
-          <div class="header-content">
-            <div class="date-info">
-              <h2>{{ selectedDate.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) }}</h2>
-              <v-chip 
-                v-if="selectedDate.isToday" 
-                color="primary" 
-                size="small"
-                rounded="lg"
-              >
-                Today
-              </v-chip>
-            </div>
-            <v-btn icon="mdi-close" variant="text" @click="showDateDetailsDialog = false" />
-          </div>
-        </v-card-title>
-
-        <v-card-text class="date-details-content">
-          <div v-if="getTasksForSelectedDate().length === 0" class="no-tasks-section">
-            <v-icon size="64" color="grey-lighten-1">mdi-calendar-blank-outline</v-icon>
-            <h3>No tasks today</h3>
-            <p>Get started by adding a task for this date</p>
-            <v-btn 
-              color="primary" 
-              prepend-icon="mdi-plus" 
-              @click="addTaskForSelectedDate"
-              rounded="lg"
-              class="mt-4"
-            >
-              Add Task
-            </v-btn>
-          </div>
-
-          <div v-else class="tasks-section">
-            <div class="section-header">
-              <h3>Tasks ({{ getTasksForSelectedDate().length }})</h3>
-              <v-btn 
-                color="primary" 
-                size="small"
-                prepend-icon="mdi-plus" 
-                @click="addTaskForSelectedDate"
-                rounded="lg"
-              >
-                Add Task
-              </v-btn>
-            </div>
-
-            <div class="task-cards-list">
-              <v-card 
-                v-for="task in getTasksForSelectedDate()" 
-                :key="task.id"
-                class="task-card-item"
-                :class="getTaskStatusClass(task.status)"
-                @click="viewTaskDetails(task)"
-                rounded="lg"
-                elevation="1"
-              >
-                <div class="task-card-content">
-                  <div class="task-card-header">
-                    <div class="task-title-section">
-                      <h4>{{ task.title }}</h4>
-                      <div class="task-badges">
-                        <v-chip 
-                          :color="getStatusColor(task.status)" 
-                          size="small"
-                          rounded="lg"
-                        >
-                          {{ task.status }}
-                        </v-chip>
-                        <v-chip
-                          v-if="task.isSubtask"
-                          color="secondary"
-                          size="small"
-                          rounded="lg"
-                        >
-                          Subtask
-                        </v-chip>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="task-card-details">
-                    <div class="detail-row" v-if="task.description">
-                      <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                      <span class="detail-text">{{ task.description }}</span>
-                    </div>
-
-                    <div class="detail-row" v-if="task.startTime">
-                      <v-icon size="small" class="detail-icon">mdi-clock-outline</v-icon>
-                      <span class="detail-text">{{ formatTime(task.startTime) }}</span>
-                    </div>
-
-                    <div class="detail-row" v-if="task.assignedTo">
-                      <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                      <span class="detail-text">{{ task.assignedTo }}</span>
-                    </div>
-
-                    <div class="detail-row" v-if="task.isSubtask && task.parentTask">
-                      <v-icon size="small" class="detail-icon">mdi-file-tree</v-icon>
-                      <span class="detail-text">Parent: {{ task.parentTask.title }}</span>
-                    </div>
-
-                    <div class="detail-row" v-if="task.attachments && task.attachments.length > 0">
-                      <v-icon size="small" class="detail-icon">mdi-paperclip</v-icon>
-                      <span class="detail-text">{{ task.attachments.length }} attachment(s)</span>
-                    </div>
-                  </div>
-                </div>
-              </v-card>
-            </div>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    
 
     <!-- Task Details Dialog -->
     <TaskDetailsDialog
-      v-model="showDetailsDialog"
+      :show="showDetailsDialog"
+      @update:show="showDetailsDialog = $event"
       :model="selectedTask"
       :taskStatuses="taskStatuses"
       :parentTaskProgress="parentTaskProgress"
@@ -733,7 +396,6 @@
       @view-parent="viewTaskDetails"
       @open-attachment="openAttachment" 
     />
-
 
     <!-- Create Task Dialog -->
     <CreateTaskDialogue
@@ -766,6 +428,7 @@ import axios from 'axios'
 import '../assets/styles.css';
 import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
 import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
+import ListView from '../components/ListView.vue'
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -800,7 +463,6 @@ const assigneeDropdownRef = ref(null)
 const showFilterDialog = ref(false)
 const selectedListTask = ref(null)
 const listSortBy = ref('dueDate')
-const sortOptions = ['Due Date', 'Priority', 'Status', 'Assignee']
 
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
@@ -1173,43 +835,16 @@ const selectedFilters = computed(() => {
 })
 
 const filteredTasksList = computed(() => {
-  let allTasks = []
-  
-  tasks.value.forEach(task => {
-    allTasks.push(task)
-    if (task.subtasks && task.subtasks.length > 0) {
-      task.subtasks.forEach((subtask, index) => {
-        allTasks.push({
-          ...subtask,
-          id: `${task.id}-subtask-${index}`,
-          isSubtask: true,
-          parentTask: task
-        })
-      })
-    }
-  })
+  let filtered = tasks.value
 
   if (selectedPriorities.value.length > 0) {
-    allTasks = allTasks.filter(task => selectedPriorities.value.includes(task.priority))
+    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
   }
   if (selectedAssignees.value.length > 0) {
-    allTasks = allTasks.filter(task => selectedAssignees.value.includes(task.assignedTo))
+    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
   }
 
-  allTasks.sort((a, b) => {
-    if (listSortBy.value === 'Due Date') {
-      return new Date(a.dueDate || '9999-12-31') - new Date(b.dueDate || '9999-12-31')
-    } else if (listSortBy.value === 'Priority') {
-      return (a.priority || 10) - (b.priority || 10)
-    } else if (listSortBy.value === 'Status') {
-      return (a.status || '').localeCompare(b.status || '')
-    } else if (listSortBy.value === 'Assignee') {
-      return (a.assignedTo || '').localeCompare(b.assignedTo || '')
-    }
-    return 0
-  })
-
-  return allTasks
+  return filtered
 })
 
 // Validate if date is in the past
@@ -1760,8 +1395,50 @@ const truncateTaskTitle = (title) => {
   return title
 }
 
-const selectListTask = (task) => {
+// List View Handlers
+const handleSelectTask = (task) => {
   selectedListTask.value = task
+}
+
+const handleListStatusChange = ({ task, status }) => {
+  changeTaskStatus(task, status)
+}
+
+const handleBulkUpdateStatus = async (taskIds) => {
+  // Show a simple prompt for now - you can make this fancier later
+  const newStatus = prompt('Enter new status (To Do, In Progress, Done):')
+  
+  if (newStatus && taskStatuses.includes(newStatus)) {
+    try {
+      for (const taskId of taskIds) {
+        const task = tasks.value.find(t => t.id === taskId)
+        if (task) {
+          await changeTaskStatus(task, newStatus)
+        }
+      }
+      showMessage(`Updated ${taskIds.length} task(s)`, 'success')
+    } catch (error) {
+      showMessage('Failed to update some tasks', 'error')
+    }
+  } else {
+    showMessage('Invalid status selected', 'error')
+  }
+}
+
+const handleBulkDelete = async (taskIds) => {
+  try {
+    for (const taskId of taskIds) {
+      await axiosClient.delete(`/tasks/${taskId}`)
+      const index = tasks.value.findIndex(t => t.id === taskId)
+      if (index > -1) {
+        tasks.value.splice(index, 1)
+      }
+    }
+    showMessage(`Deleted ${taskIds.length} task(s)`, 'success')
+    selectedListTask.value = null
+  } catch (error) {
+    showMessage('Failed to delete some tasks', 'error')
+  }
 }
 
 const calculateProgress = (task) => {
@@ -1774,12 +1451,15 @@ const calculateProgress = (task) => {
 </script>
 
 <style scoped>
-  .tasks-container {
+/* ===========================
+   Main Container
+   =========================== */
+.tasks-container {
   width: 100%;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: transparent;
 }
 
 .content-layout {
@@ -1788,9 +1468,23 @@ const calculateProgress = (task) => {
   overflow: hidden;
 }
 
+/* ===========================
+   Upcoming Sidebar
+   =========================== */
 .upcoming-sidebar {
   width: 320px;
-  background: white;
+  background: transparent;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.sidebar-collapsed {
+  width: 60px;
+}
+
+[data-theme="dark"] .upcoming-sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-header {
@@ -1846,21 +1540,26 @@ const calculateProgress = (task) => {
 
 .upcoming-task {
   padding: 12px;
-  background: #f8f9fa;
+  background: rgba(0, 0, 0, 0.02);
   border-radius: 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
+[data-theme="dark"] .upcoming-task {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .upcoming-task:hover {
-  background: #e3f2fd;
+  background: rgba(33, 150, 243, 0.08);
   border-color: #2196f3;
   transform: translateY(-1px);
 }
 
 .upcoming-task.overdue {
-  background: #ffebee;
+  background: rgba(244, 67, 54, 0.08);
   border-color: #f44336;
 }
 
@@ -1874,8 +1573,8 @@ const calculateProgress = (task) => {
 .task-name {
   font-weight: 500;
   font-size: 14px;
-  color: #2c3e50;
-  flex:  1;
+  color: var(--text-primary);
+  flex: 1;
   margin-right: 8px;
 }
 
@@ -1885,6 +1584,9 @@ const calculateProgress = (task) => {
   color: #7f8c8d;
 }
 
+/* ===========================
+   Calendar Area
+   =========================== */
 .calendar-area {
   flex: 1;
   display: flex;
@@ -1896,16 +1598,20 @@ const calculateProgress = (task) => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 20px 24px 16px 24px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 16px 24px 12px 24px;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .calendar-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .header-left h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .date-subtitle {
@@ -1920,10 +1626,17 @@ const calculateProgress = (task) => {
   align-items: center;
 }
 
+/* ===========================
+   Calendar Controls & Filters
+   =========================== */
 .calendar-controls {
-  padding: 12px 24px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 10px 24px;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .calendar-controls {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .controls-row {
@@ -1937,6 +1650,179 @@ const calculateProgress = (task) => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 8px;
+}
+
+.filter-btn {
+  min-width: 100px;
+}
+
+.reset-btn {
+  color: #666;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .filter-chips {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.filter-chip {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .filter-chip {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Custom Filter Dropdowns */
+.custom-filter-dropdown {
+  position: fixed;
+  z-index: 1000;
+  min-width: 250px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+[data-theme="dark"] .custom-filter-dropdown {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-header {
+  padding: 16px 20px 12px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .dropdown-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dropdown-body {
+  padding: 8px 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-input {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.filter-options-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.filter-option-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.filter-option-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .filter-option-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.custom-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #1976d2;
+}
+
+.option-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.dropdown-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .dropdown-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ===========================
+   Calendar Navigation
+   =========================== */
+.calendar-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .calendar-nav {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.period-title {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.nav-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
 }
 
 .view-toggle {
@@ -1963,149 +1849,21 @@ const calculateProgress = (task) => {
   color: #5a6c5a !important;
 }
 
-.action-controls {
-  display: flex;
-  gap: 8px;
+.view-type-toggle {
+  margin-right: 12px;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.filter-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7f8c8d;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-right: 8px;
+.view-type-toggle .v-btn {
+  text-transform: none;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-
-
-.filter-btn {
-  min-width: 100px;
-}
-
-.reset-btn {
-  color: #666;
-  
-}
-
-.filter-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 24px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.filter-chip {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.custom-filter-dropdown {
-  position: fixed;
-  z-index: 1000;
-  min-width: 250px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-}
-
-.dropdown-header {
-  padding: 16px 20px 12px 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.dropdown-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2c3e50;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.dropdown-body {
-  padding: 8px 0;
-}
-
-.search-input {
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  border-bottom: 1px solid #e0e0e0;
-  outline: none;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.filter-options-list {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.filter-option-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  user-select: none;
-}
-
-.filter-option-item:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-.custom-checkbox {
-  width: 16px;
-  height: 16px;
-  margin-right: 8px;
-  cursor: pointer;
-  accent-color: #1976d2;
-}
-
-.option-text {
-  flex: 1;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.87);
-}
-
-.dropdown-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 20px 16px 20px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.calendar-nav {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.period-title {
-  margin: 0 0 4px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
-  text-align: center;
-}
-
-.nav-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-
+/* ===========================
+   Month Calendar Grid
+   =========================== */
 .calendar-grid {
   flex: 1;
   display: flex;
@@ -2116,8 +1874,12 @@ const calculateProgress = (task) => {
 .calendar-header-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .calendar-header-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .day-header {
@@ -2132,83 +1894,115 @@ const calculateProgress = (task) => {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, 1fr);
-  overflow: hidden;
+  grid-auto-rows: minmax(100px, auto);
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
 }
 
 .calendar-day {
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-top: none;
   border-left: none;
-  padding: 6px;
-  background: white;
+  padding: 8px 6px;
+  background: transparent;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  overflow: hidden;
+  overflow-y: auto;
+  min-height: 100px;
+  max-height: 140px;
+}
+
+[data-theme="dark"] .calendar-day {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: none;
+  border-left: none;
 }
 
 .calendar-day:hover {
-  background: #f8f9fa;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] .calendar-day:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .today {
-  background: #e3f2fd !important;
+  background: rgba(33, 150, 243, 0.08) !important;
 }
 
 .other-month {
-  background: #fafafa;
-  color: #bbb;
+  background: transparent;
+  opacity: 0.4;
 }
 
 .weekend {
-  background: #f9f9f9;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+[data-theme="dark"] .weekend {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .day-number {
   font-weight: 600;
   margin-bottom: 4px;
   font-size: 11px;
+  color: var(--text-primary);
 }
 
 .day-tasks {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  max-height: calc(100% - 20px);
-  overflow: hidden;
+  gap: 3px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+}
+
+.day-tasks::-webkit-scrollbar {
+  width: 4px;
+}
+
+.day-tasks::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }
 
 .task-item {
-  background: #f0f0f0;
+  background: rgba(0, 0, 0, 0.03);
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   border-left: 3px solid #ccc;
-  font-size: 11px;
-  min-height: 32px;
+  font-size: 10px;
+  min-height: 28px;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .task-item {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .task-item:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .task-todo {
   border-left-color: #ff9800;
-  background: #fff3e0;
+  background: rgba(255, 152, 0, 0.1);
 }
 
 .task-progress {
   border-left-color: #2196f3;
-  background: #e3f2fd;
+  background: rgba(33, 150, 243, 0.1);
 }
 
 .task-done {
   border-left-color: #4caf50;
-  background: #e8f5e8;
+  background: rgba(76, 175, 80, 0.1);
   opacity: 0.8;
 }
 
@@ -2224,6 +2018,7 @@ const calculateProgress = (task) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-primary);
 }
 
 .task-meta {
@@ -2237,10 +2032,13 @@ const calculateProgress = (task) => {
   height: 14px !important;
 }
 
+/* ===========================
+   Week Calendar View
+   =========================== */
 .weekly-view {
   flex: 1;
   overflow: hidden;
-  background: #f8f9fa;
+  background: transparent;
 }
 
 .week-container {
@@ -2248,30 +2046,38 @@ const calculateProgress = (task) => {
   grid-template-columns: repeat(7, 1fr);
   height: 100%;
   gap: 1px;
-  background: #e0e0e0;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .week-container {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .week-day-column {
-  background: white;
+  background: transparent;
   display: flex;
   flex-direction: column;
   min-height: 100%;
 }
 
 .today-column {
-  background: #f3f7ff;
+  background: rgba(33, 150, 243, 0.03);
 }
 
 .weekend-column {
-  background: #fafafa;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+[data-theme="dark"] .weekend-column {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .week-day-header {
-  padding: 16px 12px;
-  border-bottom: 2px solid #e0e0e0;
+  padding: 12px 8px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.08);
   text-align: center;
-  background: #f8f9fa;
-  min-height: 70px;
+  background: transparent;
+  min-height: 60px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2279,8 +2085,12 @@ const calculateProgress = (task) => {
   gap: 4px;
 }
 
+[data-theme="dark"] .week-day-header {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+
 .today-column .week-day-header {
-  background: #e3f2fd;
+  background: rgba(33, 150, 243, 0.08);
   border-bottom-color: #2196f3;
 }
 
@@ -2295,12 +2105,12 @@ const calculateProgress = (task) => {
 .week-day-header .day-number {
   font-size: 24px;
   font-weight: 700;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .today-number {
   color: #2196f3;
-  background: white;
+  background: var(--bg-primary);
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -2320,33 +2130,37 @@ const calculateProgress = (task) => {
 }
 
 .week-task-item {
-  background: #f8f9fa;
+  background: rgba(0, 0, 0, 0.03);
   border-radius: 8px;
   padding: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   border-left: 4px solid #ccc;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .week-task-item {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .week-task-item:hover {
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
 .week-task-item.task-todo {
   border-left-color: #ff9800;
-  background: #fff8e1;
+  background: rgba(255, 152, 0, 0.1);
 }
 
 .week-task-item.task-progress {
   border-left-color: #2196f3;
-  background: #e3f2fd;
+  background: rgba(33, 150, 243, 0.1);
 }
 
 .week-task-item.task-done {
   border-left-color: #4caf50;
-  background: #e8f5e8;
+  background: rgba(76, 175, 80, 0.1);
   opacity: 0.8;
 }
 
@@ -2359,7 +2173,7 @@ const calculateProgress = (task) => {
 .week-task-title {
   font-weight: 500;
   font-size: 14px;
-  color: #2c3e50;
+  color: var(--text-primary);
   line-height: 1.3;
 }
 
@@ -2391,18 +2205,29 @@ const calculateProgress = (task) => {
 }
 
 .add-task-btn:hover {
-  background: #f0f0f0 !important;
+  background: rgba(0, 0, 0, 0.02) !important;
   border-color: #2196f3 !important;
   color: #2196f3 !important;
 }
 
+[data-theme="dark"] .add-task-btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* ===========================
+   Date Details Dialog
+   =========================== */
 .date-details-card {
-  background: white !important;
+  background: var(--bg-primary) !important;
 }
 
 .date-details-header {
   padding: 20px 24px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .date-details-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .header-content {
@@ -2422,7 +2247,7 @@ const calculateProgress = (task) => {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .date-details-content {
@@ -2443,7 +2268,7 @@ const calculateProgress = (task) => {
   margin: 16px 0 8px 0;
   font-size: 20px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .no-tasks-section p {
@@ -2469,7 +2294,7 @@ const calculateProgress = (task) => {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .task-cards-list {
@@ -2484,23 +2309,31 @@ const calculateProgress = (task) => {
   cursor: pointer;
   transition: all 0.2s ease;
   border-left: 4px solid #ccc;
+  background: transparent !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-left: 4px solid #ccc !important;
+}
+
+[data-theme="dark"] .task-card-item {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-left: 4px solid #ccc !important;
 }
 
 .task-card-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
 .task-card-item.task-todo {
-  border-left-color: #ff9800;
+  border-left-color: #ff9800 !important;
 }
 
 .task-card-item.task-progress {
-  border-left-color: #2196f3;
+  border-left-color: #2196f3 !important;
 }
 
 .task-card-item.task-done {
-  border-left-color: #4caf50;
+  border-left-color: #4caf50 !important;
 }
 
 .task-card-content {
@@ -2515,7 +2348,7 @@ const calculateProgress = (task) => {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .task-badges {
@@ -2551,510 +2384,59 @@ const calculateProgress = (task) => {
   align-self: center;
 }
 
-.task-details-header {
-  padding: 20px 20px 12px 20px;
-  position: relative;
-  padding-right: 40px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.close-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-}
-
-.details-title-section {
-  flex: 1;
-}
-
-.details-title-section h2 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.title-chips {
-  display: flex;
-  gap: 8px;
-}
-
-.task-details-content {
-  padding: 20px;
-}
-
-.detail-section {
-  margin-bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.detail-section-icon-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
-.detail-section h4 {
-  margin: 0 0 6px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #7f8c8d;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.detail-section p {
-  margin: 0;
-  line-height: 1.4;
-  color: #2c3e50;
-  font-size: 14px;
-}
-
-.subtask-section {
-  padding: 16px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  border: 1px solid #ffffff;
-}
-
-.subtask-section h5 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.parent-summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-}
-
-.parent-title-section {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.parent-title-btn {
-  padding: 4px 8px !important;
-  height: auto !important;
-  min-height: auto !important;
-  font-size: 14px !important;
-  font-weight: 400 !important;
-  color: #2c3e50 !important;
-  text-transform: none !important;
-  letter-spacing: normal !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  background: #f5f5f5 !important;
-  border: 1px solid #ddd !important;
-  border-radius: 4px !important;
-  box-shadow: none !important;
-  margin: 0 !important;
-  line-height: 1.4 !important;
-}
-
-.parent-title-btn:hover {
-  background: rgba(33, 150, 243, 0.1) !important;
-  box-shadow: none !important;
-}
-
-.attachments-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.attachment-chip {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.attachment-chip:hover {
-  background-color: rgba(33, 150, 243, 0.1) !important;
-}
-
-/* .parent-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-} */
-
-.create-task-card {
-  background: white !important;
-}
-
+/* ===========================
+   Dialog Styles
+   =========================== */
+.create-task-card,
 .task-details-card {
-  background: white !important;
+  background: var(--bg-primary) !important;
 }
 
-.status-timeline {
-  margin-top: 8px;
-  padding: 8px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.status-time {
-  font-size: 12px;
-  color: #7f8c8d;
-  white-space: nowrap;
-}
-
-.status-change-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0;
-}
-
-.status-chip {
-  min-width: 70px;
-  justify-content: center;
-}
-
-.status-updates {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.status-entry {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 8px 0;
-}
-
-.status-entry:not(:last-child) {
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.status-icon {
-  margin-top: 2px;
-}
-
-.status-info {
-  flex: 1;
-}
-
-.status-description {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 14px;
-  color: #2c3e50;
-}
-
-.status-timestamp {
-  font-size: 12px;
-  color: #7f8c8d;
-  margin-top: 2px;
-}
-
-.progress-bar-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.custom-progress-bar {
-  flex: 1;
-  height: 20px;
-  background: #e0e0e0;
-  border-radius: 10px;
-  overflow: hidden;
-  position: relative;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #7b92d1;
-  border-radius: 10px;
-  transition: width 0.3s ease;
-  min-width: 0;
-}
-
-.progress-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2c3e50;
-  min-width: 40px;
-}
-
-.subtask-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.subtask-item {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 12px;
-  border: 1px solid #e0e0e0;
-}
-
-.subtask-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.subtask-title {
-  font-weight: 500;
-  font-size: 14px;
-  color: #2c3e50;
-}
-
-.subtask-status {
-  flex-shrink: 0;
-}
-
-.subtask-details {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.filter-categories-list {
-  padding: 8px 0;
-}
-
-.filter-category-item {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  gap: 12px;
-  user-select: none;
-}
-
-.filter-category-item:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-.category-icon {
-  flex-shrink: 0;
-  width: 20px;
-}
-
-.category-text {
-  flex: 1;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.87);
-}
-
-.category-chevron {
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.custom-filter-menu {
-  position: relative;
-  display: inline-block;
-}
-
-.custom-dropdown-menu {
-  position: fixed;
-  z-index: 1000;
-  min-width: 250px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-}
-
-.dropdown-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.dropdown-header {
-  padding: 16px 20px 12px 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.dropdown-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2c3e50;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: #e0e0e0;
-}
-
-.dropdown-body {
-  padding: 8px 0;
-}
-
-.dropdown-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 20px 16px 20px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.footer-btn {
-  min-width: auto !important;
-}
-
-.filter-options-list {
-  padding: 5px 0;
-  margin-right: 2px ;
-}
-
-.scrollable-submenu {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.filter-option-item {
-  display: flex;
-  align-items: center;
-  padding: 6px 10px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  user-select: none;
-}
-
-.filter-option-item:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-.option-text {
-  flex: 1;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.87);
-  margin-left: 2px;
-}
-
-.submenu-dropdown {
-  min-width: 200px;
-}
-
-.floating-submenu {
-  position: fixed;
-  z-index: 9999;
-  transition: opacity 0.15s ease;
-}
-
-.view-type-toggle {
-  margin-right: 12px;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.view-type-toggle .v-btn {
-  text-transform: none;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Custom checkbox styling */
-.custom-checkbox {
-  width: 16px;
-  height: 16px;
-  margin: 5px;
-  padding: 0;
-  cursor: pointer;
-  accent-color: #1976d2;
-  flex-shrink: 0;
-}
-
-/* Dark mode overrides */
+/* ===========================
+   Dark Mode
+   =========================== */
+[data-theme="dark"] .custom-filter-dropdown,
 [data-theme="dark"] .custom-dropdown-menu {
-  background: #3d3d3d !important;
-  border-color: #555 !important;
+  background: var(--bg-primary) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 [data-theme="dark"] .dropdown-header,
 [data-theme="dark"] .dropdown-title {
-  color: #f5f4f2 !important;
+  color: var(--text-primary) !important;
 }
 
-[data-theme="dark"] .dropdown-divider {
-  background: #555 !important;
-}
-
-[data-theme="dark"] .filter-category-item,
 [data-theme="dark"] .filter-option-item {
-  color: #f5f4f2 !important;
+  color: var(--text-primary) !important;
 }
 
-[data-theme="dark"] .filter-category-item:hover,
 [data-theme="dark"] .filter-option-item:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 [data-theme="dark"] .custom-checkbox {
   accent-color: #7b92d1;
-  filter: invert(1);
 }
 
-[data-theme="dark"] .footer-btn {
-  color: #f5f4f2 !important;
-}
-
-/* Dialog backgrounds for dark mode */
 [data-theme="dark"] .create-task-card,
 [data-theme="dark"] .task-details-card,
 [data-theme="dark"] .date-details-card {
-  background: #3d3d3d !important;
-  color: #f5f4f2 !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
 }
 
-/* Ensure submenu backgrounds are dark */
-[data-theme="dark"] .floating-submenu .custom-dropdown-menu {
-  background: #3d3d3d !important;
-  border-color: #555 !important;
-}
-
-/* Form fields in dark mode */
 [data-theme="dark"] .v-field {
-  background: #555 !important;
-  color: #f5f4f2 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-primary) !important;
 }
 
 [data-theme="dark"] .v-field input,
 [data-theme="dark"] .v-field textarea,
 [data-theme="dark"] .v-field select {
-  color: #f5f4f2 !important;
+  color: var(--text-primary) !important;
 }
 
 [data-theme="dark"] .v-field__outline {
-  border-color: #777 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
-
-/* Ensure all text in filter menus and submenus is light
-[data-theme="dark"] .option-text {
-  color: #f5f4f2 !important;
-}
-
-[data-theme="dark"] .dropdown-body .filter-options-list .filter-option-item {
-  color: #f5f4f2 !important;
-}
-
-/* Ensure category text is light */
-/* [data-theme="dark"] .category-text {
-  color: #f5f4f2 !important;
-} */
-
 </style>

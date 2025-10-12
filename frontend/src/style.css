@@ -1,7 +1,7 @@
 /* Custom Theme Variables */
 :root {
   --bg-primary: #f5f4f2;
-  --bg-secondary: #e8e7f0;
+  --bg-secondary: #ffffff;
   --primary: #7b92d1;
   --secondary: #3a5998;
   --accent-light: #c5d49a; /*background of button*/
@@ -20,8 +20,8 @@
 }
 
 [data-theme="dark"] {
-  --bg-primary: #2a2a2a;
-  --bg-secondary: #3a5998;
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2a2a2a;
   --primary: #7b92d1;
   --secondary: #c5d49a;
   --accent-light: #7b92d1;
@@ -85,18 +85,18 @@ button:focus-visible {
 
 .card {
   padding: 2em;
-  background-color: var(--bg-secondary);
+  background-color: transparent;
   color: var(--text-primary);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 #app {
-  /* max-width: 1280px; */
-  /* margin: 0 auto; */
-  padding: 2rem;
+  padding: 0;
+  margin: 0;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  min-height: 100vh;
 }
 
 /* Vuetify overrides for theme compatibility */
@@ -107,12 +107,15 @@ button:focus-visible {
 
 .v-main {
   background-color: var(--bg-primary) !important;
+  padding: 70px 24px 24px 24px !important;
 }
 
+/* Remove all card backgrounds - everything should be transparent */
 .v-card {
-  background-color: var(--bg-secondary) !important;
+  background-color: transparent !important;
   color: var(--text-primary) !important;
-  border: 1px solid #e5e7eb !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .v-btn {
@@ -147,14 +150,16 @@ button:focus-visible {
 
 /* Dashboard specific styling */
 .dashboard-card {
-  background-color: var(--bg-secondary);
-  border: 1px solid #e5e7eb;
+  background-color: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 12px;
   transition: all 0.3s ease;
+  padding: 1.5rem;
 }
 
 .dashboard-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-color: var(--primary);
 }
 
 /* Success message styling */
@@ -166,23 +171,19 @@ button:focus-visible {
 
 /* Dark mode specific overrides */
 [data-theme="dark"] button {
-  border: 1px solid #404040;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="dark"] .card {
-  border: 1px solid #404040;
-}
-
-[data-theme="dark"] .v-card {
-  border: 1px solid #404040 !important;
-}
-
-[data-theme="dark"] .v-btn {
-  border: 1px solid #404040 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="dark"] .dashboard-card {
-  border: 1px solid #404040;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .dashboard-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] .success-message {
