@@ -1,18 +1,33 @@
 <template>
-<v-dialog :model-value="show" @update:model-value="$emit('update:show', $event)" max-width="800px">    <v-card v-if="task" class="task-details-card" rounded="xl">
+  <v-dialog :model-value="show" @update:model-value="$emit('update:show', $event)" max-width="800px">    
+    <v-card v-if="task" class="task-details-card" rounded="xl">
       <v-card-title class="task-details-header">
-        <div class="details-title-section">
-          <h2>{{ task.title }}</h2>
-          <div class="title-chips">
-            <v-chip :color="getStatusColor(task.status)" size="small" rounded="lg">
-              {{ task.status }}
-            </v-chip>
-            <v-chip v-if="task.isSubtask" color="secondary" size="small" rounded="lg">Subtask</v-chip>
-            <v-chip v-else color="primary" size="small" rounded="lg">Task</v-chip>
+        <div class="header-content">
+          <div class="details-title-section">
+            <h2>{{ task.title }}</h2>
+            <div class="title-chips">
+              <v-chip :color="getStatusColor(task.status)" size="small" rounded="lg">
+                {{ task.status }}
+              </v-chip>
+              <v-chip v-if="task.isSubtask" color="secondary" size="small" rounded="lg">Subtask</v-chip>
+              <v-chip v-else color="primary" size="small" rounded="lg">Task</v-chip>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <v-btn icon="mdi-close" class="close-btn" variant="text" size="small" @click="$emit('update:show', false)" />
+            <v-select
+              :model-value="task.status"
+              :items="taskStatuses"
+              label="Update Status"
+              variant="outlined"
+              density="compact"
+              @update:modelValue="onChangeStatus"
+              class="status-dropdown"
+              hide-details
+            ></v-select>
           </div>
         </div>
-
-        <v-btn icon="mdi-close" class="close-btn" variant="text" @click="$emit('update:show', false)" />
       </v-card-title>
 
       <v-card-text class="task-details-content">
@@ -181,20 +196,11 @@
         </div>
       </v-card-text>
 
-      <v-card-actions>
-        <v-btn color="white" @click="onEdit" prepend-icon="mdi-pencil" rounded="lg">
+      <v-card-actions class="task-details-actions">
+        <v-btn color="primary" @click="onEdit" prepend-icon="mdi-pencil" rounded="lg">
           {{ task.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
         </v-btn>
         <v-spacer />
-        <v-select
-          :model-value="task.status"
-          :items="taskStatuses"
-          label="Update Status"
-          variant="outlined"
-          density="compact"
-          @update:modelValue="onChangeStatus"
-          style="max-width: 200px;"
-        ></v-select>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -243,7 +249,282 @@ const onOpenAttachment = (url) => {
   emit('open-attachment', url)
 }
 </script>
-
 <style scoped>
+.task-details-card {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
 
+[data-theme="dark"] .task-details-card {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.task-details-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .task-details-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 24px;
+}
+
+.details-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.details-title-section h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.title-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 15px;
+}
+
+.header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.close-btn {
+  align-self: flex-end;
+}
+
+.status-dropdown {
+  width: 100%;
+  min-width: 200px;
+}
+
+.task-details-content {
+  padding: 24px;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.detail-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-section p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.detail-section-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.detail-section-icon-row h4 {
+  margin: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.detail-icon {
+  color: #7f8c8d;
+  flex-shrink: 0;
+}
+
+.progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .custom-progress-bar {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 40px;
+}
+
+.attachments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-chip {
+  cursor: pointer;
+}
+
+.status-updates {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-description {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.status-timestamp {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.subtask-item {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .subtask-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.subtask-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.subtask-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.subtask-details {
+  margin-top: 12px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.detail-row p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+}
+
+.parent-summary {
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .parent-summary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.parent-title-btn {
+  text-transform: none;
+  font-size: 14px;
+}
+
+.task-details-actions {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .task-details-actions {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Fix v-row spacing */
+:deep(.v-row) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+:deep(.v-col) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
 </style>

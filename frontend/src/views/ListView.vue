@@ -18,11 +18,18 @@ const props = defineProps({
     type: String,
     default: null
   },
+
   taskStatuses: {
     type: Array,
     default: () => ['Ongoing', 'Completed', 'Pending Review', 'Unassigned']
+  },
+  searchQuery: {
+    type: String,
+    default: ''
   }
 })
+
+
 
 // ===========================
 // Emits Definition
@@ -46,7 +53,7 @@ const selectedTask = ref(null)
 const sortOptions = ['Due Date', 'Priority', 'Status', 'Assignee']
 
 // Search & Filter State
-const searchQuery = ref('')
+const searchQuery = computed(() => props.searchQuery || '')
 const statusFilter = ref([])
 
 // Bulk Select State
@@ -382,141 +389,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="list-view">
-    <!-- Top Toolbar -->
-    <div class="top-toolbar">
-      <div class="toolbar-left">
-        <h2 class="page-title">Task Manager</h2>
-        <span class="task-count">{{ filteredTasks.length }} tasks</span>
-      </div>
-
-      <div class="toolbar-center">
-        <!-- Search Bar -->
-        <v-text-field
-          v-model="searchQuery"
-          prepend-inner-icon="mdi-magnify"
-          placeholder="Search tasks..."
-          variant="outlined"
-          density="compact"
-          hide-details
-          clearable
-          class="search-field"
-        />
-      </div>
-
-      <div class="toolbar-right">
-        <!-- Filter Dropdown -->
-        <v-menu offset-y>
-          <template v-slot:activator="{ props: menuProps }">
-            <v-btn
-              v-bind="menuProps"
-              variant="outlined"
-              prepend-icon="mdi-filter-variant"
-              class="toolbar-btn"
-            >
-              Filter
-              <v-badge
-                v-if="statusFilter.length > 0"
-                :content="statusFilter.length"
-                color="primary"
-                inline
-              />
-            </v-btn>
-          </template>
-          <v-card min-width="250">
-            <v-card-text>
-              <div class="filter-section">
-                <div class="filter-header">Filter by Status</div>
-                <v-chip-group
-                  v-model="statusFilter"
-                  multiple
-                  column
-                >
-                  <v-chip
-                    v-for="status in taskStatuses"
-                    :key="status"
-                    :value="status"
-                    :color="getStatusColor(status)"
-                    filter
-                    size="small"
-                    variant="outlined"
-                  >
-                    {{ status }}
-                  </v-chip>
-                </v-chip-group>
-              </div>
-            </v-card-text>
-            <v-card-actions>
-              <v-btn
-                size="small"
-                @click="statusFilter = []"
-                variant="text"
-              >
-                Clear
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-menu>
-
-        <!-- Sort Dropdown -->
-        <v-select
-          :model-value="sortBy"
-          :items="sortOptions"
-          @update:modelValue="$emit('update:sortBy', $event)"
-          density="compact"
-          variant="outlined"
-          hide-details
-          prepend-inner-icon="mdi-sort"
-          class="sort-select"
-        ></v-select>
-
-        <!-- Bulk Select Toggle -->
-        <v-btn
-          v-if="!bulkSelectMode"
-          icon="mdi-checkbox-multiple-marked-outline"
-          variant="outlined"
-          @click="bulkSelectMode = true"
-          title="Bulk select mode"
-          class="toolbar-btn"
-        />
-        <v-btn
-          v-else
-          color="error"
-          @click="cancelBulkSelect"
-          prepend-icon="mdi-close"
-          class="toolbar-btn"
-        >
-          Cancel Bulk
-        </v-btn>
-
-        <!-- Add Task Button -->
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-plus"
-          @click="$emit('add-task')"
-          class="toolbar-btn"
-        >
-          Add Task
-        </v-btn>
-      </div>
-    </div>
-
-    <!-- Bulk Actions Bar (shown when items selected) -->
-    <div v-if="bulkSelectMode && selectedTaskIds.length > 0" class="bulk-actions-bar">
-      <div class="bulk-info">
-        <v-icon>mdi-checkbox-multiple-marked</v-icon>
-        <span class="bulk-count">{{ selectedTaskIds.length }} task(s) selected</span>
-      </div>
-      <div class="bulk-action-buttons">
-        <v-btn size="small" @click="bulkUpdateStatus" prepend-icon="mdi-update" variant="tonal">
-          Update Status
-        </v-btn>
-        <v-btn size="small" @click="bulkDelete" color="error" prepend-icon="mdi-delete" variant="tonal">
-          Delete
-        </v-btn>
-      </div>
-    </div>
-
+  <div class="list-view-content">
     <!-- Main Content Area -->
     <div class="main-content">
       <!-- Left Panel: Task List -->
@@ -531,6 +404,44 @@ defineExpose({
             density="compact"
             color="primary"
           />
+        </div>
+
+        <!-- Bulk Actions Bar (shown when items selected) -->
+        <div v-if="bulkSelectMode && selectedTaskIds.length > 0" class="bulk-actions-bar">
+          <div class="bulk-info">
+            <v-icon>mdi-checkbox-multiple-marked</v-icon>
+            <span class="bulk-count">{{ selectedTaskIds.length }} task(s) selected</span>
+          </div>
+          <div class="bulk-action-buttons">
+            <v-btn size="small" @click="bulkUpdateStatus" prepend-icon="mdi-update" variant="tonal">
+              Update Status
+            </v-btn>
+            <v-btn size="small" @click="bulkDelete" color="error" prepend-icon="mdi-delete" variant="tonal">
+              Delete
+            </v-btn>
+          </div>
+        </div>
+
+        <!-- Action Buttons Row -->
+        <div class="action-buttons-bar">
+          <v-btn
+            v-if="!bulkSelectMode"
+            icon="mdi-checkbox-multiple-marked-outline"
+            variant="text"
+            @click="bulkSelectMode = true"
+            title="Bulk select mode"
+            size="small"
+          />
+          <v-btn
+            v-else
+            color="error"
+            @click="cancelBulkSelect"
+            prepend-icon="mdi-close"
+            size="small"
+            variant="tonal"
+          >
+            Cancel
+          </v-btn>
         </div>
 
         <!-- Task List Scroll Area -->
@@ -607,18 +518,8 @@ defineExpose({
             <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
             <p class="empty-title">No tasks found</p>
             <p class="empty-subtitle">
-              {{ searchQuery || statusFilter.length > 0 ? 'Try adjusting your search or filters' : 'Get started by creating your first task' }}
+              Try adjusting your search or filters
             </p>
-            <v-btn 
-              v-if="!searchQuery && statusFilter.length === 0"
-              color="primary" 
-              prepend-icon="mdi-plus"
-              @click="$emit('add-task')"
-              class="mt-4"
-              rounded="lg"
-            >
-              Add Your First Task
-            </v-btn>
           </div>
         </div>
       </div>
@@ -872,136 +773,12 @@ defineExpose({
 /* ===========================
    Main Layout
    =========================== */
-.list-view {
+.list-view-content {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: #f5f7fa;
-  overflow: hidden;
-}
-
-/* ===========================
-   Top Toolbar
-   =========================== */
-.top-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  background: white;
-  border-bottom: 2px solid #e0e0e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  gap: 24px;
-  z-index: 100;
-  flex-wrap: wrap;
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 200px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1a202c;
-  white-space: nowrap;
-}
-
-.task-count {
-  padding: 4px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.toolbar-center {
   flex: 1;
-  max-width: 500px;
-  min-width: 250px;
-}
-
-.search-field {
-  width: 100%;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-btn {
-  text-transform: none;
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.sort-select {
-  min-width: 180px;
-  max-width: 200px;
-}
-
-.filter-section {
-  padding: 8px 0;
-}
-
-.filter-header {
-  font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
-}
-
-/* ===========================
-   Bulk Actions Bar
-   =========================== */
-.bulk-actions-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-bottom: 2px solid #5a67d8;
-  color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  z-index: 99;
-}
-
-.bulk-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.bulk-count {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.bulk-action-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-.bulk-action-buttons .v-btn {
-  background: white;
-  color: #5a67d8;
-  font-weight: 600;
-}
-
-.bulk-action-buttons .v-btn[color="error"] {
-  background: white;
-  color: #ef4444;
+  overflow: hidden;
+  background: transparent;
 }
 
 /* ===========================
@@ -1018,20 +795,71 @@ defineExpose({
    Left Panel: Task List
    =========================== */
 .task-list-panel {
-  width: 45%;
-  min-width: 400px;
-  max-width: 650px;
+  width: 40%;
+  min-width: 350px;
+  max-width: 600px;
   background: white;
   border-right: 2px solid #e0e0e0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .select-all-bar {
   padding: 12px 20px;
   background: #f8fafc;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.action-buttons-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+/* ===========================
+   Bulk Actions Bar
+   =========================== */
+.bulk-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: 2px solid #5a67d8;
+  color: white;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.bulk-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bulk-count {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.bulk-action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.bulk-action-buttons .v-btn {
+  background: white;
+  color: #5a67d8;
+  font-weight: 600;
+}
+
+.bulk-action-buttons .v-btn[color="error"] {
+  background: white;
+  color: #ef4444;
 }
 
 /* Task List Scroll Area */
@@ -1230,8 +1058,8 @@ defineExpose({
   background: #ffffff;
   overflow-y: auto;
   position: relative;
+  width: 100%;
 }
-
 .task-detail-panel::-webkit-scrollbar {
   width: 10px;
 }
@@ -1582,14 +1410,6 @@ defineExpose({
 }
 
 @media (max-width: 1200px) {
-  .top-toolbar {
-    padding: 14px 20px;
-  }
-
-  .toolbar-center {
-    max-width: 400px;
-  }
-
   .task-detail-content {
     padding: 24px 30px;
   }
@@ -1611,20 +1431,6 @@ defineExpose({
   .task-detail-panel {
     height: 50vh;
   }
-
-  .top-toolbar {
-    padding: 12px 16px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .toolbar-center {
-    order: 3;
-    width: 100%;
-    max-width: none;
-  }
 }
 
 @media (max-width: 768px) {
@@ -1632,23 +1438,8 @@ defineExpose({
     min-width: auto;
   }
 
-  .top-toolbar {
-    gap: 12px;
-  }
-
-  .toolbar-left {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .toolbar-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .sort-select {
-    min-width: 140px;
+  .action-buttons-bar {
+    flex-wrap: wrap;
   }
 
   .bulk-actions-bar {
@@ -1700,20 +1491,6 @@ defineExpose({
   .task-list-description {
     font-size: 13px;
   }
-
-  .page-title {
-    font-size: 18px;
-  }
-
-  .task-count {
-    font-size: 11px;
-    padding: 3px 8px;
-  }
-
-  .toolbar-btn {
-    font-size: 13px;
-    padding: 8px 12px;
-  }
 }
 
 /* ===========================
@@ -1747,14 +1524,59 @@ defineExpose({
 }
 
 /* Smooth hover transitions */
-.toolbar-btn:hover,
 .v-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.toolbar-btn:active,
 .v-btn:active {
   transform: translateY(0);
+}
+
+/* Dark mode support */
+[data-theme="dark"] .task-list-panel,
+[data-theme="dark"] .task-detail-panel {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .task-list-card {
+  background: #2d3748;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .task-list-title,
+[data-theme="dark"] .detail-title-section h2,
+[data-theme="dark"] .subtask-title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .meta-item,
+[data-theme="dark"] .task-list-description,
+[data-theme="dark"] .detail-section p {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .select-all-bar,
+[data-theme="dark"] .action-buttons-bar {
+  background: #1a202c;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .status-updates {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .subtask-item {
+  background: #2d3748;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .subtask-assignee,
+[data-theme="dark"] .subtask-date,
+[data-theme="dark"] .subtask-priority {
+  background: #1a202c;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 </style>

@@ -311,9 +311,14 @@ const onSave = () => {
   max-width: 700px;
   padding: 12px 0;
   box-sizing: border-box;
-  background: #ffffff;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
 }
 
+[data-theme="dark"] .create-task-card {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
 
 .mb-4 { margin-bottom: 16px !important; }
 .mb-3 { margin-bottom: 12px !important; }
@@ -324,10 +329,15 @@ const onSave = () => {
 
 /* Subtask section */
 .subtask-section {
-  background: #fafafa;
+  background: rgba(0, 0, 0, 0.02);
   border-radius: 8px;
   padding: 12px;
-  border: 1px solid #eee;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .subtask-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* File input / attachments */
@@ -347,6 +357,101 @@ const onSave = () => {
 .v-form { width: 100%; }
 .v-text-field, .v-textarea, .v-select {
   background: transparent;
+}
+
+/* Override Vuetify primary color buttons to green in light mode */
+.v-btn.text-primary,
+:deep(.v-btn.text-primary) {
+  color: #6b9b6b !important;
+}
+
+.v-btn[color="primary"],
+:deep(.v-btn[color="primary"]) {
+  background: #6b9b6b !important;
+  color: white !important;
+}
+
+.v-btn[color="primary"]:hover,
+:deep(.v-btn[color="primary"]:hover) {
+  background: #5a8a5a !important;
+}
+
+.v-btn[color="secondary"],
+:deep(.v-btn[color="secondary"]) {
+  background: #6b9b6b !important;
+  color: white !important;
+}
+
+.v-btn[color="secondary"]:hover,
+:deep(.v-btn[color="secondary"]:hover) {
+  background: #5a8a5a !important;
+}
+
+/* Dark mode - use blue */
+[data-theme="dark"] .v-btn[color="primary"],
+[data-theme="dark"] :deep(.v-btn[color="primary"]) {
+  background: #5a7a9b !important;
+  color: white !important;
+}
+
+[data-theme="dark"] .v-btn[color="primary"]:hover,
+[data-theme="dark"] :deep(.v-btn[color="primary"]:hover) {
+  background: #4a6a8b !important;
+}
+
+[data-theme="dark"] .v-btn[color="secondary"],
+[data-theme="dark"] :deep(.v-btn[color="secondary"]) {
+  background: #5a7a9b !important;
+  color: white !important;
+}
+
+[data-theme="dark"] .v-btn[color="secondary"]:hover,
+[data-theme="dark"] :deep(.v-btn[color="secondary"]:hover) {
+  background: #4a6a8b !important;
+}
+
+/* Chips and outlined buttons */
+.v-chip.text-primary,
+:deep(.v-chip.text-primary) {
+  color: #6b9b6b !important;
+  border-color: #6b9b6b !important;
+}
+
+.v-btn[variant="outlined"][color="primary"],
+:deep(.v-btn[variant="outlined"][color="primary"]) {
+  color: #6b9b6b !important;
+  border-color: #6b9b6b !important;
+}
+
+.v-btn[variant="outlined"][color="primary"]:hover,
+:deep(.v-btn[variant="outlined"][color="primary"]:hover) {
+  background: rgba(107, 155, 107, 0.1) !important;
+}
+
+[data-theme="dark"] .v-btn[variant="outlined"][color="primary"],
+[data-theme="dark"] :deep(.v-btn[variant="outlined"][color="primary"]) {
+  color: #7b92d1 !important;
+  border-color: #7b92d1 !important;
+}
+
+[data-theme="dark"] .v-btn[variant="outlined"][color="primary"]:hover,
+[data-theme="dark"] :deep(.v-btn[variant="outlined"][color="primary"]:hover) {
+  background: rgba(123, 146, 209, 0.1) !important;
+}
+
+/* Icon colors */
+.v-icon.text-primary,
+:deep(.v-icon.text-primary),
+.v-icon[color="primary"],
+:deep(.v-icon[color="primary"]) {
+  color: #6b9b6b !important;
+}
+
+[data-theme="dark"] .v-icon.text-primary,
+[data-theme="dark"] :deep(.v-icon.text-primary),
+[data-theme="dark"] .v-icon[color="primary"],
+[data-theme="dark"] :deep(.v-icon[color="primary"]) {
+  color: #7b92d1 !important;
 }
 
 /* Small responsive tweak */
