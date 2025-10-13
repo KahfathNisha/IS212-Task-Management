@@ -312,3 +312,80 @@ exports.getAllRecurringTasks = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+// Update Recurring Task
+exports.updateRecurringTask = async (req, res) => {
+    try {
+        const recurringTaskId = req.params.id;
+        const { userId, recurrence } = req.body;
+
+        // // 1. Only owner can update
+        // const recurringDoc = await db.collection('recurringTasks').doc(recurringTaskId).get();
+        // if (!recurringDoc.exists) {
+        //     return res.status(404).json({ message: 'Recurring task not found' });
+        // }
+        // const recurringData = recurringDoc.data();
+        // if (recurringData.userId !== userId) {
+        //     return res.status(403).json({ message: 'Only the owner can update recurrence rules' });
+        // }
+
+        // 2. Update recurrence rules
+        await db.collection('recurringTasks').doc(recurringTaskId).update({
+            recurrence,
+            updatedAt: admin.firestore.Timestamp.now()
+        });
+
+        // 3. Apply changes only to future instances (not past/completed)
+        // Find all future tasks linked to this recurringTaskId that are not completed and not in the past
+        const now = new Date();
+        const tasksSnapshot = await db.collection('tasks')
+            .where('recurringTaskId', '==', recurringTaskId)
+            .get();
+
+        const batch = db.batch();
+        tasksSnapshot.forEach(doc => {
+            const data = doc.data();
+            // Only update tasks that are not completed and due in the future
+            const dueDate = data.dueDate && data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
+            if (
+                data.status !== 'Completed' &&
+                dueDate >= now
+            ) {
+                // Optionally, update the recurrence info on the task (if you store it)
+                batch.update(doc.ref, {
+                    recurrence,
+                    updatedAt: admin.firestore.Timestamp.now()
+                });
+            }
+        });
+        await batch.commit();
+
+        // 4. If recurrence is removed, update recurringTasks and tasks accordingly
+        if (!recurrence.enabled) {
+            // Mark recurringTasks as inactive
+            await db.collection('recurringTasks').doc(recurringTaskId).update({
+                active: false
+            });
+            // Optionally, remove recurringTaskId from future tasks
+            const batch2 = db.batch();
+            tasksSnapshot.forEach(doc => {
+                const data = doc.data();
+                const dueDate = data.dueDate && data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
+                if (
+                    data.status !== 'Completed' &&
+                    dueDate >= now
+                ) {
+                    batch2.update(doc.ref, {
+                        recurringTaskId: admin.firestore.FieldValue.delete(),
+                        updatedAt: admin.firestore.Timestamp.now()
+                    });
+                }
+            });
+            await batch2.commit();
+        }
+
+        res.status(200).json({ message: 'Recurrence updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
