@@ -8,6 +8,9 @@ router.post('/', taskController.createTask);
 // Get all tasks
 router.get('/', taskController.getAllTasks);
 
+// Get all recurring tasks
+router.get('/recurring', taskController.getAllRecurringTasks);
+
 // Get a specific task by ID
 router.get('/:id', taskController.getTask);
 

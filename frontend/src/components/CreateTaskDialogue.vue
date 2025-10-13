@@ -140,27 +140,6 @@
             </v-btn>
           </div>
 
-          <div class="d-flex justify-center mb-4">
-            <v-btn
-              variant="outlined"
-              color="primary"
-              prepend-icon="mdi-repeat"
-              @click="showRecurrence = !showRecurrence"
-              rounded="lg"
-              class="mb-4"
-            >
-              {{ showRecurrence ? 'Disable Recurrence' : 'Set Recurrence' }}
-            </v-btn>
-            <v-icon v-if="localTask.recurrence?.enabled" color="primary" class="ml-2">mdi-repeat</v-icon>
-          </div>
-          <RecurrenceOptions
-            v-if="showRecurrence"
-            v-model="localTask.recurrence"
-            :min-date="localTask.dueDate || todayDate"
-            @stop="stopRecurrence"
-          />
-
-
           <div v-for="(subtask, index) in subtasks" :key="index" class="subtask-section mb-4">
             <v-divider class="mb-4"></v-divider>
             <h5 class="mb-3">Subtask {{ index + 1 }}</h5>
@@ -291,6 +270,27 @@
               Remove Subtask
             </v-btn>
           </div>
+
+          <div class="d-flex justify-center mb-4">
+            <v-btn
+              variant="outlined"
+              color="primary"
+              prepend-icon="mdi-repeat"
+              @click="showRecurrence = !showRecurrence"
+              rounded="lg"
+              class="mb-4"
+            >
+              {{ showRecurrence ? 'Disable Recurrence' : 'Set Recurrence' }}
+            </v-btn>
+            <v-icon v-if="localTask.recurrence?.enabled" color="primary" class="ml-2">mdi-repeat</v-icon>
+          </div>
+          <RecurrenceOptions
+            v-if="showRecurrence"
+            v-model="localTask.recurrence"
+            :min-date="todayDate"
+            @stop="stopRecurrence"
+          />
+
         </v-form>
       </v-card-text>
       
