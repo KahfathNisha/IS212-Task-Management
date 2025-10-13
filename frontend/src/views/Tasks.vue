@@ -426,7 +426,6 @@
         @update:sortOrder="listSortOrder = $event"
         :selected-task-id="selectedListTask?.id"
         :task-statuses="taskStatuses"
-        :current-view="currentView"
         @change-view="currentView = $event"
         @select-task="handleSelectTask"
         @edit-task="editTask"
