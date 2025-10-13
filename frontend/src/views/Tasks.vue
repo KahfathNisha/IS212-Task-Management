@@ -417,9 +417,11 @@
         v-else-if="viewType === 'list'"
         :tasks="filteredTasksList"
         :sort-by="listSortBy"
+        :sort-order="listSortOrder"
         :search-query="listSearchQuery"
         :current-view="'list'"
         @update:sortBy="listSortBy = $event"
+        @update:sortOrder="listSortOrder = $event"
         :selected-task-id="selectedListTask?.id"
         :task-statuses="taskStatuses"
         @select-task="handleSelectTask"
@@ -536,6 +538,7 @@ const departmentDropdownRef = ref(null)
 const showFilterDialog = ref(false)
 const selectedListTask = ref(null)
 const listSortBy = ref('dueDate')
+const listSortOrder = ref('asc')
 const listSearchQuery = ref('')
 
 const showDetailsDialog = ref(false)

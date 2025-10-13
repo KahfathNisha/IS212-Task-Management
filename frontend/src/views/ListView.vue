@@ -15,6 +15,10 @@ const props = defineProps({
     type: String,
     default: 'priority'
   },
+  sortOrder: {
+    type: String,
+    default: 'asc'
+  },
   selectedTaskId: {
     type: String,
     default: null
@@ -40,6 +44,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:sortBy',
+  'update:sortOrder',
   'select-task',
   'edit-task',
   'change-status',
@@ -137,21 +142,25 @@ const filteredTasks = computed(() => {
  */
 const sortedTasks = computed(() => {
   const tasks = [...filteredTasks.value]
-  
+
   tasks.sort((a, b) => {
+    let comparison = 0
+
     switch (props.sortBy) {
       case 'Due Date':
         // Tasks without dates go to the end
         const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31')
         const dateB = b.dueDate ? new Date(b.dueDate) : new Date('9999-12-31')
-        return dateA - dateB
-        
+        comparison = dateA - dateB
+        break
+
       case 'Priority':
         // Lower priority number = higher priority (1 is highest, 10 is lowest)
         const priorityA = typeof a.priority === 'number' ? a.priority : 10
         const priorityB = typeof b.priority === 'number' ? b.priority : 10
-        return priorityA - priorityB
-        
+        comparison = priorityA - priorityB
+        break
+
       case 'Status':
         // Custom order: To Do → In Progress → Pending Review → Completed → Blocked
         const statusOrder = {
@@ -164,13 +173,17 @@ const sortedTasks = computed(() => {
         const statusB = b.status || 'Unassigned'
         const orderA = statusOrder[statusA] || 8
         const orderB = statusOrder[statusB] || 8
-        return orderA - orderB
-        
+        comparison = orderA - orderB
+        break
+
       default:
-        return 0
+        comparison = 0
     }
+
+    // Apply sort order
+    return props.sortOrder === 'desc' ? -comparison : comparison
   })
-  
+
   return tasks
 })
 
@@ -209,6 +222,10 @@ watch(() => props.currentView, (newView) => {
     const savedSort = loadSortPreference()
     if (savedSort !== props.sortBy) {
       emit('update:sortBy', savedSort)
+    }
+    const savedOrder = loadSortOrderPreference()
+    if (savedOrder !== props.sortOrder) {
+      emit('update:sortOrder', savedOrder)
     }
   }
 })
@@ -440,6 +457,34 @@ const loadSortPreference = () => {
 }
 
 /**
+ * Save sort order preference to localStorage per view
+ */
+const saveSortOrderPreference = (sortOrder) => {
+  const viewKey = props.currentView || 'list'
+  const storageKey = `taskSortOrder_${viewKey}`
+  localStorage.setItem(storageKey, sortOrder)
+}
+
+/**
+ * Load sort order preference from localStorage
+ */
+const loadSortOrderPreference = () => {
+  const viewKey = props.currentView || 'list'
+  const storageKey = `taskSortOrder_${viewKey}`
+  const savedOrder = localStorage.getItem(storageKey)
+  return savedOrder || 'asc' // Default to ascending
+}
+
+/**
+ * Toggle sort order between asc and desc
+ */
+const toggleSortOrder = () => {
+  const newOrder = props.sortOrder === 'asc' ? 'desc' : 'asc'
+  emit('update:sortOrder', newOrder)
+  saveSortOrderPreference(newOrder)
+}
+
+/**
  * Get icon for sort option
  */
 const getSortIcon = (option) => {
@@ -620,6 +665,17 @@ defineExpose({
           </div>
 
           <div class="view-actions">
+            <!-- SORT ORDER TOGGLE -->
+            <button
+              class="sort-order-btn"
+              type="button"
+              :class="{ 'sort-order-active': sortOrder === 'desc' }"
+              @click="toggleSortOrder"
+              :title="sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'"
+            >
+              <v-icon size="small">mdi-sort</v-icon>
+            </button>
+
             <!-- SORT BY (self-contained, no nextTick needed) -->
             <div class="sort-wrapper" ref="sortWrapper">
               <button
@@ -1198,8 +1254,8 @@ defineExpose({
 }
 
 /* ===========================
-   View Toggle Bar (Kanban/List + Actions)
-   =========================== */
+    View Toggle Bar (Kanban/List + Actions)
+    =========================== */
 .view-toggle-bar {
   display: flex;
   justify-content: space-between;
@@ -1208,6 +1264,35 @@ defineExpose({
   background: #f8fafc;
   border-bottom: 1px solid #e0e0e0;
   gap: 16px;
+}
+
+/* Sort Order Toggle Button */
+.sort-order-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.12);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s ease;
+  width: 40px;
+  height: 40px;
+}
+
+.sort-order-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.sort-order-active {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-color: #3b82f6;
 }
 
 .view-tabs {
