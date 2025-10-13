@@ -83,6 +83,35 @@
             />
           </div>
 
+          <div v-if="localTask.collaborators && localTask.collaborators.length > 0" class="collaborator-permissions mb-4">
+            <h4 class="mb-3">Collaborator Permissions</h4>
+            <div v-for="perm in collaboratorPermissions" :key="perm.name" class="permission-row d-flex align-center ga-3 mb-2">
+              <span class="flex-1">{{ perm.name }}</span>
+              <div class="custom-permission-toggle">
+                <v-btn
+                  :class="{ 'active': perm.permission === 'view' }"
+                  @click="perm.permission = 'view'"
+                  prepend-icon="mdi-eye"
+                  size="small"
+                  variant="outlined"
+                  class="permission-btn"
+                >
+                  View
+                </v-btn>
+                <v-btn
+                  :class="{ 'active': perm.permission === 'edit' }"
+                  @click="perm.permission = 'edit'"
+                  prepend-icon="mdi-pencil"
+                  size="small"
+                  variant="outlined"
+                  class="permission-btn"
+                >
+                  Edit
+                </v-btn>
+              </div>
+            </div>
+          </div>
+
           <div class="mb-4">
             <v-file-input
               v-model="localTask.attachments"
@@ -201,6 +230,35 @@
               />
             </div>
 
+            <div v-if="subtask.collaborators && subtask.collaborators.length > 0" class="collaborator-permissions mb-3">
+              <h5 class="mb-2">Collaborator Permissions</h5>
+              <div v-for="perm in subtask.collaboratorPermissions" :key="perm.name" class="permission-row d-flex align-center ga-3 mb-2">
+                <span class="flex-1">{{ perm.name }}</span>
+                <div class="custom-permission-toggle">
+                  <v-btn
+                    :class="{ 'active': perm.permission === 'view' }"
+                    @click="perm.permission = 'view'"
+                    prepend-icon="mdi-eye"
+                    size="small"
+                    variant="outlined"
+                    class="permission-btn"
+                  >
+                    View
+                  </v-btn>
+                  <v-btn
+                    :class="{ 'active': perm.permission === 'edit' }"
+                    @click="perm.permission = 'edit'"
+                    prepend-icon="mdi-pencil"
+                    size="small"
+                    variant="outlined"
+                    class="permission-btn"
+                  >
+                    Edit
+                  </v-btn>
+                </div>
+              </div>
+            </div>
+
             <div class="mb-3">
               <v-file-input
                 v-model="subtask.attachments"
@@ -239,7 +297,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, watchEffect } from 'vue'
 import '../assets/styles.css';
 import RecurrenceOptions from './RecurrenceOptions.vue'
 
@@ -261,12 +319,21 @@ const localShow = computed({
   set: (v) => emit('update:show', v)
 })
 
+const normalizeCollaborators = (collabs) => {
+  return (collabs || []).map(c => typeof c === 'string' ? { name: c, permission: 'view' } : c)
+}
+
 const localTask = ref({ ...props.model })
 const subtasks = ref(localTask.value.subtasks ? [...localTask.value.subtasks] : [])
+const collaboratorPermissions = ref(normalizeCollaborators(localTask.value.collaborators))
 const formValid = ref(false)
 const taskForm = ref(null)
 
-watch(() => props.model, (v) => { localTask.value = { ...v }; subtasks.value = v?.subtasks ? [...v.subtasks] : [] }, { immediate: true })
+watch(() => props.model, (v) => {
+  localTask.value = { ...v }
+  collaboratorPermissions.value = normalizeCollaborators(v.collaborators)
+  subtasks.value = v?.subtasks ? v.subtasks.map(s => ({ ...s, collaboratorPermissions: normalizeCollaborators(s.collaborators) })) : []
+}, { immediate: true })
 
 const showRecurrence = ref(false);
 
@@ -283,8 +350,39 @@ const stopRecurrence = () => {
 }
 
 const addSubtask = () => {
-  subtasks.value.push({ title: '', description: '', status: props.taskStatuses[0] || 'To Do', priority: props.priorities[0] || 1, dueDate: '', assignedTo: null, collaborators: [], attachments: [] })
+  subtasks.value.push({
+    title: '',
+    description: '',
+    status: props.taskStatuses[0] || 'To Do',
+    priority: props.priorities[0] || 1,
+    dueDate: '',
+    assignedTo: null,
+    collaborators: [],
+    collaboratorPermissions: [],
+    attachments: []
+  })
 }
+
+// Sync main task collaborator permissions
+watch(() => localTask.value.collaborators, (newCollabs, oldCollabs) => {
+  const newNames = newCollabs || []
+  const oldNames = oldCollabs || []
+  const added = newNames.filter(n => !oldNames.includes(n))
+  const removed = oldNames.filter(n => !newNames.includes(n))
+  collaboratorPermissions.value = collaboratorPermissions.value.filter(p => !removed.includes(p.name)).concat(added.map(name => ({ name, permission: 'view' })))
+}, { deep: true })
+
+// Sync subtask collaborator permissions
+watchEffect(() => {
+  subtasks.value.forEach(subtask => {
+    if (!subtask.collaboratorPermissions) subtask.collaboratorPermissions = []
+    const currentNames = subtask.collaborators || []
+    const existingNames = subtask.collaboratorPermissions.map(p => p.name)
+    const added = currentNames.filter(n => !existingNames.includes(n))
+    const removed = existingNames.filter(n => !currentNames.includes(n))
+    subtask.collaboratorPermissions = subtask.collaboratorPermissions.filter(p => !removed.includes(p.name)).concat(added.map(name => ({ name, permission: 'view' })))
+  })
+})
 
 const onCancel = () => {
   emit('cancel')
@@ -298,8 +396,12 @@ const onSave = () => {
   } else {
     localTask.value.recurrence = { enabled: false, type: '', interval: 1, startDate: '', endDate: '' }
   }
-  // merge subtasks into task before emitting
-  const payload = { ...localTask.value, subtasks: subtasks.value }
+  // merge subtasks and collaborators with permissions
+  const payload = {
+    ...localTask.value,
+    collaborators: collaboratorPermissions.value,
+    subtasks: subtasks.value.map(s => ({ ...s, collaborators: s.collaboratorPermissions }))
+  }
   emit('save', payload)
   emit('update:show', false)
 }
@@ -452,6 +554,83 @@ const onSave = () => {
 [data-theme="dark"] .v-icon[color="primary"],
 [data-theme="dark"] :deep(.v-icon[color="primary"]) {
   color: #7b92d1 !important;
+}
+
+/* Collaborator permissions section */
+.collaborator-permissions {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .collaborator-permissions {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.collaborator-permissions h4, .collaborator-permissions h5 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.permission-row {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  align-items: center;
+}
+
+[data-theme="dark"] .permission-row {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.custom-permission-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.permission-btn {
+  min-width: 70px;
+  height: 32px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  text-transform: none;
+  padding: 0 8px;
+  transition: all 0.2s ease;
+}
+
+.permission-btn.active {
+  background: #6b9b6b !important;
+  color: white !important;
+  border-color: #6b9b6b !important;
+}
+
+[data-theme="dark"] .permission-btn.active {
+  background: #5a7a9b !important;
+  color: white !important;
+  border-color: #5a7a9b !important;
+}
+
+.permission-btn:not(.active) {
+  color: var(--text-primary) !important;
+  border-color: rgba(0, 0, 0, 0.23) !important;
+}
+
+[data-theme="dark"] .permission-btn:not(.active) {
+  border-color: rgba(255, 255, 255, 0.23) !important;
+}
+
+.permission-btn:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="dark"] .permission-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.04) !important;
 }
 
 /* Small responsive tweak */
