@@ -414,13 +414,15 @@
 
       <!-- LIST VIEW ONLY -->
       <ListView
-        v-else-if="viewType === 'list'"
+        v-if="viewType === 'list' && currentView === 'list'"
         :tasks="filteredTasksList"
         :sort-by="listSortBy"
         :search-query="listSearchQuery"
         @update:sort-by="listSortBy = $event"
         :selected-task-id="selectedListTask?.id"
         :task-statuses="taskStatuses"
+        :current-view="currentView"
+        @change-view="currentView = $event"
         @select-task="handleSelectTask"
         @edit-task="editTask"
         @change-status="handleListStatusChange"
@@ -430,7 +432,24 @@
         @bulk-update-status="handleBulkUpdateStatus"
         @bulk-delete="handleBulkDelete"
       />
-      </div>
+
+      <KanbanView
+        v-else-if="viewType === 'list' && currentView === 'kanban'"
+        :tasks="filteredTasksList"
+        :selected-task-id="selectedTaskId"
+        :task-statuses="taskStatuses"
+        :search-query="searchQuery"
+        :current-view="currentView"
+        @change-view="currentView = $event"
+        @select-task="handleSelectTask"
+        @edit-task="editTask"
+        @change-status="handleListStatusChange"
+        @view-parent="viewTaskDetails"
+        @open-attachment="openAttachment"
+        @add-task="showCreateDialog = true"
+      />
+          
+    </div>
       
     
         
@@ -496,6 +515,7 @@ const axiosClient = axios.create({
 const viewMode = ref('month')
 const currentDate = ref(new Date())
 const viewType = ref('calendar')
+const currentView = ref('list') 
 const viewTabs = [
   { label: 'Overview', value: 'overview' },
   { label: 'Calendar', value: 'calendar' },
@@ -535,6 +555,8 @@ const showFilterDialog = ref(false)
 const selectedListTask = ref(null)
 const listSortBy = ref('dueDate')
 const listSearchQuery = ref('')
+const selectedTaskId = ref(null) 
+const searchQuery = ref('') 
 
 const showDetailsDialog = ref(false)
 const showCreateDialog = ref(false)
@@ -1556,6 +1578,7 @@ const truncateTaskTitle = (title) => {
 // List View Handlers
 const handleSelectTask = (task) => {
   selectedListTask.value = task
+  selectedTaskId.value = task?.id || null 
 }
 
 const handleListStatusChange = ({ task, status }) => {

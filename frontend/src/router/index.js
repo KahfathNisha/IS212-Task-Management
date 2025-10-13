@@ -7,6 +7,7 @@ import LoginView from '@/views/LoginView.vue';
 import PasswordResetView from '@/views/PasswordResetView.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import TasksView from '@/views/Tasks.vue';
+import ProjectsView from '@/views/Projects.vue'; // ADD THIS
 import ReportsView from '@/views/Reports.vue';
 import ProfileView from '@/views/Profile.vue';
 import SettingsView from '@/views/Settings.vue';
@@ -35,6 +36,13 @@ const routes = [
     component: DashboardView,
     meta: { requiresAuth: true }
   },
+
+  {
+    path: '/projects',
+    name: 'Projects',
+    component: ProjectsView,
+    meta: { requiresAuth: true }
+  },
   {
     path: '/tasks',
     name: 'Tasks',
@@ -47,7 +55,6 @@ const routes = [
     component: ReportsView,
     meta: { requiresAuth: true }
   },
-  // --- THIS IS THE FIX: A single, correct route for the notification history page ---
   {
     path: '/notifications',
     name: 'NotificationHistory',
@@ -78,7 +85,7 @@ const router = createRouter({
   routes
 });
 
-// Navigation guard (your existing guard is correct)
+// Navigation guard
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
   if (authStore.loading) {
@@ -112,4 +119,3 @@ router.afterEach(() => {
 });
 
 export default router;
-

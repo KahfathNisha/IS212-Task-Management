@@ -1,118 +1,3 @@
-<template>
-  <div>
-    <!-- Thin Top Header Bar -->
-    <header class="top-header">
-      <div class="header-content">
-        <div class="header-left">
-          <!-- Hamburger Menu -->
-          <button class="icon-btn hamburger-btn" @click="toggleNav">
-            <div class="hamburger" :class="{ 'active': isOpen }">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </button>
-          
-          <h1 class="page-title">{{ pageTitle }}</h1>
-        </div>
-        
-        <div class="header-actions">
-          <!-- Theme Toggle -->
-          <button class="icon-btn" @click="toggleTheme" :title="isDarkMode ? 'Light Mode' : 'Dark Mode'">
-            <v-icon size="18">{{ isDarkMode ? 'mdi-white-balance-sunny' : 'mdi-moon-waning-crescent' }}</v-icon>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <!-- Sidebar Navigation -->
-    <nav :class="{ 'nav-open': isOpen }" class="navbar">
-      <div class="nav-content">
-        <div class="nav-header">
-          <h2>Task Management</h2>
-        </div>
-        
-        <div class="nav-menu">
-          <div v-for="item in menuItems" :key="item.path" class="nav-item">
-            <router-link :to="item.path" class="nav-link" @click="closeNav">
-              <v-icon class="nav-icon" size="18">{{ item.icon }}</v-icon>
-              <span>{{ item.title }}</span>
-            </router-link>
-          </div>
-        </div>
-
-        <!-- Projects Section -->
-        <div class="projects-section">
-          <div class="projects-header">
-            <h3>Projects</h3>
-            <v-btn icon="mdi-plus" size="small" variant="text" @click="showProjectDialog = true" />
-          </div>
-          
-          <div class="projects-list">
-            <div 
-              v-for="project in projects" 
-              :key="project.id"
-              class="project-item" 
-              :class="{ 'active-project': selectedProject === project.id }"
-              @click="selectProject(project.id)"
-            >
-              <v-icon class="project-icon" size="14" :color="project.color">mdi-circle</v-icon>
-              <span>{{ project.name }}</span>
-            </div>
-            <div class="project-item" @click="showProjectDialog = true">
-              <v-icon class="project-icon" size="14" color="purple">mdi-folder-plus</v-icon>
-              <span>Create Folder</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Settings and Logout -->
-        <div class="nav-bottom">
-          <div class="nav-item">
-            <a href="#" class="nav-link" @click.prevent="handleSettings">
-              <v-icon class="nav-icon" size="18">mdi-cog</v-icon>
-              <span>Settings</span>
-            </a>
-          </div>
-          <div class="nav-item">
-            <a href="#" class="nav-link" @click.prevent="handleLogout">
-              <v-icon class="nav-icon" size="18">mdi-logout</v-icon>
-              <span>Logout</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Overlay for mobile -->
-    <div v-if="isOpen" class="overlay" @click="closeNav"></div>
-
-    <!-- Project Dialog -->
-    <v-dialog v-model="showProjectDialog" max-width="400px">
-      <v-card rounded="xl">
-        <v-card-title>Create New Project</v-card-title>
-        <v-card-text>
-          <v-text-field
-            v-model="newProject.name"
-            label="Project Name"
-            required
-          />
-          <v-select
-            v-model="newProject.color"
-            :items="colorOptions"
-            label="Color"
-          />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showProjectDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="createProject">Create</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </div>
-</template>
-
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -145,8 +30,10 @@ const colorOptions = [
   { title: 'Red', value: 'red' }
 ]
 
+// Updated menu items with Projects
 const menuItems = [
   { title: 'Home', path: '/', icon: 'mdi-home' },
+  { title: 'Projects', path: '/projects', icon: 'mdi-folder-multiple' },
   { title: 'Tasks', path: '/tasks', icon: 'mdi-clipboard-list' },
   { title: 'Reports', path: '/reports', icon: 'mdi-file-document' },
   { title: 'Dashboards', path: '/dashboards', icon: 'mdi-chart-line' },
@@ -157,6 +44,7 @@ const menuItems = [
 const pageTitle = computed(() => {
   const titles = {
     '/': 'Home',
+    '/projects': 'Projects',
     '/tasks': 'Task Management Board',
     '/reports': 'Reports',
     '/dashboards': 'Dashboards',
@@ -179,6 +67,8 @@ const closeNav = () => {
 
 const selectProject = (projectId) => {
   selectedProject.value = projectId
+  // You can filter tasks by project or navigate to project-specific view
+  // router.push(`/tasks?project=${projectId}`)
 }
 
 const createProject = () => {
@@ -215,8 +105,124 @@ const toggleTheme = () => {
 }
 </script>
 
+<template>
+  <div>
+    <!-- Thin Top Header Bar -->
+    <header class="top-header">
+      <div class="header-content">
+        <div class="header-left">
+          <!-- Hamburger Menu -->
+          <button class="icon-btn hamburger-btn" @click="toggleNav">
+            <div class="hamburger" :class="{ 'active': isOpen }">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </button>
+          
+          <h1 class="page-title">{{ pageTitle }}</h1>
+        </div>
+        
+        <div class="header-actions">
+          <!-- Theme Toggle -->
+          <button class="icon-btn" @click="toggleTheme" :title="isDarkMode ? 'Light Mode' : 'Dark Mode'">
+            <v-icon size="18">{{ isDarkMode ? 'mdi-white-balance-sunny' : 'mdi-moon-waning-crescent' }}</v-icon>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav :class="{ 'nav-open': isOpen }" class="navbar">
+      <div class="nav-content">
+        <div class="nav-header">
+          <h2>Task Management</h2>
+        </div>
+        
+        <!-- Main Navigation Menu -->
+        <div class="nav-menu">
+          <div v-for="item in menuItems" :key="item.path" class="nav-item">
+            <router-link :to="item.path" class="nav-link" @click="closeNav">
+              <v-icon class="nav-icon" size="18">{{ item.icon }}</v-icon>
+              <span>{{ item.title }}</span>
+            </router-link>
+          </div>
+        </div>
+
+        <!-- Workspaces/Project Filters Section -->
+        <div class="projects-section">
+          <div class="projects-header">
+            <h3>Workspaces</h3>
+            <v-btn icon="mdi-plus" size="small" variant="text" @click="showProjectDialog = true" />
+          </div>
+          
+          <div class="projects-list">
+            <div 
+              v-for="project in projects" 
+              :key="project.id"
+              class="project-item" 
+              :class="{ 'active-project': selectedProject === project.id }"
+              @click="selectProject(project.id)"
+            >
+              <v-icon class="project-icon" size="14" :color="project.color">mdi-circle</v-icon>
+              <span>{{ project.name }}</span>
+            </div>
+            <div class="project-item" @click="showProjectDialog = true">
+              <v-icon class="project-icon" size="14" color="purple">mdi-folder-plus</v-icon>
+              <span>Create Workspace</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings and Logout -->
+        <div class="nav-bottom">
+          <div class="nav-item">
+            <a href="#" class="nav-link" @click.prevent="handleSettings">
+              <v-icon class="nav-icon" size="18">mdi-cog</v-icon>
+              <span>Settings</span>
+            </a>
+          </div>
+          <div class="nav-item">
+            <a href="#" class="nav-link" @click.prevent="handleLogout">
+              <v-icon class="nav-icon" size="18">mdi-logout</v-icon>
+              <span>Logout</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Overlay for mobile -->
+    <div v-if="isOpen" class="overlay" @click="closeNav"></div>
+
+    <!-- Project Dialog -->
+    <v-dialog v-model="showProjectDialog" max-width="400px">
+      <v-card rounded="xl">
+        <v-card-title>Create New Workspace</v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="newProject.name"
+            label="Workspace Name"
+            required
+          />
+          <v-select
+            v-model="newProject.color"
+            :items="colorOptions"
+            label="Color"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showProjectDialog = false">Cancel</v-btn>
+          <v-btn color="primary" @click="createProject">Create</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </div>
+</template>
+
 <style scoped>
-/* Top Header Bar */
+/* All your existing styles remain the same */
 .top-header {
   position: fixed;
   top: 0;
@@ -326,7 +332,6 @@ const toggleTheme = () => {
   transform: rotate(-45deg) translate(5px, -5px);
 }
 
-/* Sidebar Navigation */
 .navbar {
   position: fixed;
   top: 0;
