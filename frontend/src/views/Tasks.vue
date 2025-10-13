@@ -559,7 +559,7 @@ const tasks = ref([
     description: 'Write and finalize the Q4 project proposal for the new marketing campaign',
     dueDate: '2025-09-27',
     assignedTo: 'John Doe',
-    status: 'In Progress',
+    status: 'Ongoing',
     priority: 1,
     attachments: [],
     startTime: '2025-09-25T14:30:00',
@@ -571,11 +571,6 @@ const tasks = ref([
         timestamp: '2025-09-25T14:30:00',
         oldStatus: null,
         newStatus: 'Ongoing'
-      },
-      {
-        timestamp: '2025-09-27T09:30:00',
-        oldStatus: 'Ongoing',
-        newStatus: 'In Progress'
       }
     ],
     subtasks: [
@@ -586,20 +581,15 @@ const tasks = ref([
         startTime: '2025-09-27T09:00:00',
         endTime: '2025-09-27T17:00:00',
         dueDate: '2025-09-27',
-        status: 'In Progress',
+        status: 'Ongoing',
         priority: 2,
         createdAt: '2025-09-25T15:00:00',
         statusHistory: [
           {
             timestamp: '2025-09-25T15:00:00',
             oldStatus: null,
-            newStatus: 'To Do'
-          },
-          {
-            timestamp: '2025-09-27T16:30:00',
-            oldStatus: 'Ongoing',
-            newStatus: 'In Progress'
-          },
+            newStatus: 'Ongoing'
+          }
         ],
         attachments: []
       },
@@ -610,20 +600,20 @@ const tasks = ref([
         startTime: '2025-09-26T10:00:00',
         endTime: '2025-09-27T11:00:00',
         dueDate: '2025-09-27',
-        status: 'In Progress',
+        status: 'Pending Review',
         priority: 2,
         createdAt: '2025-09-26T10:00:00',
         statusHistory: [
           {
             timestamp: '2025-09-26T10:00:00',
             oldStatus: null,
-            newStatus: 'To Do'
+            newStatus: 'Ongoing'
           },
           {
             timestamp: '2025-09-26T12:00:00',
             oldStatus: 'Ongoing',
-            newStatus: 'In Progress'
-          },
+            newStatus: 'Pending Review'
+          }
         ],
         attachments: []
       }
@@ -646,7 +636,7 @@ const tasks = ref([
       {
         timestamp: '2025-09-24T11:20:00',
         oldStatus: null,
-        newStatus: 'To Do'
+        newStatus: 'Ongoing'
       }
     ],
     subtasks: []
@@ -657,7 +647,7 @@ const tasks = ref([
     description: 'Update the company website with new product information',
     dueDate: '2025-09-24',
     assignedTo: 'Alice Johnson',
-    status: 'Ongoing',
+    status: 'Unassigned',
     priority: 6,
     attachments: [],
     startTime: '2025-09-24T10:00:00',
@@ -668,7 +658,7 @@ const tasks = ref([
       {
         timestamp: '2025-09-22T16:45:00',
         oldStatus: null,
-        newStatus: 'To Do'
+        newStatus: 'Unassigned'
       }
     ],
     subtasks: [
@@ -686,7 +676,7 @@ const tasks = ref([
           {
             timestamp: '2025-09-23T09:15:00',
             oldStatus: null,
-            newStatus: 'To Do'
+            newStatus: 'Ongoing'
           }
         ],
         attachments: []
@@ -699,7 +689,7 @@ const tasks = ref([
     description: 'Create slides for the upcoming client presentation',
     dueDate: '2025-10-02',
     assignedTo: 'John Doe',
-    status: 'Done',
+    status: 'Completed',
     priority: 2,
     attachments: [],
     startTime: '2025-10-02T13:00:00',
@@ -715,12 +705,12 @@ const tasks = ref([
       {
         timestamp: '2025-09-27T14:20:00',
         oldStatus: 'Ongoing',
-        newStatus: 'In Progress'
+        newStatus: 'Pending Review'
       },
       {
         timestamp: '2025-09-29T17:30:00',
-        oldStatus: 'In Progress',
-        newStatus: 'Done'
+        oldStatus: 'Pending Review',
+        newStatus: 'Completed'
       }
     ],
     subtasks: []
@@ -837,7 +827,7 @@ const weekDates = computed(() => {
 
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
-  let filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Done')
+  let filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Completed')
 
   if (selectedPriorities.value.length > 0) {
     filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
@@ -858,7 +848,7 @@ const weekTasks = computed(() => {
   nextWeek.setDate(today.getDate() + 7)
 
   let filtered = tasks.value.filter(task => {
-    if (!task.dueDate || task.status === 'Done') return false
+    if (!task.dueDate || task.status === 'Completed') return false
     const taskDate = new Date(task.dueDate)
     return taskDate > today && taskDate <= nextWeek
   })
@@ -879,7 +869,7 @@ const weekTasks = computed(() => {
 const overdueTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
   let filtered = tasks.value.filter(task => {
-    return task.dueDate && task.dueDate < today && task.status !== 'Done'
+    return task.dueDate && task.dueDate < today && task.status !== 'Completed'
   })
 
   if (selectedPriorities.value.length > 0) {
@@ -900,7 +890,7 @@ const parentTaskProgress = computed(() => {
   if (!task || !task.subtasks || task.subtasks.length === 0) return 0;
 
   const totalSubtasks = task.subtasks.length;
-  const completedSubtasks = task.subtasks.filter(subtask => subtask.status === 'Done').length;
+  const completedSubtasks = task.subtasks.filter(subtask => subtask.status === 'Completed').length;
   return Math.round((completedSubtasks / totalSubtasks) * 100);
 });
 
@@ -1266,9 +1256,10 @@ const getTasksForDate = (dateKey) => {
 
 const getTaskStatusClass = (status) => {
   return {
-    'task-todo': status === 'To Do',
-    'task-progress': status === 'In Progress', 
-    'task-done': status === 'Done'
+    'task-ongoing': status === 'Ongoing',
+    'task-pending': status === 'Pending Review', 
+    'task-unassigned': status === 'Unassigned', 
+    'task-completed': status === 'Completed'
   }
 }
 
@@ -1306,7 +1297,7 @@ const editTask = (task) => {
   newTask.value = { ...task }
   newTask.value.collaborators = newTask.value.collaborators || []
   newTask.value.attachments = newTask.value.attachments || []
-  newTask.value.status = newTask.value.status || 'To Do'
+  newTask.value.status = newTask.value.status || 'Ongoing'
   subtasks.value = task.subtasks ? [...task.subtasks] : []
   if (!newTask.value.statusHistory) newTask.value.statusHistory = []
   subtasks.value.forEach(subtask => {
@@ -1343,7 +1334,7 @@ const addSubtask = () => {
   subtasks.value.push({
     title: '',
     description: '',
-    status: 'Ongoing',
+    status: 'Unassigned',
     priority: 1,
     assignedTo: '',
     collaborators: [],
@@ -2237,23 +2228,23 @@ const handleBulkDelete = async (taskIds) => {
 }
 
 .task-ongoing {
-  border-left-color: #2196f3;
+  border-left-color: #8acbff;
   background: rgba(33, 150, 243, 0.1);
 }
 
 .task-completed {
-  border-left-color: #4caf50;
+  border-left-color: #9cf99f;
   background: rgba(76, 175, 80, 0.1);
   opacity: 0.8;
 }
 
 .task-pending-review {
-  border-left-color: #ff9800;
+  border-left-color: hsl(36, 82%, 78%);
   background: rgba(255, 152, 0, 0.1);
 }
 
 .task-unassigned {
-  border-left-color: #9e9e9e;
+  border-left-color: #f79595;
   background: rgba(158, 158, 158, 0.1);
 }
 
