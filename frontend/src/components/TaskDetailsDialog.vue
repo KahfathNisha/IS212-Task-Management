@@ -73,14 +73,24 @@
           </v-col>
         </v-row>
 
-        <v-row v-if="task.collaborators && task.collaborators.length > 0">
+        <v-row>
           <v-col cols="12">
             <div class="detail-section">
               <div class="detail-section-icon-row">
                 <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                <h4>Collaborators</h4>
+                <h4>COLLABORATORS ({{ task.collaborators?.length || 0 }})</h4>
               </div>
-              <p>{{ task.collaborators.join(', ') }}</p>
+              <div v-if="!task.collaborators || task.collaborators.length === 0" class="empty-state">
+                No collaborators
+              </div>
+              <div v-else class="collaborators-list">
+                <div v-for="collaborator in task.collaborators" :key="collaborator.name || collaborator" class="collaborator-item">
+                  <span class="collaborator-name">{{ collaborator.name || collaborator }}</span>
+                  <v-chip size="small" :color="getPermissionColor(collaborator.permission || 'View')" variant="outlined" class="permission-badge">
+                    {{ collaborator.permission || 'View' }}
+                  </v-chip>
+                </div>
+              </div>
             </div>
           </v-col>
         </v-row>
@@ -166,7 +176,14 @@
                   <v-col cols="6">
                     <div class="detail-row" v-if="subtask.collaborators && subtask.collaborators.length > 0">
                       <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                      <p>{{ subtask.collaborators.join(', ') }}</p>
+                      <div class="subtask-collaborators">
+                        <div v-for="collaborator in subtask.collaborators" :key="collaborator.name || collaborator" class="subtask-collaborator-item">
+                          <span class="subtask-collaborator-name">{{ collaborator.name || collaborator }}</span>
+                          <v-chip size="x-small" :color="getPermissionColor(collaborator.permission || 'View')" variant="outlined" class="subtask-permission-badge">
+                            {{ collaborator.permission || 'View' }}
+                          </v-chip>
+                        </div>
+                      </div>
                     </div>
                   </v-col>
                 </v-row>
@@ -224,6 +241,10 @@ const parentProgress = computed(() => props.parentTaskProgress || 0)
 
 const getStatusColor = (status) => {
   return status === 'To Do' ? 'orange' : status === 'In Progress' ? 'blue' : 'green'
+}
+
+const getPermissionColor = (permission) => {
+  return permission === 'Edit' ? 'primary' : 'secondary'
 }
 
 const formatDate = (s) => s ? new Date(s).toLocaleDateString() : ''
@@ -515,6 +536,94 @@ const onOpenAttachment = (url) => {
 
 [data-theme="dark"] .task-details-actions {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Collaborators section styles */
+.collaborators-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collaborator-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .collaborator-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.collaborator-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.permission-badge {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empty-state {
+  font-size: 14px;
+  color: #7f8c8d;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Subtask collaborators styles */
+.subtask-collaborators {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.subtask-collaborator-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .subtask-collaborator-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.subtask-collaborator-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.subtask-permission-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 /* Fix v-row spacing */

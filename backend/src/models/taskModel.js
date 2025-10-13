@@ -22,6 +22,8 @@ const taskModel = {
     interval: 1,   // for custom, in days
     startDate: null, // ISO string or null
     endDate: null, // ISO string or null
+    dueOffset: 0, // number of units after startDate
+    dueOffsetUnit: 'days' // 'days' or 'weeks'
   }
 };
 

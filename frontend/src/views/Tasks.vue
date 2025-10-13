@@ -88,6 +88,8 @@
           <v-icon size="24" class="collapsed-icon">mdi-clock-outline</v-icon>
         </div>
       </div>
+      <!-- Recuurent Tasks Sidebar-->
+      <RecurringTasksSidebar @select="viewTaskDetails" />
 
       <!-- Main Content Area -->
       <div class="main-view-area">
@@ -417,8 +419,11 @@
         v-if="viewType === 'list' && currentView === 'list'"
         :tasks="filteredTasksList"
         :sort-by="listSortBy"
+        :sort-order="listSortOrder"
         :search-query="listSearchQuery"
-        @update:sort-by="listSortBy = $event"
+        :current-view="'list'"
+        @update:sortBy="listSortBy = $event"
+        @update:sortOrder="listSortOrder = $event"
         :selected-task-id="selectedListTask?.id"
         :task-statuses="taskStatuses"
         :current-view="currentView"
@@ -479,6 +484,7 @@
       :todayDate="todayDate"
       @save="handleCreateSave"
       @cancel="cancelCreate"
+      @message="handleMessage"
     />
 
     <v-snackbar
@@ -503,6 +509,7 @@ import '../assets/styles.css';
 import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
 import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 import ListView from './ListView.vue'
+import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -554,6 +561,7 @@ const departmentDropdownRef = ref(null)
 const showFilterDialog = ref(false)
 const selectedListTask = ref(null)
 const listSortBy = ref('dueDate')
+const listSortOrder = ref('asc')
 const listSearchQuery = ref('')
 const selectedTaskId = ref(null) 
 const searchQuery = ref('') 
@@ -985,10 +993,11 @@ const handleCreateSave = async (taskData) => {
   try {
     const response = await axios.post('http://localhost:3000/tasks', taskData);
     const newTaskId = response.data.id;
-    const newTaskWithId = { 
-      ...taskData, 
+    const newTaskWithId = {
+      ...taskData,
       id: newTaskId,
-      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status || 'Ongoing' }],      createdAt: new Date().toISOString(),
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status || 'Ongoing' }],
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     tasks.value.push(newTaskWithId);
@@ -997,7 +1006,7 @@ const handleCreateSave = async (taskData) => {
     snackbarColor.value = 'success';
   } catch (error) {
     showSnackbar.value = true;
-    snackbarMessage.value = 'Failed to create task.';
+    snackbarMessage.value = error.response?.data?.message || 'Failed to create task.';
     snackbarColor.value = 'error';
   }
 };
@@ -1015,7 +1024,7 @@ const updateTask = async (taskId, updatedData) => {
     }
 
     await axiosClient.put(`/tasks/${taskId}`, updatedData);
-    
+
     const taskIndex = tasks.value.findIndex(t => t.id === taskId);
     if (taskIndex !== -1) {
       tasks.value[taskIndex] = {
@@ -1023,7 +1032,7 @@ const updateTask = async (taskId, updatedData) => {
         ...updatedData,
         updatedAt: new Date().toISOString()
       };
-      
+
       if (selectedTask.value?.id === taskId) {
         selectedTask.value = tasks.value[taskIndex];
       }
@@ -1031,7 +1040,7 @@ const updateTask = async (taskId, updatedData) => {
         selectedListTask.value = tasks.value[taskIndex];
       }
     }
-    
+
     showMessage('Task updated successfully!', 'success');
     return true;
   } catch (error) {
@@ -1618,6 +1627,10 @@ const handleBulkDelete = async (taskIds) => {
   } catch (error) {
     showMessage('Failed to delete some tasks', 'error')
   }
+}
+
+const handleMessage = ({ message, color }) => {
+  showMessage(message, color)
 }
 
 </script>

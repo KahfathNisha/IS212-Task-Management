@@ -8,6 +8,9 @@ router.post('/', taskController.createTask);
 // Get all tasks
 router.get('/', taskController.getAllTasks);
 
+// Get all recurring tasks
+router.get('/recurring', taskController.getAllRecurringTasks);
+
 // Get a specific task by ID
 router.get('/:id', taskController.getTask);
 
@@ -22,6 +25,9 @@ router.put('/:id/archive', taskController.archiveTask);
 
 // Add this line to your routes file
 router.put('/:id', taskController.updateTask);
+
+// Update recurrence rules for a recurring task
+router.put('/recurring/:id', taskController.updateRecurringTask);
 
 module.exports = router;
 

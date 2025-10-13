@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 
 // ===========================
 // Props Definition
@@ -13,7 +13,11 @@ const props = defineProps({
   },
   sortBy: {
     type: String,
-    default: 'Due Date'
+    default: 'priority'
+  },
+  sortOrder: {
+    type: String,
+    default: 'asc'
   },
   selectedTaskId: {
     type: String,
@@ -40,6 +44,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:sortBy',
+  'update:sortOrder',
   'select-task',
   'edit-task',
   'change-status',
@@ -55,7 +60,16 @@ const emit = defineEmits([
 // Local State
 // ===========================
 const selectedTask = ref(null)
-const sortOptions = ['Due Date', 'Priority', 'Status', 'Assignee']
+const sortOptions = ['Due Date', 'Priority', 'Status']
+const sortDropdownOpen = ref(false)
+const sortDropdownTop = ref(0)
+const sortDropdownLeft = ref(0)
+const sortBtnRef = ref(null)
+const sortDropdownRef = ref(null)
+
+// Sort By State
+const sortOpen = ref(false)
+const sortWrapper = ref(null)
 
 // Search & Filter State
 const searchQuery = computed(() => props.searchQuery || '')
@@ -128,32 +142,48 @@ const filteredTasks = computed(() => {
  */
 const sortedTasks = computed(() => {
   const tasks = [...filteredTasks.value]
-  
+
   tasks.sort((a, b) => {
+    let comparison = 0
+
     switch (props.sortBy) {
       case 'Due Date':
         // Tasks without dates go to the end
-        const dateA = new Date(a.dueDate || '9999-12-31')
-        const dateB = new Date(b.dueDate || '9999-12-31')
-        return dateA - dateB
-        
+        const dateA = a.dueDate ? new Date(a.dueDate) : new Date('9999-12-31')
+        const dateB = b.dueDate ? new Date(b.dueDate) : new Date('9999-12-31')
+        comparison = dateA - dateB
+        break
+
       case 'Priority':
-        // Lower priority number = higher priority
-        return (a.priority || 10) - (b.priority || 10)
-        
+        // Lower priority number = higher priority (1 is highest, 10 is lowest)
+        const priorityA = typeof a.priority === 'number' ? a.priority : 10
+        const priorityB = typeof b.priority === 'number' ? b.priority : 10
+        comparison = priorityA - priorityB
+        break
+
       case 'Status':
-        // Alphabetical sort by status
-        return (a.status || '').localeCompare(b.status || '')
-        
-      case 'Assignee':
-        // Alphabetical sort by assignee
-        return (a.assignedTo || 'Unassigned').localeCompare(b.assignedTo || 'Unassigned')
-        
+        // Custom order: To Do → In Progress → Pending Review → Completed → Blocked
+        const statusOrder = {
+          'Ongoing': 1,
+          'Pending Review': 2,
+          'Completed': 3,
+          'Unassigned': 4
+        }
+        const statusA = a.status || 'Unassigned'
+        const statusB = b.status || 'Unassigned'
+        const orderA = statusOrder[statusA] || 8
+        const orderB = statusOrder[statusB] || 8
+        comparison = orderA - orderB
+        break
+
       default:
-        return 0
+        comparison = 0
     }
+
+    // Apply sort order
+    return props.sortOrder === 'desc' ? -comparison : comparison
   })
-  
+
   return tasks
 })
 
@@ -183,6 +213,22 @@ watch(() => props.selectedTaskId, (newId) => {
     selectedTask.value = null
   }
 }, { immediate: true })
+
+/**
+ * Watch for view changes to load appropriate sort preference
+ */
+watch(() => props.currentView, (newView) => {
+  if (newView) {
+    const savedSort = loadSortPreference()
+    if (savedSort !== props.sortBy) {
+      emit('update:sortBy', savedSort)
+    }
+    const savedOrder = loadSortOrderPreference()
+    if (savedOrder !== props.sortOrder) {
+      emit('update:sortOrder', savedOrder)
+    }
+  }
+})
 
 /**
  * Clear bulk selection when filters change
@@ -282,6 +328,204 @@ const bulkDelete = () => {
     cancelBulkSelect()
   }
 }
+
+// ===========================
+// Sort Dropdown Methods
+// ===========================
+
+/**
+ * Toggle sort dropdown menu
+ */
+const toggleSortDropdown = () => {
+  if (sortDropdownOpen.value) {
+    closeSortDropdown()
+  } else {
+    closeOtherDropdowns()
+    openSortDropdown()
+  }
+}
+
+/**
+ * Open sort dropdown menu
+ */
+const openSortDropdown = () => {
+  nextTick(() => {
+    if (sortBtnRef.value) {
+      const rect = sortBtnRef.value.$el.getBoundingClientRect()
+      const dropdownWidth = 200
+      const dropdownHeight = 120 // Approximate height
+
+      // Position below the button
+      sortDropdownTop.value = rect.bottom + 8
+
+      // Check if there's enough space on the right
+      const spaceOnRight = window.innerWidth - rect.right
+      if (spaceOnRight >= dropdownWidth) {
+        // Align to the right edge of the button
+        sortDropdownLeft.value = rect.right - dropdownWidth
+      } else {
+        // Align to the left edge of the button
+        sortDropdownLeft.value = rect.left
+      }
+
+      // Ensure dropdown doesn't go below viewport
+      const dropdownBottom = sortDropdownTop.value + dropdownHeight
+      if (dropdownBottom > window.innerHeight) {
+        sortDropdownTop.value = rect.top - dropdownHeight - 8
+      }
+    }
+  })
+
+  sortDropdownOpen.value = true
+
+  nextTick(() => {
+    document.addEventListener('click', handleSortClickOutside)
+  })
+}
+
+/**
+ * Close sort dropdown menu
+ */
+const closeSortDropdown = () => {
+  sortDropdownOpen.value = false
+  document.removeEventListener('click', handleSortClickOutside)
+}
+
+/**
+ * Handle click outside to close dropdown
+ */
+const handleSortClickOutside = (event) => {
+  if (sortBtnRef.value && !sortBtnRef.value.$el.contains(event.target) &&
+      sortDropdownRef.value && !sortDropdownRef.value.contains(event.target)) {
+    closeSortDropdown()
+  }
+}
+
+/**
+ * Handle keyboard navigation for accessibility
+ */
+const handleSortKeydown = (event) => {
+  if (event.key === 'Escape') {
+    closeSortDropdown()
+  }
+}
+
+/**
+ * Close other dropdowns when opening sort dropdown
+ */
+const closeOtherDropdowns = () => {
+  // This would close other dropdowns if they exist
+}
+
+/**
+ * Select a sort option
+ */
+const selectSortOption = (option) => {
+  emit('update:sortBy', option)
+  saveSortPreference(option)
+  closeSortDropdown()
+
+  // Visual feedback - briefly highlight the sort button
+  if (sortBtnRef.value) {
+    const btn = sortBtnRef.value.$el
+    btn.style.backgroundColor = '#e8f5e9'
+    btn.style.transform = 'scale(1.02)'
+    setTimeout(() => {
+      btn.style.backgroundColor = ''
+      btn.style.transform = ''
+    }, 200)
+  }
+}
+
+/**
+ * Save sort preference to localStorage per view
+ */
+const saveSortPreference = (sortOption) => {
+  const viewKey = props.currentView || 'list'
+  const storageKey = `taskSort_${viewKey}`
+  localStorage.setItem(storageKey, sortOption)
+}
+
+/**
+ * Load sort preference from localStorage
+ */
+const loadSortPreference = () => {
+  const viewKey = props.currentView || 'list'
+  const storageKey = `taskSort_${viewKey}`
+  const savedSort = localStorage.getItem(storageKey)
+  return savedSort || 'Due Date' // Default to Due Date
+}
+
+/**
+ * Save sort order preference to localStorage per view
+ */
+const saveSortOrderPreference = (sortOrder) => {
+  const viewKey = props.currentView || 'list'
+  const storageKey = `taskSortOrder_${viewKey}`
+  localStorage.setItem(storageKey, sortOrder)
+}
+
+/**
+ * Load sort order preference from localStorage
+ */
+const loadSortOrderPreference = () => {
+  const viewKey = props.currentView || 'list'
+  const storageKey = `taskSortOrder_${viewKey}`
+  const savedOrder = localStorage.getItem(storageKey)
+  return savedOrder || 'asc' // Default to ascending
+}
+
+/**
+ * Toggle sort order between asc and desc
+ */
+const toggleSortOrder = () => {
+  const newOrder = props.sortOrder === 'asc' ? 'desc' : 'asc'
+  emit('update:sortOrder', newOrder)
+  saveSortOrderPreference(newOrder)
+}
+
+/**
+ * Get icon for sort option
+ */
+const getSortIcon = (option) => {
+  const icons = {
+    'Due Date': 'mdi-calendar',
+    'Priority': 'mdi-alert-circle',
+    'Status': 'mdi-check-circle'
+  }
+  return icons[option] || 'mdi-sort'
+}
+
+// keep a local mirror of current sort for radios
+const currentSort = ref(props.sortBy)
+watch(() => props.sortBy, v => (currentSort.value = v), { immediate: true })
+
+function selectSort(key) {
+  // Map the lowercase keys to the expected format for sorting
+  const sortKeyMap = {
+    'priority': 'Priority',
+    'status': 'Status',
+    'dueDate': 'Due Date'
+  }
+
+  const mappedKey = sortKeyMap[key] || key
+  currentSort.value = mappedKey
+
+  // persist (optional): mirror what your app already does
+  try { localStorage.setItem('listSortBy', mappedKey) } catch {}
+
+  // IMPORTANT: keep event name consistent with parent listener (@update:sortBy)
+  emit('update:sortBy', mappedKey)
+
+  sortOpen.value = false
+}
+
+function onDocClick(e) {
+  if (!sortWrapper.value?.contains(e.target)) sortOpen.value = false
+}
+
+onMounted(() => document.addEventListener('click', onDocClick, { capture: true }))
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick, { capture: true }))
 
 // ===========================
 // Utility Methods
@@ -421,6 +665,96 @@ defineExpose({
           </div>
 
           <div class="view-actions">
+            <!-- SORT ORDER TOGGLE -->
+            <button
+              class="sort-order-btn"
+              type="button"
+              :class="{ 'sort-order-active': sortOrder === 'desc' }"
+              @click="toggleSortOrder"
+              :title="sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'"
+            >
+              <v-icon size="small">mdi-sort</v-icon>
+            </button>
+
+            <!-- SORT BY (self-contained, no nextTick needed) -->
+            <div class="sort-wrapper" ref="sortWrapper">
+              <button
+                class="sort-btn"
+                type="button"
+                @click.stop="sortOpen = !sortOpen"
+                aria-haspopup="menu"
+                :aria-expanded="sortOpen ? 'true' : 'false'"
+              >
+                <span class="sort-label">Sort By:</span>
+                <span class="current-sort">{{ currentSort }}</span>
+              </button>
+
+              <!-- Always present in DOM; just toggled with v-show -->
+              <div
+                class="custom-filter-dropdown"
+                v-show="sortOpen"
+                role="menu"
+                @click.stop
+              >
+                <div class="dropdown-header">
+                  <div class="dropdown-title">Sort tasks by</div>
+                </div>
+
+                <ul class="filter-options-list">
+                  <li
+                    class="filter-option-item"
+                    :class="{ 'active': currentSort === 'Priority' }"
+                    role="menuitemradio"
+                    :aria-checked="currentSort === 'Priority'"
+                    @click="selectSort('priority')"
+                  >
+                    <input
+                      class="custom-radio"
+                      type="radio"
+                      name="sort"
+                      :checked="currentSort === 'Priority'"
+                      readonly
+                    />
+                    <span>Priority</span>
+                  </li>
+
+                  <li
+                    class="filter-option-item"
+                    :class="{ 'active': currentSort === 'Status' }"
+                    role="menuitemradio"
+                    :aria-checked="currentSort === 'Status'"
+                    @click="selectSort('status')"
+                  >
+                    <input
+                      class="custom-radio"
+                      type="radio"
+                      name="sort"
+                      :checked="currentSort === 'Status'"
+                      readonly
+                    />
+                    <span>Status</span>
+                  </li>
+
+                  <li
+                    class="filter-option-item"
+                    :class="{ 'active': currentSort === 'Due Date' }"
+                    role="menuitemradio"
+                    :aria-checked="currentSort === 'Due Date'"
+                    @click="selectSort('dueDate')"
+                  >
+                    <input
+                      class="custom-radio"
+                      type="radio"
+                      name="sort"
+                      :checked="currentSort === 'Due Date'"
+                      readonly
+                    />
+                    <span>Due date</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
             <v-btn
               v-if="!bulkSelectMode"
               icon="mdi-checkbox-multiple-marked-outline"
@@ -440,7 +774,7 @@ defineExpose({
               Cancel
             </v-btn>
 
-            
+
           </div>
         </div>
       </div>
@@ -800,6 +1134,7 @@ defineExpose({
       </div>
     </div>
   </div>
+
 </template>
 
 
@@ -919,8 +1254,8 @@ defineExpose({
 }
 
 /* ===========================
-   View Toggle Bar (Kanban/List + Actions)
-   =========================== */
+    View Toggle Bar (Kanban/List + Actions)
+    =========================== */
 .view-toggle-bar {
   display: flex;
   justify-content: space-between;
@@ -929,6 +1264,35 @@ defineExpose({
   background: #f8fafc;
   border-bottom: 1px solid #e0e0e0;
   gap: 16px;
+}
+
+/* Sort Order Toggle Button */
+.sort-order-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.12);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s ease;
+  width: 40px;
+  height: 40px;
+}
+
+.sort-order-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.sort-order-active {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-color: #3b82f6;
 }
 
 .view-tabs {
@@ -1661,8 +2025,117 @@ defineExpose({
 }
 
 /* ===========================
-   Transitions & Animations
-   =========================== */
+      Sort By Dropdown
+      =========================== */
+.sort-item-icon {
+  color: #757575;
+  flex-shrink: 0;
+}
+
+.sort-item-check {
+  color: #2e7d32;
+  flex-shrink: 0;
+}
+
+/* wrapper anchors the absolute menu */
+.sort-wrapper {
+  position: relative;
+  display: inline-block; /* keeps menu aligned to the button */
+}
+
+/* your existing button styles can stay; here’s a neutral base */
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.12);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.sort-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.sort-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.current-sort {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+/* DROPDOWN: now absolutely positioned under the button */
+.custom-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 8px); /* under the button */
+  right: 0;
+  min-width: 240px;
+  z-index: 1000;
+  background: var(--bg-primary, #fff);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+
+/* keep your existing decorative classes */
+.dropdown-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+.dropdown-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.filter-options-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+
+.filter-option-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-option-item:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+.filter-option-item.active {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+}
+
+.filter-option-item.active .custom-radio {
+  accent-color: #3b82f6;
+}
+
+.custom-radio {
+  pointer-events: none; /* click on whole row */
+}
+
+/* ===========================
+    Transitions & Animations
+    =========================== */
 .task-list-card,
 .subtask-item,
 .attachment-chip,
