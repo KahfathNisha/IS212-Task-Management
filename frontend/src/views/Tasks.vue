@@ -99,7 +99,7 @@
           </div>
           
           <div class="header-right">
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg">
+            <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg" class="add-task-btn">
               Add Task
             </v-btn>
           </div>
@@ -110,17 +110,16 @@
           <div class="controls-row">
             <!-- Left side: View toggle -->
             <div class="view-toggle-left">
-              <v-btn-toggle v-model="viewType" mandatory class="view-type-toggle">
-                <v-btn value="calendar" size="small" prepend-icon="mdi-calendar" rounded="lg">
-                  Calendar
-                </v-btn>
-                <v-btn value="list" size="small" prepend-icon="mdi-format-list-bulleted" rounded="lg">
-                  List
-                </v-btn>
-                <v-btn value="projects" size="small" prepend-icon="mdi-folder-multiple" rounded="lg">
-                  Projects
-                </v-btn>
-              </v-btn-toggle>
+              <div class="view-tabs">
+                <button 
+                  v-for="tab in viewTabs" 
+                  :key="tab.value"
+                  @click="viewType = tab.value"
+                  :class="['view-tab', { 'active': viewType === tab.value }]"
+                >
+                  {{ tab.label }}
+                </button>
+              </div>
             </div>
 
             <!-- Right side: Filters -->
@@ -497,6 +496,14 @@ const axiosClient = axios.create({
 const viewMode = ref('month')
 const currentDate = ref(new Date())
 const viewType = ref('calendar')
+const viewTabs = [
+  { label: 'Overview', value: 'overview' },
+  { label: 'Calendar', value: 'calendar' },
+  { label: 'Task List', value: 'list' },
+  { label: 'Timeline', value: 'timeline' },
+  { label: 'Projects', value: 'projects' },
+  { label: 'Team', value: 'team' }
+]
 const selectedTask = ref(null)
 const selectedDate = ref(null)
 const upcomingSidebarOpen = ref(true)
@@ -1868,25 +1875,25 @@ const handleBulkDelete = async (taskIds) => {
   border-color: #7b92d1 !important;
 }
 
-/* Add Task button - force green in light mode */
-:deep(.calendar-controls .v-btn[prepend-icon="mdi-plus"]) {
+/* Add Task button - force green in light mode, blue in dark mode */
+:deep(.v-btn[prepend-icon="mdi-plus"]) {
   background: #6b9b6b !important;
   color: white !important;
   border: none !important;
 }
 
-:deep(.calendar-controls .v-btn[prepend-icon="mdi-plus"]:hover) {
+:deep(.v-btn[prepend-icon="mdi-plus"]:hover) {
   background: #5a8a5a !important;
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(107, 155, 107, 0.3) !important;
 }
 
-[data-theme="dark"] :deep(.calendar-controls .v-btn[prepend-icon="mdi-plus"]) {
+[data-theme="dark"] :deep(.v-btn[prepend-icon="mdi-plus"]) {
   background: #5a7a9b !important;
   color: white !important;
 }
 
-[data-theme="dark"] :deep(.calendar-controls .v-btn[prepend-icon="mdi-plus"]:hover) {
+[data-theme="dark"] :deep(.v-btn[prepend-icon="mdi-plus"]:hover) {
   background: #4a6a8b !important;
   box-shadow: 0 2px 6px rgba(90, 122, 155, 0.3) !important;
 }
@@ -2732,5 +2739,51 @@ const handleBulkDelete = async (taskIds) => {
 
 [data-theme="dark"] .v-field__outline {
   border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ===========================
+   View Tabs Navigation
+   =========================== */
+.view-toggle-left {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .view-toggle-left {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.view-tabs {
+  display: flex;
+  gap: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+}
+
+.view-tab {
+  all: unset;
+  padding: 14px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8b95a0;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+  border-bottom: 3px solid transparent;
+}
+
+.view-tab:hover {
+  color: #4a5568;
+}
+
+.view-tab.active {
+  color: #1a202c;
+  border-bottom-color: #6b9b6b;
+}
+
+[data-theme="dark"] .view-tab.active {
+  color: #f7fafc;
+  border-bottom-color: #5a7a9b;
 }
 </style>

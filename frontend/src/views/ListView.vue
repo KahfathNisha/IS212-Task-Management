@@ -4,6 +4,7 @@ import { ref, computed, watch } from 'vue'
 // ===========================
 // Props Definition
 // ===========================
+
 const props = defineProps({
   tasks: {
     type: Array,
@@ -18,7 +19,6 @@ const props = defineProps({
     type: String,
     default: null
   },
-
   taskStatuses: {
     type: Array,
     default: () => ['Ongoing', 'Completed', 'Pending Review', 'Unassigned']
@@ -26,14 +26,18 @@ const props = defineProps({
   searchQuery: {
     type: String,
     default: ''
+  },
+  currentView: {    // ← ADD THIS NEW PROP
+    type: String,
+    default: 'list'
   }
 })
-
 
 
 // ===========================
 // Emits Definition
 // ===========================
+
 const emit = defineEmits([
   'update:sortBy',
   'select-task',
@@ -43,7 +47,8 @@ const emit = defineEmits([
   'open-attachment',
   'add-task',
   'bulk-update-status',
-  'bulk-delete'
+  'bulk-delete',
+  'change-view'    // ← ADD THIS
 ])
 
 // ===========================
@@ -392,374 +397,403 @@ defineExpose({
   <div class="list-view-content">
     <!-- Main Content Area -->
     <div class="main-content">
-      <!-- Left Panel: Task List -->
-      <div class="task-list-panel">
-        <!-- Select All (only in bulk mode) -->
-        <div v-if="bulkSelectMode" class="select-all-bar">
-          <v-checkbox
-            :model-value="allSelected"
-            @update:model-value="toggleSelectAll"
-            label="Select All"
-            hide-details
-            density="compact"
-            color="primary"
-          />
-        </div>
-
-        <!-- Bulk Actions Bar (shown when items selected) -->
-        <div v-if="bulkSelectMode && selectedTaskIds.length > 0" class="bulk-actions-bar">
-          <div class="bulk-info">
-            <v-icon>mdi-checkbox-multiple-marked</v-icon>
-            <span class="bulk-count">{{ selectedTaskIds.length }} task(s) selected</span>
+      <!-- View Toggle Bar - SPANS FULL WIDTH ACROSS BOTH PANELS -->
+      <div class="view-toggle-bar-wrapper">
+        <div class="view-toggle-bar">
+          <div class="view-tabs">
+            <button 
+              class="view-tab"
+              :class="{ active: currentView === 'kanban' }"
+              @click="$emit('change-view', 'kanban')"
+            >
+              <v-icon size="small">mdi-view-column</v-icon>
+              <span>Kanban</span>
+            </button>
+            
+            <button 
+              class="view-tab"
+              :class="{ active: currentView === 'list' }"
+              @click="$emit('change-view', 'list')"
+            >
+              <v-icon size="small">mdi-format-list-bulleted</v-icon>
+              <span>List view</span>
+            </button>
           </div>
-          <div class="bulk-action-buttons">
-            <v-btn size="small" @click="bulkUpdateStatus" prepend-icon="mdi-update" variant="tonal">
-              Update Status
-            </v-btn>
-            <v-btn size="small" @click="bulkDelete" color="error" prepend-icon="mdi-delete" variant="tonal">
-              Delete
-            </v-btn>
-          </div>
-        </div>
 
-        <!-- Action Buttons Row -->
-        <div class="action-buttons-bar">
-          <v-btn
-            v-if="!bulkSelectMode"
-            icon="mdi-checkbox-multiple-marked-outline"
-            variant="text"
-            @click="bulkSelectMode = true"
-            title="Bulk select mode"
-            size="small"
-          />
-          <v-btn
-            v-else
-            color="error"
-            @click="cancelBulkSelect"
-            prepend-icon="mdi-close"
-            size="small"
-            variant="tonal"
-          >
-            Cancel
-          </v-btn>
-        </div>
-
-        <!-- Task List Scroll Area -->
-        <div class="tasks-list-scroll">
-          <!-- Task Cards -->
-          <div 
-            v-for="task in sortedTasks" 
-            :key="task.id"
-            class="task-list-card"
-            :class="{ 
-              'active': selectedTaskId === task.id,
-              'bulk-selected': selectedTaskIds.includes(task.id)
-            }"
-            @click="handleTaskClick(task)"
-          >
-            <v-checkbox
-              v-if="bulkSelectMode"
-              :model-value="selectedTaskIds.includes(task.id)"
-              @click.stop
-              @update:model-value="toggleTaskSelection(task.id)"
-              class="bulk-checkbox"
-              hide-details
-              density="compact"
+          <div class="view-actions">
+            <v-btn
+              v-if="!bulkSelectMode"
+              icon="mdi-checkbox-multiple-marked-outline"
+              variant="text"
+              @click="bulkSelectMode = true"
+              title="Bulk select mode"
+              size="small"
             />
+            <v-btn
+              v-else
+              color="error"
+              @click="cancelBulkSelect"
+              prepend-icon="mdi-close"
+              size="small"
+              variant="tonal"
+            >
+              Cancel
+            </v-btn>
 
-            <div class="task-card-content" :class="{ 'with-checkbox': bulkSelectMode }">
-              <div class="task-list-header">
-                <h4 class="task-list-title">{{ task.title }}</h4>
-                <v-chip 
-                  :color="getStatusColor(task.status)" 
-                  size="small"
-                  rounded="lg"
-                  variant="flat"
-                >
-                  {{ task.status }}
-                </v-chip>
-              </div>
-
-              <div class="task-list-meta">
-                <div v-if="task.dueDate" class="meta-item">
-                  <v-icon size="small">mdi-calendar</v-icon>
-                  <span>{{ formatDate(task.dueDate) }}</span>
-                </div>
-                <div v-if="task.assignedTo" class="meta-item">
-                  <v-icon size="small">mdi-account</v-icon>
-                  <span>{{ task.assignedTo }}</span>
-                </div>
-                <div v-if="task.priority" class="meta-item">
-                  <v-icon size="small">mdi-flag</v-icon>
-                  <span>P{{ task.priority }}</span>
-                </div>
-              </div>
-
-              <p class="task-list-description" v-if="task.description">
-                {{ truncateText(task.description, 100) }}
-              </p>
-
-              <div class="task-badges">
-                <div class="task-subtasks-indicator" v-if="task.subtasks && task.subtasks.length > 0">
-                  <v-icon size="small">mdi-file-tree</v-icon>
-                  <span>{{ task.subtasks.length }} subtask(s)</span>
-                </div>
-
-                <div v-if="task.isSubtask && task.parentTask" class="subtask-badge">
-                  <v-icon size="x-small">mdi-subdirectory-arrow-right</v-icon>
-                  <span class="parent-task-name">{{ task.parentTask.title }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Empty State -->
-          <div v-if="filteredTasks.length === 0" class="no-tasks-message">
-            <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
-            <p class="empty-title">No tasks found</p>
-            <p class="empty-subtitle">
-              Try adjusting your search or filters
-            </p>
+            
           </div>
         </div>
       </div>
 
-      <!-- Right Panel: Task Details -->
-      <div class="task-detail-panel">
-        <!-- No Selection State -->
-        <div v-if="!selectedTask" class="no-selection">
-          <v-icon size="80" color="grey-lighten-2">mdi-clipboard-text-search-outline</v-icon>
-          <h3>Select a task to view details</h3>
-          <p>Click on any task from the list to see its full details here</p>
-        </div>
-
-        <!-- Task Detail Content -->
-        <div v-else class="task-detail-content">
-          <!-- Header -->
-          <div class="detail-header">
-            <div class="detail-title-section">
-              <h2>{{ selectedTask.title }}</h2>
-              <div class="detail-chips">
-                <v-chip
-                  :color="getStatusColor(selectedTask.status)"
-                  size="small"
-                  rounded="lg"
-                  variant="flat"
-                >
-                  {{ selectedTask.status }}
-                </v-chip>
-                <v-chip
-                  v-if="selectedTask.isSubtask"
-                  color="secondary"
-                  size="small"
-                  rounded="lg"
-                  variant="tonal"
-                >
-                  Subtask
-                </v-chip>
-                <v-chip
-                  v-else
-                  color="primary"
-                  size="small"
-                  rounded="lg"
-                  variant="tonal"
-                >
-                  Task
-                </v-chip>
-              </div>
-            </div>
-
-            <v-btn
+      <!-- Content Panels Wrapper - Side by Side -->
+      <div class="content-panels-wrapper">
+        <!-- Left Panel: Task List -->
+        <div class="task-list-panel">
+          <!-- Select All (only in bulk mode) -->
+          <div v-if="bulkSelectMode" class="select-all-bar">
+            <v-checkbox
+              :model-value="allSelected"
+              @update:model-value="toggleSelectAll"
+              label="Select All"
+              hide-details
+              density="compact"
               color="primary"
-              @click="$emit('edit-task', selectedTask)"
-              prepend-icon="mdi-pencil"
-              rounded="lg"
-            >
-              Edit
-            </v-btn>
+            />
           </div>
 
-          <v-divider class="my-4"></v-divider>
+          <!-- Bulk Actions Bar (shown when items selected) -->
+          <div v-if="bulkSelectMode && selectedTaskIds.length > 0" class="bulk-actions-bar">
+            <div class="bulk-info">
+              <v-icon>mdi-checkbox-multiple-marked</v-icon>
+              <span class="bulk-count">{{ selectedTaskIds.length }} task(s) selected</span>
+            </div>
+            <div class="bulk-action-buttons">
+              <v-btn size="small" @click="bulkUpdateStatus" prepend-icon="mdi-update" variant="tonal">
+                Update Status
+              </v-btn>
+              <v-btn size="small" @click="bulkDelete" color="error" prepend-icon="mdi-delete" variant="tonal">
+                Delete
+              </v-btn>
+            </div>
+          </div>
 
-          <!-- Task Details Body -->
-          <div class="detail-body">
-            <!-- Row 1: Description and Due Date -->
-            <v-row>
-              <v-col cols="12" md="6">
-                <div class="detail-section">
-                  <div class="detail-section-icon-row">
-                    <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                    <h4>Description</h4>
-                  </div>
-                  <p>{{ selectedTask.description || "No description provided" }}</p>
-                </div>
-              </v-col>
-              <v-col cols="12" md="6">
-                <div class="detail-section">
-                  <div class="detail-section-icon-row">
-                    <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-                    <h4>Due Date</h4>
-                  </div>
-                  <p>{{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'No due date' }}</p>
-                </div>
-              </v-col>
-            </v-row>
+          <!-- Task List Scroll Area -->
+          <div class="tasks-list-scroll">
+            <!-- Task Cards -->
+            <div 
+              v-for="task in sortedTasks" 
+              :key="task.id"
+              class="task-list-card"
+              :class="{ 
+                'active': selectedTaskId === task.id,
+                'bulk-selected': selectedTaskIds.includes(task.id)
+              }"
+              @click="handleTaskClick(task)"
+            >
+              <v-checkbox
+                v-if="bulkSelectMode"
+                :model-value="selectedTaskIds.includes(task.id)"
+                @click.stop
+                @update:model-value="toggleTaskSelection(task.id)"
+                class="bulk-checkbox"
+                hide-details
+                density="compact"
+              />
 
-            <!-- Row 2: Assignee and Priority -->
-            <v-row>
-              <v-col cols="12" md="6">
-                <div class="detail-section">
-                  <div class="detail-section-icon-row">
-                    <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                    <h4>Assigned To</h4>
-                  </div>
-                  <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
+              <div class="task-card-content" :class="{ 'with-checkbox': bulkSelectMode }">
+                <div class="task-list-header">
+                  <h4 class="task-list-title">{{ task.title }}</h4>
+                  <v-chip 
+                    :color="getStatusColor(task.status)" 
+                    size="small"
+                    rounded="lg"
+                    variant="flat"
+                  >
+                    {{ task.status }}
+                  </v-chip>
                 </div>
-              </v-col>
-              <v-col cols="12" md="6">
-                <div class="detail-section">
-                  <div class="detail-section-icon-row">
-                    <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
-                    <h4>Priority</h4>
-                  </div>
-                  <p>{{ selectedTask.priority ? 'P' + selectedTask.priority : 'Not set' }}</p>
-                </div>
-              </v-col>
-            </v-row>
 
-            <!-- Row 3: Collaborators (if exists) -->
-            <v-row v-if="selectedTask.collaborators && selectedTask.collaborators.length > 0">
-              <v-col cols="12">
-                <div class="detail-section">
-                  <div class="detail-section-icon-row">
-                    <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                    <h4>Collaborators</h4>
+                <div class="task-list-meta">
+                  <div v-if="task.dueDate" class="meta-item">
+                    <v-icon size="small">mdi-calendar</v-icon>
+                    <span>{{ formatDate(task.dueDate) }}</span>
                   </div>
-                  <div class="collaborators-list">
-                    <v-chip
-                      v-for="collaborator in selectedTask.collaborators"
-                      :key="collaborator"
-                      size="small"
-                      class="mr-2"
-                      variant="tonal"
-                    >
-                      {{ collaborator }}
-                    </v-chip>
+                  <div v-if="task.assignedTo" class="meta-item">
+                    <v-icon size="small">mdi-account</v-icon>
+                    <span>{{ task.assignedTo }}</span>
+                  </div>
+                  <div v-if="task.priority" class="meta-item">
+                    <v-icon size="small">mdi-flag</v-icon>
+                    <span>P{{ task.priority }}</span>
                   </div>
                 </div>
-              </v-col>
-            </v-row>
 
-            <!-- Progress Bar (for tasks with subtasks) -->
-            <div class="detail-section" v-if="selectedTask.subtasks && selectedTask.subtasks.length > 0">
-              <h4>Progress</h4>
-              <div class="progress-bar-container">
-                <div class="custom-progress-bar">
-                  <div class="progress-fill" :style="{ width: calculateProgress(selectedTask) + '%' }"></div>
+                <p class="task-list-description" v-if="task.description">
+                  {{ truncateText(task.description, 100) }}
+                </p>
+
+                <div class="task-badges">
+                  <div class="task-subtasks-indicator" v-if="task.subtasks && task.subtasks.length > 0">
+                    <v-icon size="small">mdi-file-tree</v-icon>
+                    <span>{{ task.subtasks.length }} subtask(s)</span>
+                  </div>
+
+                  <div v-if="task.isSubtask && task.parentTask" class="subtask-badge">
+                    <v-icon size="x-small">mdi-subdirectory-arrow-right</v-icon>
+                    <span class="parent-task-name">{{ task.parentTask.title }}</span>
+                  </div>
                 </div>
-                <span class="progress-text">{{ calculateProgress(selectedTask) }}%</span>
               </div>
             </div>
 
-            <!-- Attachments -->
-            <div class="detail-section" v-if="selectedTask.attachments && selectedTask.attachments.length > 0">
-              <h4>Attachments ({{ selectedTask.attachments.length }})</h4>
-              <div class="attachments-list">
-                <v-chip
-                  v-for="attachment in selectedTask.attachments"
-                  :key="attachment.url"
-                  variant="outlined"
-                  class="attachment-chip"
-                  @click="$emit('open-attachment', attachment.url)"
-                  prepend-icon="mdi-paperclip"
-                >
-                  {{ attachment.name }}
-                </v-chip>
+            <!-- Empty State -->
+            <div v-if="filteredTasks.length === 0" class="no-tasks-message">
+              <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
+              <p class="empty-title">No tasks found</p>
+              <p class="empty-subtitle">
+                Try adjusting your search or filters
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Task Details -->
+        <div class="task-detail-panel">
+          <!-- No Selection State -->
+          <div v-if="!selectedTask" class="no-selection">
+            <v-icon size="80" color="grey-lighten-2">mdi-clipboard-text-search-outline</v-icon>
+            <h3>Select a task to view details</h3>
+            <p>Click on any task from the list to see its full details here</p>
+          </div>
+
+          <!-- Task Detail Content -->
+          <div v-else class="task-detail-content">
+            <!-- Header -->
+            <div class="detail-header">
+              <div class="detail-title-section">
+                <h2>{{ selectedTask.title }}</h2>
+                <div class="detail-chips">
+                  <v-chip
+                    :color="getStatusColor(selectedTask.status)"
+                    size="small"
+                    rounded="lg"
+                    variant="flat"
+                  >
+                    {{ selectedTask.status }}
+                  </v-chip>
+                  <v-chip
+                    v-if="selectedTask.isSubtask"
+                    color="secondary"
+                    size="small"
+                    rounded="lg"
+                    variant="tonal"
+                  >
+                    Subtask
+                  </v-chip>
+                  <v-chip
+                    v-else
+                    color="primary"
+                    size="small"
+                    rounded="lg"
+                    variant="tonal"
+                  >
+                    Task
+                  </v-chip>
+                </div>
               </div>
+
+              <v-btn
+                color="primary"
+                @click="$emit('edit-task', selectedTask)"
+                prepend-icon="mdi-pencil"
+                rounded="lg"
+              >
+                Edit
+              </v-btn>
             </div>
 
-            <!-- Status History -->
-            <div class="detail-section" v-if="selectedTask.statusHistory && selectedTask.statusHistory.length > 0">
-              <h4>Status History</h4>
-              <div class="status-updates">
-                <div v-for="(entry, idx) in selectedTask.statusHistory" :key="idx" class="status-entry">
-                  <div class="status-dot" :style="{ backgroundColor: getStatusColor(entry.newStatus) }"></div>
-                  <div class="status-info">
-                    <div class="status-description">
-                      Status changed 
-                      <span v-if="entry.oldStatus">from <strong>{{ entry.oldStatus }}</strong></span>
-                      to <v-chip size="x-small" :color="getStatusColor(entry.newStatus)" variant="flat">{{ entry.newStatus }}</v-chip>
+            <v-divider class="my-4"></v-divider>
+
+            <!-- Task Details Body -->
+            <div class="detail-body">
+              <!-- Row 1: Description and Due Date -->
+              <v-row>
+                <v-col cols="12" md="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                      <h4>Description</h4>
                     </div>
-                    <div class="status-timestamp">{{ formatDateTime(entry.timestamp) }}</div>
+                    <p>{{ selectedTask.description || "No description provided" }}</p>
                   </div>
-                </div>
-              </div>
-            </div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+                      <h4>Due Date</h4>
+                    </div>
+                    <p>{{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'No due date' }}</p>
+                  </div>
+                </v-col>
+              </v-row>
 
-            <!-- Subtasks List -->
-            <div class="detail-section" v-if="selectedTask.subtasks && selectedTask.subtasks.length > 0">
-              <h4>Subtasks ({{ selectedTask.subtasks.length }})</h4>
-              <div class="subtask-list">
-                <div v-for="(subtask, index) in selectedTask.subtasks" :key="subtask.id || index" class="subtask-item">
-                  <div class="subtask-info">
-                    <div class="subtask-title">{{ subtask.title }}</div>
-                    <div class="subtask-status">
+              <!-- Row 2: Assignee and Priority -->
+              <v-row>
+                <v-col cols="12" md="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-account</v-icon>
+                      <h4>Assigned To</h4>
+                    </div>
+                    <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
+                      <h4>Priority</h4>
+                    </div>
+                    <p>{{ selectedTask.priority ? 'P' + selectedTask.priority : 'Not set' }}</p>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <!-- Row 3: Collaborators (if exists) -->
+              <v-row v-if="selectedTask.collaborators && selectedTask.collaborators.length > 0">
+                <v-col cols="12">
+                  <div class="detail-section">
+                    <div class="detail-section-icon-row">
+                      <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
+                      <h4>Collaborators</h4>
+                    </div>
+                    <div class="collaborators-list">
                       <v-chip
-                        :color="getStatusColor(subtask.status)"
+                        v-for="collaborator in selectedTask.collaborators"
+                        :key="collaborator"
                         size="small"
-                        rounded="lg"
-                        variant="flat"
+                        class="mr-2"
+                        variant="tonal"
                       >
-                        {{ subtask.status }}
+                        {{ collaborator }}
                       </v-chip>
                     </div>
                   </div>
-                  <div class="subtask-meta">
-                    <span v-if="subtask.assignedTo" class="subtask-assignee">
-                      <v-icon size="x-small">mdi-account</v-icon>
-                      {{ subtask.assignedTo }}
-                    </span>
-                    <span v-if="subtask.dueDate" class="subtask-date">
-                      <v-icon size="x-small">mdi-calendar</v-icon>
-                      {{ formatDate(subtask.dueDate) }}
-                    </span>
-                    <span v-if="subtask.priority" class="subtask-priority">
-                      <v-icon size="x-small">mdi-flag</v-icon>
-                      P{{ subtask.priority }}
-                    </span>
+                </v-col>
+              </v-row>
+
+              <!-- Progress Bar (for tasks with subtasks) -->
+              <div class="detail-section" v-if="selectedTask.subtasks && selectedTask.subtasks.length > 0">
+                <h4>Progress</h4>
+                <div class="progress-bar-container">
+                  <div class="custom-progress-bar">
+                    <div class="progress-fill" :style="{ width: calculateProgress(selectedTask) + '%' }"></div>
+                  </div>
+                  <span class="progress-text">{{ calculateProgress(selectedTask) }}%</span>
+                </div>
+              </div>
+
+              <!-- Attachments -->
+              <div class="detail-section" v-if="selectedTask.attachments && selectedTask.attachments.length > 0">
+                <h4>Attachments ({{ selectedTask.attachments.length }})</h4>
+                <div class="attachments-list">
+                  <v-chip
+                    v-for="attachment in selectedTask.attachments"
+                    :key="attachment.url"
+                    variant="outlined"
+                    class="attachment-chip"
+                    @click="$emit('open-attachment', attachment.url)"
+                    prepend-icon="mdi-paperclip"
+                  >
+                    {{ attachment.name }}
+                  </v-chip>
+                </div>
+              </div>
+
+              <!-- Status History -->
+              <div class="detail-section" v-if="selectedTask.statusHistory && selectedTask.statusHistory.length > 0">
+                <h4>Status History</h4>
+                <div class="status-updates">
+                  <div v-for="(entry, idx) in selectedTask.statusHistory" :key="idx" class="status-entry">
+                    <div class="status-dot" :style="{ backgroundColor: getStatusColor(entry.newStatus) }"></div>
+                    <div class="status-info">
+                      <div class="status-description">
+                        Status changed 
+                        <span v-if="entry.oldStatus">from <strong>{{ entry.oldStatus }}</strong></span>
+                        to <v-chip size="x-small" :color="getStatusColor(entry.newStatus)" variant="flat">{{ entry.newStatus }}</v-chip>
+                      </div>
+                      <div class="status-timestamp">{{ formatDateTime(entry.timestamp) }}</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Parent Task Reference (for subtasks) -->
-            <div class="detail-section" v-if="selectedTask.isSubtask && selectedTask.parentTask">
-              <h4>Parent Task</h4>
-              <div class="parent-task-card">
-                <v-btn
-                  variant="outlined"
-                  @click="$emit('view-parent', selectedTask.parentTask)"
-                  class="parent-task-btn"
-                  block
-                >
-                  <v-icon start>mdi-file-tree</v-icon>
-                  {{ selectedTask.parentTask.title }}
-                </v-btn>
+              <!-- Subtasks List -->
+              <div class="detail-section" v-if="selectedTask.subtasks && selectedTask.subtasks.length > 0">
+                <h4>Subtasks ({{ selectedTask.subtasks.length }})</h4>
+                <div class="subtask-list">
+                  <div v-for="(subtask, index) in selectedTask.subtasks" :key="subtask.id || index" class="subtask-item">
+                    <div class="subtask-info">
+                      <div class="subtask-title">{{ subtask.title }}</div>
+                      <div class="subtask-status">
+                        <v-chip
+                          :color="getStatusColor(subtask.status)"
+                          size="small"
+                          rounded="lg"
+                          variant="flat"
+                        >
+                          {{ subtask.status }}
+                        </v-chip>
+                      </div>
+                    </div>
+                    <div class="subtask-meta">
+                      <span v-if="subtask.assignedTo" class="subtask-assignee">
+                        <v-icon size="x-small">mdi-account</v-icon>
+                        {{ subtask.assignedTo }}
+                      </span>
+                      <span v-if="subtask.dueDate" class="subtask-date">
+                        <v-icon size="x-small">mdi-calendar</v-icon>
+                        {{ formatDate(subtask.dueDate) }}
+                      </span>
+                      <span v-if="subtask.priority" class="subtask-priority">
+                        <v-icon size="x-small">mdi-flag</v-icon>
+                        P{{ subtask.priority }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <!-- Status Update Action -->
-            <div class="detail-actions">
-              <v-select
-                :model-value="selectedTask.status"
-                :items="taskStatuses"
-                label="Update Status"
-                variant="outlined"
-                density="comfortable"
-                @update:modelValue="handleStatusChange($event)"
-                prepend-inner-icon="mdi-update"
-                class="status-update-select"
-              ></v-select>
+              <!-- Parent Task Reference (for subtasks) -->
+              <div class="detail-section" v-if="selectedTask.isSubtask && selectedTask.parentTask">
+                <h4>Parent Task</h4>
+                <div class="parent-task-card">
+                  <v-btn
+                    variant="outlined"
+                    @click="$emit('view-parent', selectedTask.parentTask)"
+                    class="parent-task-btn"
+                    block
+                  >
+                    <v-icon start>mdi-file-tree</v-icon>
+                    {{ selectedTask.parentTask.title }}
+                  </v-btn>
+                </div>
+              </div>
+
+              <!-- Status Update Action -->
+              <div class="detail-actions">
+                <v-select
+                  :model-value="selectedTask.status"
+                  :items="taskStatuses"
+                  label="Update Status"
+                  variant="outlined"
+                  density="comfortable"
+                  @update:modelValue="handleStatusChange($event)"
+                  prepend-inner-icon="mdi-update"
+                  class="status-update-select"
+                ></v-select>
+              </div>
             </div>
           </div>
         </div>
@@ -786,6 +820,84 @@ defineExpose({
    =========================== */
 .main-content {
   display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===========================
+   View Toggle Bar Wrapper - SPANS FULL WIDTH
+   =========================== */
+.view-toggle-bar-wrapper {
+  width: 100%;
+  background: #f8fafc;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.view-toggle-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 16px;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  background: #e8eaed;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.view-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #5f6368;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-tab:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.view-tab.active {
+  background: #ffffff;
+  color: #1a73e8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.view-tab .v-icon {
+  color: inherit;
+}
+
+.view-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.add-task-btn {
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ===========================
+   Content Panels Wrapper - Side by Side
+   =========================== */
+.content-panels-wrapper {
+  display: flex;
   flex: 1;
   overflow: hidden;
   gap: 0;
@@ -806,20 +918,64 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.select-all-bar {
+/* ===========================
+   View Toggle Bar (Kanban/List + Actions)
+   =========================== */
+.view-toggle-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 12px 20px;
   background: #f8fafc;
   border-bottom: 1px solid #e0e0e0;
+  gap: 16px;
 }
 
-.action-buttons-bar {
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  background: #e8eaed;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.view-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #5f6368;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-tab:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.view-tab.active {
+  background: #ffffff;
+  color: #1a73e8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.view-tab .v-icon {
+  color: inherit;
+}
+
+.view-actions {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e0e0e0;
 }
+
+
 
 /* ===========================
    Bulk Actions Bar
@@ -1438,8 +1594,19 @@ defineExpose({
     min-width: auto;
   }
 
-  .action-buttons-bar {
+  .view-toggle-bar {
     flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .view-tabs {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .view-actions {
+    flex: 1;
+    justify-content: flex-end;
   }
 
   .bulk-actions-bar {

@@ -360,53 +360,53 @@ const onSave = () => {
 }
 
 /* Override Vuetify primary color buttons to green in light mode */
-.v-btn.text-primary,
-:deep(.v-btn.text-primary) {
+.v-btn.text-primary:not([prepend-icon="mdi-plus"]),
+:deep(.v-btn.text-primary:not([prepend-icon="mdi-plus"])) {
   color: #6b9b6b !important;
 }
 
-.v-btn[color="primary"],
-:deep(.v-btn[color="primary"]) {
+.v-btn[color="primary"]:not([prepend-icon="mdi-plus"]),
+:deep(.v-btn[color="primary"]:not([prepend-icon="mdi-plus"])) {
   background: #6b9b6b !important;
   color: white !important;
 }
 
-.v-btn[color="primary"]:hover,
-:deep(.v-btn[color="primary"]:hover) {
+.v-btn[color="primary"]:not([prepend-icon="mdi-plus"]):hover,
+:deep(.v-btn[color="primary"]:not([prepend-icon="mdi-plus"]):hover) {
   background: #5a8a5a !important;
 }
 
-.v-btn[color="secondary"],
-:deep(.v-btn[color="secondary"]) {
+.v-btn[color="secondary"]:not([prepend-icon="mdi-plus"]),
+:deep(.v-btn[color="secondary"]:not([prepend-icon="mdi-plus"])) {
   background: #6b9b6b !important;
   color: white !important;
 }
 
-.v-btn[color="secondary"]:hover,
-:deep(.v-btn[color="secondary"]:hover) {
+.v-btn[color="secondary"]:not([prepend-icon="mdi-plus"]):hover,
+:deep(.v-btn[color="secondary"]:not([prepend-icon="mdi-plus"]):hover) {
   background: #5a8a5a !important;
 }
 
 /* Dark mode - use blue */
-[data-theme="dark"] .v-btn[color="primary"],
-[data-theme="dark"] :deep(.v-btn[color="primary"]) {
+[data-theme="dark"] .v-btn[color="primary"]:not([prepend-icon="mdi-plus"]),
+[data-theme="dark"] :deep(.v-btn[color="primary"]:not([prepend-icon="mdi-plus"])) {
   background: #5a7a9b !important;
   color: white !important;
 }
 
-[data-theme="dark"] .v-btn[color="primary"]:hover,
-[data-theme="dark"] :deep(.v-btn[color="primary"]:hover) {
+[data-theme="dark"] .v-btn[color="primary"]:not([prepend-icon="mdi-plus"]):hover,
+[data-theme="dark"] :deep(.v-btn[color="primary"]:not([prepend-icon="mdi-plus"]):hover) {
   background: #4a6a8b !important;
 }
 
-[data-theme="dark"] .v-btn[color="secondary"],
-[data-theme="dark"] :deep(.v-btn[color="secondary"]) {
+[data-theme="dark"] .v-btn[color="secondary"]:not([prepend-icon="mdi-plus"]),
+[data-theme="dark"] :deep(.v-btn[color="secondary"]:not([prepend-icon="mdi-plus"])) {
   background: #5a7a9b !important;
   color: white !important;
 }
 
-[data-theme="dark"] .v-btn[color="secondary"]:hover,
-[data-theme="dark"] :deep(.v-btn[color="secondary"]:hover) {
+[data-theme="dark"] .v-btn[color="secondary"]:not([prepend-icon="mdi-plus"]):hover,
+[data-theme="dark"] :deep(.v-btn[color="secondary"]:not([prepend-icon="mdi-plus"]):hover) {
   background: #4a6a8b !important;
 }
 
@@ -417,25 +417,25 @@ const onSave = () => {
   border-color: #6b9b6b !important;
 }
 
-.v-btn[variant="outlined"][color="primary"],
-:deep(.v-btn[variant="outlined"][color="primary"]) {
+.v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"]),
+:deep(.v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"])) {
   color: #6b9b6b !important;
   border-color: #6b9b6b !important;
 }
 
-.v-btn[variant="outlined"][color="primary"]:hover,
-:deep(.v-btn[variant="outlined"][color="primary"]:hover) {
+.v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"]):hover,
+:deep(.v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"]):hover) {
   background: rgba(107, 155, 107, 0.1) !important;
 }
 
-[data-theme="dark"] .v-btn[variant="outlined"][color="primary"],
-[data-theme="dark"] :deep(.v-btn[variant="outlined"][color="primary"]) {
+[data-theme="dark"] .v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"]),
+[data-theme="dark"] :deep(.v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"])) {
   color: #7b92d1 !important;
   border-color: #7b92d1 !important;
 }
 
-[data-theme="dark"] .v-btn[variant="outlined"][color="primary"]:hover,
-[data-theme="dark"] :deep(.v-btn[variant="outlined"][color="primary"]:hover) {
+[data-theme="dark"] .v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"]):hover,
+[data-theme="dark"] :deep(.v-btn[variant="outlined"][color="primary"]:not([prepend-icon="mdi-plus"]):hover) {
   background: rgba(123, 146, 209, 0.1) !important;
 }
 

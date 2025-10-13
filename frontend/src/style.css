@@ -8,6 +8,8 @@
   --accent-dark: #3d3d3d; /*font colour*/
   --text-primary: #3d3d3d;
   --text-secondary: #7b92d1;
+  --add-task-bg: #6b9b6b; /* Green for Add Task in light mode */
+  --add-task-hover: #5a8a5a;
 
   /* Base font settings */
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -28,6 +30,8 @@
   --accent-dark: #f5f4f2;
   --text-primary: #f5f4f2;
   --text-secondary: #c5d49a;
+  --add-task-bg: #5a7a9b; /* Blue for Add Task in dark mode */
+  --add-task-hover: #7b92d1;
 }
 
 /* Apply theme colors */
@@ -118,6 +122,7 @@ button:focus-visible {
   box-shadow: none !important;
 }
 
+/* General button styles */
 .v-btn {
   background-color: var(--accent-light) !important;
   color: var(--accent-dark) !important;
@@ -141,6 +146,27 @@ button:focus-visible {
 
 .v-btn--variant-outlined:hover {
   background-color: var(--accent-light) !important;
+}
+
+/* Add Task button - using CSS variables for easy theme switching */
+.add-task-btn,
+.header-right .v-btn {
+  background-color: var(--add-task-bg) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.add-task-btn:hover,
+.header-right .v-btn:hover {
+  background-color: var(--add-task-hover) !important;
+  color: white !important;
+  box-shadow: 0 2px 6px rgba(107, 155, 107, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-theme="dark"] .add-task-btn:hover,
+[data-theme="dark"] .header-right .v-btn:hover {
+  box-shadow: 0 2px 6px rgba(90, 122, 155, 0.3) !important;
 }
 
 .v-snackbar {
