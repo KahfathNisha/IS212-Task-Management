@@ -460,6 +460,7 @@
       :todayDate="todayDate"
       @save="handleCreateSave"
       @cancel="cancelCreate"
+      @message="handleMessage"
     />
 
     <v-snackbar
@@ -963,10 +964,11 @@ const handleCreateSave = async (taskData) => {
   try {
     const response = await axios.post('http://localhost:3000/tasks', taskData);
     const newTaskId = response.data.id;
-    const newTaskWithId = { 
-      ...taskData, 
+    const newTaskWithId = {
+      ...taskData,
       id: newTaskId,
-      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status || 'Ongoing' }],      createdAt: new Date().toISOString(),
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status || 'Ongoing' }],
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     tasks.value.push(newTaskWithId);
@@ -975,7 +977,7 @@ const handleCreateSave = async (taskData) => {
     snackbarColor.value = 'success';
   } catch (error) {
     showSnackbar.value = true;
-    snackbarMessage.value = 'Failed to create task.';
+    snackbarMessage.value = error.response?.data?.message || 'Failed to create task.';
     snackbarColor.value = 'error';
   }
 };
@@ -993,7 +995,7 @@ const updateTask = async (taskId, updatedData) => {
     }
 
     await axiosClient.put(`/tasks/${taskId}`, updatedData);
-    
+
     const taskIndex = tasks.value.findIndex(t => t.id === taskId);
     if (taskIndex !== -1) {
       tasks.value[taskIndex] = {
@@ -1001,7 +1003,7 @@ const updateTask = async (taskId, updatedData) => {
         ...updatedData,
         updatedAt: new Date().toISOString()
       };
-      
+
       if (selectedTask.value?.id === taskId) {
         selectedTask.value = tasks.value[taskIndex];
       }
@@ -1009,7 +1011,7 @@ const updateTask = async (taskId, updatedData) => {
         selectedListTask.value = tasks.value[taskIndex];
       }
     }
-    
+
     showMessage('Task updated successfully!', 'success');
     return true;
   } catch (error) {
@@ -1595,6 +1597,10 @@ const handleBulkDelete = async (taskIds) => {
   } catch (error) {
     showMessage('Failed to delete some tasks', 'error')
   }
+}
+
+const handleMessage = ({ message, color }) => {
+  showMessage(message, color)
 }
 
 </script>

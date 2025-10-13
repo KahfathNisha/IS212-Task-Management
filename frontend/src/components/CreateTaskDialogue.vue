@@ -35,20 +35,23 @@
             />
             <v-text-field
               v-model="localTask.dueDate"
-              label="Due Date"
+              label="Due Date *"
               type="date"
+              :rules="[v => !!v || 'Due date is required']"
               required
               :min="todayDate"
               variant="outlined"
               class="flex-1"
             />
           </div>
-          
+
           <div class="d-flex ga-4 mb-4">
             <v-select
               v-model="localTask.priority"
-              label="Priority"
+              label="Priority *"
               :items="priorities"
+              :rules="[v => !!v || 'Priority is required']"
+              required
               variant="outlined"
               class="flex-1"
             />
@@ -63,19 +66,19 @@
           </div>
           
           <div class="d-flex ga-4 mb-4">
-            <v-select
+            <v-autocomplete
               v-model="localTask.assignedTo"
               label="Assignee"
               :items="teamMembers.filter(member => !localTask.collaborators.includes(member))"
-              placeholder="Select assignee"
+              placeholder="Search and select assignee"
               variant="outlined"
               class="flex-1"
             />
-            <v-select
+            <v-autocomplete
               v-model="localTask.collaborators"
               label="Collaborators"
               :items="teamMembers.filter(member => member !== localTask.assignedTo)"
-              placeholder="Select collaborators"
+              placeholder="Search and select collaborators"
               variant="outlined"
               multiple
               chips
@@ -190,19 +193,23 @@
               />
               <v-select
                 v-model="subtask.priority"
-                label="Priority"
+                label="Priority *"
                 :items="priorities"
+                :rules="[v => !!v || 'Priority is required']"
+                required
                 variant="outlined"
                 class="flex-1"
               />
             </div>
-            
+
             <div class="d-flex mb-3">
               <v-text-field
                 v-model="subtask.dueDate"
-                label="Due Date"
+                label="Due Date *"
                 type="date"
+                :rules="[v => !!v || 'Due date is required']"
                 :min="todayDate"
+                required
                 variant="outlined"
                 class="flex-1"
               />
@@ -210,19 +217,19 @@
 
 
             <div class="d-flex ga-4 mb-3">
-              <v-select
+              <v-autocomplete
                 v-model="subtask.assignedTo"
                 label="Assignee"
                 :items="teamMembers.filter(member => !subtask.collaborators.includes(member))"
-                placeholder="Select assignee"
+                placeholder="Search and select assignee"
                 variant="outlined"
                 class="flex-1"
               />
-              <v-select
+              <v-autocomplete
                 v-model="subtask.collaborators"
                 label="Collaborators"
                 :items="teamMembers.filter(member => member !== subtask.assignedTo)"
-                placeholder="Select collaborators"
+                placeholder="Search and select collaborators"
                 variant="outlined"
                 multiple
                 chips
@@ -314,6 +321,11 @@ const props = defineProps({
 
 const emit = defineEmits(['update:show', 'save', 'cancel'])
 
+const showMessage = (message, color = 'success') => {
+  // Emit a message event that can be handled by the parent
+  emit('message', { message, color })
+}
+
 const localShow = computed({
   get: () => props.show,
   set: (v) => emit('update:show', v)
@@ -390,6 +402,42 @@ const onCancel = () => {
 }
 
 const onSave = () => {
+  // Validate form
+  if (!taskForm.value.validate()) {
+    return
+  }
+
+  // Validate main task title
+  if (!localTask.value.title || localTask.value.title.trim() === '') {
+    showMessage('Task title is required', 'error')
+    return
+  }
+
+  // Validate subtasks
+  for (let i = 0; i < subtasks.value.length; i++) {
+    const subtask = subtasks.value[i]
+    if (!subtask.title || subtask.title.trim() === '') {
+      showMessage(`Subtask ${i + 1}: Title is required`, 'error')
+      return
+    }
+    if (!subtask.dueDate) {
+      showMessage(`Subtask ${i + 1}: Due date is required`, 'error')
+      return
+    }
+    if (!subtask.priority) {
+      showMessage(`Subtask ${i + 1}: Priority is required`, 'error')
+      return
+    }
+    // Check if due date is in the past
+    const subDueDate = new Date(subtask.dueDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (subDueDate < today) {
+      showMessage(`Subtask ${i + 1}: Due date cannot be in the past`, 'error')
+      return
+    }
+  }
+
   // Ensure recurrence.enabled is set correctly
   if (localTask.value.recurrence && localTask.value.recurrence.type) {
     localTask.value.recurrence.enabled = true
@@ -405,6 +453,7 @@ const onSave = () => {
   emit('save', payload)
   emit('update:show', false)
 }
+
 </script>
 
 <style scoped>
