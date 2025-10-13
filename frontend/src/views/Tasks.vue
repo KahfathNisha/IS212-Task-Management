@@ -88,6 +88,8 @@
           <v-icon size="24" class="collapsed-icon">mdi-clock-outline</v-icon>
         </div>
       </div>
+      <!-- Recuurent Tasks Sidebar-->
+      <RecurringTasksSidebar @select="viewTaskDetails" />
 
       <!-- Main Content Area -->
       <div class="main-view-area">
@@ -488,6 +490,7 @@ import '../assets/styles.css';
 import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
 import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 import ListView from './ListView.vue'
+import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
 
 // Axios client configuration
 const axiosClient = axios.create({
