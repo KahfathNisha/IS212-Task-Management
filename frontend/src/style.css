@@ -170,7 +170,8 @@ button:focus-visible {
 }
 
 .v-snackbar {
-  background-color: var(--secondary) !important;
+  /* background-color: var(--secondary) !important; */
+  background-color: transparent;
   color: var(--text-primary) !important;
 }
 
@@ -215,4 +216,11 @@ button:focus-visible {
 [data-theme="dark"] .success-message {
   background-color: #064e3b;
   color: #a7f3d0;
+}
+
+html, body, #app, .v-application, .v-main {
+  min-height: 100vh !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  box-sizing: border-box;
 }

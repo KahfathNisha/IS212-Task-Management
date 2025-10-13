@@ -4,7 +4,7 @@
     <NavBar v-if="isAuthenticated" />
 
     <!-- Main Content -->
-    <v-main>
+    <v-main class="app-main">
       <!-- Your existing Session Warning Dialog remains -->
       <v-dialog v-model="showSessionWarning" persistent max-width="400">
         <v-card>
@@ -42,6 +42,7 @@
       The old, conflicting v-snackbar has been removed.
       We now use our new, stable Notifications component which will handle all popups.
     -->
+    <NotificationPopup />
     <Notifications />
   </v-app>
 </template>
