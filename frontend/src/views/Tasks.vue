@@ -414,6 +414,14 @@
         </div>
       </div>
 
+      <TimelineView
+          v-else-if="viewType === 'timeline'"
+          :tasks="filteredTasksList"
+          :task-statuses="taskStatuses"
+          @view-task-details="viewTaskDetails"
+          @add-task="showCreateDialog = true"
+        />
+
       <!-- LIST VIEW ONLY -->
       <ListView
         v-if="viewType === 'list' && currentView === 'list'"
@@ -507,6 +515,7 @@ import axios from 'axios'
 import '../assets/styles.css';
 import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
 import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
+import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
 import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
 
