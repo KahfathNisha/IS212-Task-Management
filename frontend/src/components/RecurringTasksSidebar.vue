@@ -1,50 +1,55 @@
 <template>
   <div class="recurring-tasks-sidebar" :class="{ 'sidebar-collapsed': !sidebarOpen }">
     <div class="sidebar-header">
-      <h3 v-if="sidebarOpen">Recurring Tasks</h3>
+      <div v-if="sidebarOpen" class="header-content">
+        <h3>Recurring Tasks</h3>
+      </div>
       <v-btn 
-        icon="mdi-chevron-right"
+        :icon="sidebarOpen ? 'mdi-chevron-left' : 'mdi-chevron-right'"
         size="small"
         variant="text"
         @click="toggleSidebar"
         class="collapse-btn"
-        :class="{ 'rotated': !sidebarOpen }"
       />
     </div>
+    <div v-if="!sidebarOpen" class="collapsed-repeat-row">
+      <v-icon color="primary" size="28">mdi-repeat</v-icon>
+    </div>
     <div v-if="sidebarOpen" class="recurring-tasks-list">
-      <div
+      <RecurringTaskItem
         v-for="task in recurringTasks"
         :key="task.id"
-        class="recurring-task-item"
-        @click="$emit('select', task)"
-      >
-        <div class="task-title">
-          <v-icon color="primary" size="16" class="mr-1">mdi-repeat</v-icon>
-          {{ task.title }}
-        </div>
-        <div class="task-meta">
-          <span class="recurrence-type">{{ formatRecurrence(task.recurrence) }}</span>
-          <span class="recurrence-range">
-            {{ formatDate(task.recurrence.startDate) }} - {{ formatDate(task.recurrence.endDate) }}
-          </span>
-        </div>
-      </div>
+        :task="task"
+        :is-editing="editingId === task.id"
+        @edit="onEditRecurringTask"
+      />
       <div v-if="recurringTasks.length === 0" class="no-tasks">
         No recurring tasks found.
       </div>
     </div>
-    <div v-if="!sidebarOpen" class="collapsed-content">
-      <v-icon size="24" class="collapsed-icon">mdi-repeat</v-icon>
-    </div>
+    <EditRecurrenceDialog
+      v-if="editingTask"
+      :show="!!editingTask"
+      :recurrence="editingTask.recurrence"
+      @close="closeEdit"
+      @save="saveEdit"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import RecurringTaskItem from './RecurringTaskItem.vue'
+import EditRecurrenceDialog from './EditRecurrenceDialog.vue'
 import axios from 'axios'
 
 const recurringTasks = ref([])
 const sidebarOpen = ref(true)
+const editingId = ref(null)
+
+const editingTask = computed(() =>
+  recurringTasks.value.find(t => t.id === editingId.value)
+)
 
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value
@@ -61,17 +66,21 @@ const fetchRecurringTasks = async () => {
 
 onMounted(fetchRecurringTasks)
 
-const formatRecurrence = (recurrence) => {
-  if (!recurrence) return ''
-  if (recurrence.type === 'custom') {
-    return `Every ${recurrence.interval} days`
-  }
-  return `Every ${recurrence.type.charAt(0).toUpperCase() + recurrence.type.slice(1)}`
+const onEditRecurringTask = (task) => {
+  editingId.value = task.id
 }
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString()
+const closeEdit = () => {
+  editingId.value = null
+}
+const saveEdit = async (newRecurrence) => {
+  if (!editingTask.value) return
+  // Call your backend API to update recurrence
+  await axios.put(`http://localhost:3000/api/tasks/recurring/${editingTask.value.id}`, {
+    userId: editingTask.value.userId,
+    recurrence: newRecurrence
+  })
+  closeEdit()
+  fetchRecurringTasks()
 }
 </script>
 
@@ -91,37 +100,22 @@ const formatDate = (dateStr) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 56px;
+}
+.header-content {
+  display: flex;
+  align-items: center;
+}
+.collapsed-repeat-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0 0 0;
 }
 .recurring-tasks-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-}
-.recurring-task-item {
-  padding: 12px;
-  border-radius: 8px;
-  background: #fff;
-  margin-bottom: 12px;
-  cursor: pointer;
-  border: 1px solid #e0e0e0;
-  transition: background 0.2s;
-}
-.recurring-task-item:hover {
-  background: #e3f2fd;
-}
-.task-title {
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-}
-.task-meta {
-  font-size: 12px;
-  color: #757575;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  padding: 12px 8px 12px 8px;
 }
 .no-tasks {
   color: #bdbdbd;
@@ -134,16 +128,7 @@ const formatDate = (dateStr) => {
   max-width: 56px;
   transition: width 0.2s;
 }
-.collapsed-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
 .collapse-btn {
   transition: transform 0.2s;
-}
-.collapse-btn.rotated {
-  transform: rotate(180deg);
 }
 </style>
