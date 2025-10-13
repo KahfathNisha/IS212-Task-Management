@@ -563,11 +563,11 @@ const tasks = ref([
       {
         timestamp: '2025-09-25T14:30:00',
         oldStatus: null,
-        newStatus: 'To Do'
+        newStatus: 'Ongoing'
       },
       {
         timestamp: '2025-09-27T09:30:00',
-        oldStatus: 'To Do',
+        oldStatus: 'Ongoing',
         newStatus: 'In Progress'
       }
     ],
@@ -590,7 +590,7 @@ const tasks = ref([
           },
           {
             timestamp: '2025-09-27T16:30:00',
-            oldStatus: 'To Do',
+            oldStatus: 'Ongoing',
             newStatus: 'In Progress'
           },
         ],
@@ -614,7 +614,7 @@ const tasks = ref([
           },
           {
             timestamp: '2025-09-26T12:00:00',
-            oldStatus: 'To Do',
+            oldStatus: 'Ongoing',
             newStatus: 'In Progress'
           },
         ],
@@ -628,7 +628,7 @@ const tasks = ref([
     description: 'Review and approve the quarterly financial reports',
     dueDate: '2025-09-28',
     assignedTo: 'Jane Smith',
-    status: 'To Do',
+    status: 'Ongoing',
     priority: 7,
     attachments: [],
     startTime: '2025-09-28T14:00:00',
@@ -650,7 +650,7 @@ const tasks = ref([
     description: 'Update the company website with new product information',
     dueDate: '2025-09-24',
     assignedTo: 'Alice Johnson',
-    status: 'To Do',
+    status: 'Ongoing',
     priority: 6,
     attachments: [],
     startTime: '2025-09-24T10:00:00',
@@ -672,7 +672,7 @@ const tasks = ref([
         startTime: '2025-09-24T10:00:00',
         endTime: '2025-09-24T11:00:00',
         dueDate: '2025-09-24',
-        status: 'To Do',
+        status: 'Ongoing',
         priority: 5,
         createdAt: '2025-09-23T09:15:00',
         statusHistory: [
@@ -703,11 +703,11 @@ const tasks = ref([
       {
         timestamp: '2025-09-26T12:00:00',
         oldStatus: null,
-        newStatus: 'To Do'
+        newStatus: 'Ongoing'
       },
       {
         timestamp: '2025-09-27T14:20:00',
-        oldStatus: 'To Do',
+        oldStatus: 'Ongoing',
         newStatus: 'In Progress'
       },
       {
@@ -726,14 +726,14 @@ const newTask = ref({
   dueDate: '',
   assignedTo: '',
   collaborators: [],
-  status: 'To Do',
+  status: 'Ongoing',
   attachments: [],
   startTime: '',
   endTime: ''
 })
 
 const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
-const taskStatuses = ['To Do', 'In Progress', 'Done']
+const taskStatuses = ['Ongoing', 'Completed', 'Pending Review', 'Unassigned']
 const priorities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 const priorityFilterOptions = [
   { title: 'Priority 1', value: 1 },
@@ -969,8 +969,7 @@ const handleCreateSave = async (taskData) => {
     const newTaskWithId = { 
       ...taskData, 
       id: newTaskId,
-      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status }],
-      createdAt: new Date().toISOString(),
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status || 'Ongoing' }],      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     tasks.value.push(newTaskWithId);
@@ -1068,7 +1067,7 @@ const createTask = async () => {
       dueDate: newTask.value.dueDate || null,
       assigneeId: newTask.value.assignedTo || null,
       priority: newTask.value.priority || 1,
-      status: newTask.value.status || 'To Do',
+      status: newTask.value.status || 'Ongoing',
       collaborators: Array.isArray(newTask.value.collaborators) ? newTask.value.collaborators : [],
       attachments: mainAttachments || [],
       subtasks: processedSubtasks || [],
@@ -1268,9 +1267,10 @@ const getTaskStatusClass = (status) => {
 
 const getStatusColor = (status) => {
   const colors = {
-    'To Do': 'orange',
-    'In Progress': 'blue',
-    'Done': 'green'
+    'Ongoing': 'blue',
+    'Completed': 'green',
+    'Pending Review': 'orange',
+    'Unassigned': 'grey'
   }
   return colors[status] || 'grey'
 }
@@ -1325,7 +1325,7 @@ const resetForm = () => {
     dueDate: '',
     assignedTo: '',
     collaborators: [],
-    status: 'To Do',
+    status: 'Ongoing',
     attachments: [],
   }
   subtasks.value = []
@@ -1336,7 +1336,7 @@ const addSubtask = () => {
   subtasks.value.push({
     title: '',
     description: '',
-    status: 'To Do',
+    status: 'Ongoing',
     priority: 1,
     assignedTo: '',
     collaborators: [],
@@ -1565,8 +1565,7 @@ const handleListStatusChange = ({ task, status }) => {
 }
 
 const handleBulkUpdateStatus = async (taskIds) => {
-  const newStatus = prompt('Enter new status (To Do, In Progress, Done):')
-  
+  const newStatus = prompt('Enter new status (Ongoing, Completed, Pending Review, Unassigned):')  
   if (newStatus && taskStatuses.includes(newStatus)) {
     try {
       for (const taskId of taskIds) {
@@ -2230,20 +2229,25 @@ const handleBulkDelete = async (taskIds) => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.task-todo {
-  border-left-color: #ff9800;
-  background: rgba(255, 152, 0, 0.1);
-}
-
-.task-progress {
+.task-ongoing {
   border-left-color: #2196f3;
   background: rgba(33, 150, 243, 0.1);
 }
 
-.task-done {
+.task-completed {
   border-left-color: #4caf50;
   background: rgba(76, 175, 80, 0.1);
   opacity: 0.8;
+}
+
+.task-pending-review {
+  border-left-color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.task-unassigned {
+  border-left-color: #9e9e9e;
+  background: rgba(158, 158, 158, 0.1);
 }
 
 .task-content {
@@ -2395,20 +2399,25 @@ const handleBulkDelete = async (taskIds) => {
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
-.week-task-item.task-todo {
-  border-left-color: #ff9800;
-  background: rgba(255, 152, 0, 0.1);
-}
-
-.week-task-item.task-progress {
+.week-task-item.task-ongoing {
   border-left-color: #2196f3;
   background: rgba(33, 150, 243, 0.1);
 }
 
-.week-task-item.task-done {
+.week-task-item.task-completed {
   border-left-color: #4caf50;
   background: rgba(76, 175, 80, 0.1);
   opacity: 0.8;
+}
+
+.week-task-item.task-pending-review {
+  border-left-color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.week-task-item.task-unassigned {
+  border-left-color: #9e9e9e;
+  background: rgba(158, 158, 158, 0.1);
 }
 
 .week-task-content {
