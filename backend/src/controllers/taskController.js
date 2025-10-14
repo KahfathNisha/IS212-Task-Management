@@ -181,12 +181,18 @@ try {
 // Update entire task
 exports.updateTask = async (req, res) => {
     try {
-        const { dueDate, priority, subtasks, title, ...otherFields } = req.body;
+        const { dueDate, priority, subtasks, title, collaborators, ...otherFields } = req.body;
 
         const updateData = {
             ...otherFields,
             updatedAt: admin.firestore.Timestamp.now()
         };
+
+        // Handle collaborators separately to ensure proper structure
+        if (collaborators !== undefined) {
+            updateData.collaborators = collaborators;
+        }
+
 
         // Validate title
         if (title !== undefined && (!title || title.trim() === '')) {
@@ -250,7 +256,18 @@ exports.updateTask = async (req, res) => {
             updateData.dueDate = admin.firestore.Timestamp.fromDate(due);
         }
 
-        await db.collection('tasks').doc(req.params.id).update(updateData);
+        // Remove fields that shouldn't be updated
+        const { id, createdAt, ...finalUpdateData } = updateData;
+
+
+        // Check if document exists first
+        const docRef = db.collection('tasks').doc(req.params.id);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+        await docRef.update(finalUpdateData);
 
         res.status(200).json({ message: 'Task updated successfully' });
     } catch (err) {
