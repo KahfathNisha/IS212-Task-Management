@@ -332,7 +332,14 @@ const localShow = computed({
 })
 
 const normalizeCollaborators = (collabs) => {
-  return (collabs || []).map(c => typeof c === 'string' ? { name: c, permission: 'view' } : c)
+  const normalized = (collabs || []).map(c => typeof c === 'string' ? { name: c, permission: 'view' } : c)
+  // Remove duplicates based on name
+  const seen = new Set()
+  return normalized.filter(c => {
+    if (seen.has(c.name)) return false
+    seen.add(c.name)
+    return true
+  })
 }
 
 const localTask = ref({ ...props.model })
@@ -344,7 +351,14 @@ const taskForm = ref(null)
 watch(() => props.model, (v) => {
   localTask.value = { ...v }
   collaboratorPermissions.value = normalizeCollaborators(v.collaborators)
-  subtasks.value = v?.subtasks ? v.subtasks.map(s => ({ ...s, collaboratorPermissions: normalizeCollaborators(s.collaborators) })) : []
+  localTask.value.collaborators = [...new Set(collaboratorPermissions.value.map(c => c.name))] // Deduplicate names
+  console.log('Setting localTask.collaborators:', localTask.value.collaborators)
+  subtasks.value = v?.subtasks ? v.subtasks.map(s => {
+    const collabPerms = normalizeCollaborators(s.collaborators)
+    const dedupedCollabs = [...new Set(collabPerms.map(c => c.name))]
+    console.log('Subtask collaborators after dedup:', dedupedCollabs)
+    return { ...s, collaborators: dedupedCollabs, collaboratorPermissions: collabPerms }
+  }) : []
 }, { immediate: true })
 
 const showRecurrence = ref(false);
@@ -377,22 +391,41 @@ const addSubtask = () => {
 
 // Sync main task collaborator permissions
 watch(() => localTask.value.collaborators, (newCollabs, oldCollabs) => {
-  const newNames = newCollabs || []
-  const oldNames = oldCollabs || []
+  if (!newCollabs) return
+  const newNames = [...new Set(newCollabs || [])] // Ensure unique names
+  const oldNames = [...new Set(oldCollabs || [])] // Ensure unique old names
   const added = newNames.filter(n => !oldNames.includes(n))
   const removed = oldNames.filter(n => !newNames.includes(n))
-  collaboratorPermissions.value = collaboratorPermissions.value.filter(p => !removed.includes(p.name)).concat(added.map(name => ({ name, permission: 'view' })))
+
+  // Remove collaborators that are no longer selected
+  collaboratorPermissions.value = collaboratorPermissions.value.filter(p => !removed.includes(p.name))
+
+  // Add new collaborators with default 'view' permission, but only if they don't already exist
+  added.forEach(name => {
+    if (!collaboratorPermissions.value.some(p => p.name === name)) {
+      collaboratorPermissions.value.push({ name, permission: 'view' })
+    }
+  })
 }, { deep: true })
 
 // Sync subtask collaborator permissions
 watchEffect(() => {
   subtasks.value.forEach(subtask => {
     if (!subtask.collaboratorPermissions) subtask.collaboratorPermissions = []
-    const currentNames = subtask.collaborators || []
+    const currentNames = [...new Set(subtask.collaborators || [])] // Ensure unique names
     const existingNames = subtask.collaboratorPermissions.map(p => p.name)
     const added = currentNames.filter(n => !existingNames.includes(n))
     const removed = existingNames.filter(n => !currentNames.includes(n))
-    subtask.collaboratorPermissions = subtask.collaboratorPermissions.filter(p => !removed.includes(p.name)).concat(added.map(name => ({ name, permission: 'view' })))
+
+    // Remove collaborators that are no longer selected
+    subtask.collaboratorPermissions = subtask.collaboratorPermissions.filter(p => !removed.includes(p.name))
+
+    // Add new collaborators with default 'view' permission, but only if they don't already exist
+    added.forEach(name => {
+      if (!subtask.collaboratorPermissions.some(p => p.name === name)) {
+        subtask.collaboratorPermissions.push({ name, permission: 'view' })
+      }
+    })
   })
 })
 
@@ -445,11 +478,21 @@ const onSave = () => {
     localTask.value.recurrence = { enabled: false, type: '', interval: 1, startDate: '', endDate: '' }
   }
   // merge subtasks and collaborators with permissions
+  const dedupedCollaborators = collaboratorPermissions.value.filter((perm, index, self) =>
+    index === self.findIndex(p => p.name === perm.name)
+  )
   const payload = {
     ...localTask.value,
-    collaborators: collaboratorPermissions.value,
-    subtasks: subtasks.value.map(s => ({ ...s, collaborators: s.collaboratorPermissions }))
+    collaborators: dedupedCollaborators,
+    subtasks: subtasks.value.map(s => ({
+      ...s,
+      collaborators: s.collaboratorPermissions.filter((perm, index, self) =>
+        index === self.findIndex(p => p.name === perm.name)
+      )
+    }))
   }
+  console.log('Final payload collaborators:', payload.collaborators)
+  console.log('Final payload subtasks collaborators:', payload.subtasks.map(s => s.collaborators))
   emit('save', payload)
   emit('update:show', false)
 }

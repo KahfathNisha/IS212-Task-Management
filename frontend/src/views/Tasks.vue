@@ -489,7 +489,7 @@
       :priorities="priorities"
       :teamMembers="teamMembers"
       :todayDate="todayDate"
-      @save="handleCreateSave"
+      @save="isEditing ? updateTask(newTask.id, $event) : handleCreateSave($event)"
       @cancel="cancelCreate"
       @message="handleMessage"
     />
@@ -794,7 +794,11 @@ const subtasks = ref([])
 onMounted(async () => {
   try {
     const response = await axiosClient.get('/tasks');
-    tasks.value = response.data;
+    // Remove duplicates based on id before setting tasks
+    const uniqueTasks = response.data.filter((task, index, self) =>
+      index === self.findIndex(t => t.id === task.id)
+    );
+    tasks.value = uniqueTasks;
   } catch (error) {
     showMessage('Failed to load tasks', 'error');
   }
@@ -1001,6 +1005,7 @@ const handleCreateSave = async (taskData) => {
   try {
     const response = await axios.post('http://localhost:3000/tasks', taskData);
     const newTaskId = response.data.id;
+
     const newTaskWithId = {
       ...taskData,
       id: newTaskId,
@@ -1008,7 +1013,13 @@ const handleCreateSave = async (taskData) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    // Remove any existing task with this ID first to prevent duplicates
+    tasks.value = tasks.value.filter(t => t.id !== newTaskId);
+
+    // Add the new task
     tasks.value.push(newTaskWithId);
+
     showSnackbar.value = true;
     snackbarMessage.value = 'Task created successfully!';
     snackbarColor.value = 'success';
@@ -1031,29 +1042,36 @@ const updateTask = async (taskId, updatedData) => {
       updatedData.attachments = await uploadFiles(updatedData.attachments);
     }
 
-    await axiosClient.put(`/tasks/${taskId}`, updatedData);
+    // Prepare the data for backend - ensure collaborators is properly formatted and serialize Vue proxies
+    const backendData = JSON.parse(JSON.stringify({
+      ...updatedData,
+      collaborators: updatedData.collaborators || []
+    }));
 
-    const taskIndex = tasks.value.findIndex(t => t.id === taskId);
-    if (taskIndex !== -1) {
-      tasks.value[taskIndex] = {
-        ...tasks.value[taskIndex],
-        ...updatedData,
-        updatedAt: new Date().toISOString()
-      };
+    await axiosClient.put(`/tasks/${taskId}`, backendData);
 
-      if (selectedTask.value?.id === taskId) {
-        selectedTask.value = tasks.value[taskIndex];
-      }
-      if (selectedListTask.value?.id === taskId) {
-        selectedListTask.value = tasks.value[taskIndex];
-      }
+    // Remove any existing task with this ID first to prevent duplicates
+    tasks.value = tasks.value.filter(t => t.id !== taskId);
+
+    // Add the updated task
+    const updatedTask = {
+      ...updatedData,
+      id: taskId,
+      updatedAt: new Date().toISOString()
+    };
+    tasks.value.push(updatedTask);
+
+    if (selectedTask.value?.id === taskId) {
+      selectedTask.value = updatedTask;
+    }
+    if (selectedListTask.value?.id === taskId) {
+      selectedListTask.value = updatedTask;
     }
 
     showMessage('Task updated successfully!', 'success');
     return true;
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Failed to update task';
-    console.error('Error updating task:', errorMessage, error);
     showMessage(errorMessage, 'error');
     return false;
   }
