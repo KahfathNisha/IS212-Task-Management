@@ -16,7 +16,7 @@
     <div class="view-controls">
       <div class="controls-row">
         <div class="view-toggle-left">
-          <div class="view-tabs">
+          <div class="view-tabs button-spacing-fix">
             <button 
               v-for="mode in viewModes" 
               :key="mode.value"
@@ -47,7 +47,7 @@
 import { ref, computed, watch, onMounted, defineProps, defineEmits, nextTick } from 'vue';
 import Gantt from 'frappe-gantt';
 
-// 🚨 SPECIFIC CSS IMPORT REQUESTED BY USER
+// 🚨 CSS IMPORT: Using the specific local path you determined.
 import '/node_modules/frappe-gantt/dist/frappe-gantt.css'; 
 
 // Define Props and Emits
@@ -76,7 +76,42 @@ const viewModes = [
   { label: 'Month', value: 'Month' },
 ];
 
-// Simple helper to get status color (reused from your Tasks.vue logic)
+// 🚨 ESSENTIAL FIX: Helper function to convert complex date format to YYYY-MM-DD
+const parseGanttDate = (dateString) => {
+  if (!dateString || typeof dateString !== 'string') return null;
+
+  try {
+    // 1. Clean the string to prepare for parsing (removes UTC+8, inserts comma)
+    let cleanedString = dateString
+      .replace(' at ', ' ')
+      .replace(' UTC+8', '');
+    
+    // Insert a comma before the year/time for better compatibility
+    cleanedString = cleanedString.replace(/(\d{1,2}\s+[A-Za-z]+\s+)(\d{4})/, '$1$2,');
+      
+    const date = new Date(cleanedString);
+    
+    // 2. Validation and Formatting
+    if (isNaN(date) || date.getFullYear() < 2000) {
+        // Logging an error here is crucial for debugging if it still fails
+        console.error("Date Validation Failed on cleaned string:", cleanedString);
+        return null; 
+    } 
+
+    // Format into the required YYYY-MM-DD format
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    console.error("FINAL DATE PARSING CRASH:", dateString, e);
+    return null;
+  }
+};
+
+
+// Simple helper to get status color
 const getStatusColor = (status) => {
   const colors = {
     'Ongoing': '#2196f3',
@@ -105,16 +140,18 @@ const getGanttTaskClass = (status) => {
 // Map your task structure to the Frappe Gantt format
 const tasksForGantt = computed(() => {
   return props.tasks
-    .filter(task => task.dueDate) // Tasks must have a due date to be charted
+    .filter(task => task.dueDate && task.createdAt) 
     .map(task => {
       
-      // FIX: Robust check for date strings to prevent .split() error
-      const endDateString = task.dueDate && typeof task.dueDate === 'string' ? task.dueDate.split('T')[0] : null;
+      // ✅ CORRECT LOGIC: Start Date = createdAt, End Date = dueDate
+      const startDateString = parseGanttDate(task.createdAt); 
+      const endDateString = parseGanttDate(task.dueDate);
       
-      const startDateString = (task.startTime && typeof task.startTime === 'string') ? 
-                        task.startTime.split('T')[0] : 
-                        endDateString; 
-      
+      // CRITICAL CHECK: If parsing failed on either date, return null to filter later.
+      if (!startDateString || !endDateString) {
+          return null; 
+      }
+
       let progress = 0;
       if (task.subtasks && task.subtasks.length > 0) {
         const completed = task.subtasks.filter(s => s.status === 'Completed').length;
@@ -136,7 +173,8 @@ const tasksForGantt = computed(() => {
         data: task 
       };
     })
-    .filter(task => task.start && task.end); // Ensure only tasks with valid dates proceed
+    // Final filter removes any tasks that returned null due to parsing failure
+    .filter(task => task !== null); 
 });
 
 
@@ -145,6 +183,7 @@ const tasksForGantt = computed(() => {
 const initializeGantt = () => {
   if (!ganttChart.value) return;
 
+  // 🚨 CRITICAL FIX: Prevent re-initialization with an empty array
   if (tasksForGantt.value.length === 0) {
     if (ganttInstance.value) {
       ganttChart.value.innerHTML = '';
@@ -212,9 +251,11 @@ onMounted(() => {
   nextTick(initializeGantt);
 });
 
-watch(tasksForGantt, () => {
-  loading.value = true;
-  nextTick(initializeGantt);
+watch(tasksForGantt, (newTasks) => {
+  if (newTasks.length > 0 || ganttInstance.value) {
+    loading.value = true;
+    nextTick(initializeGantt);
+  }
 }, { deep: true });
 
 watch(ganttViewMode, (newMode) => {
@@ -249,6 +290,11 @@ watch(ganttViewMode, (newMode) => {
   justify-content: flex-start;
 }
 
+/* 🚨 FIX: Add gap to spread the Day/Week/Month buttons */
+.button-spacing-fix {
+    gap: 16px; 
+}
+
 /* === Frappe Gantt Container Styles === */
 .gantt-chart-container {
   flex: 1;
@@ -256,11 +302,11 @@ watch(ganttViewMode, (newMode) => {
   padding: 24px;
   position: relative;
   background: var(--bg-secondary);
-  min-height: 400px; /* 🚨 FIX: Enforce minimum height so the bars can draw */
+  min-height: 400px; /* FIX: Enforce minimum height so the bars can draw */
 }
 
 .gantt-target {
-  min-height: 350px; /* 🚨 FIX: Enforce minimum height on the SVG target */
+  min-height: 350px; /* FIX: Enforce minimum height on the SVG target */
 }
 
 /* Custom Status Bar Coloring for Gantt Bars (Requires !important to override defaults) */

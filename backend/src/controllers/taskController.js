@@ -1,6 +1,15 @@
 const { db, admin } = require('../config/firebase');
 const taskModel = require('../models/taskModel');
 
+// --- Helper function for Timestamp conversion ---
+const formatTimestampToISO = (timestamp) => {
+    if (timestamp && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toISOString();
+    }
+    // If it's not a Firestore Timestamp, return the original data.
+    return timestamp;
+};
+
 // Create Task
 exports.createTask = async (req, res) => {
     try {
@@ -153,7 +162,13 @@ exports.getTask = async (req, res) => {
         const doc = await db.collection('tasks').doc(req.params.id).get();
         if (!doc.exists) return res.status(404).json({ message: 'Task not found' });
 
-        res.status(200).json(doc.data());
+        let taskData = doc.data();
+        
+        // Convert Timestamps for single task retrieval
+        taskData.dueDate = formatTimestampToISO(taskData.dueDate);
+        taskData.createdAt = formatTimestampToISO(taskData.createdAt);
+
+        res.status(200).json(taskData);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -161,20 +176,26 @@ exports.getTask = async (req, res) => {
 
 // Get All Tasks
 exports.getAllTasks = async (req, res) => {
-try {
-    const snapshot = await db.collection('tasks').get();
-    const tasks = [];
-    snapshot.forEach(doc => {
-        const data = doc.data();
-        const dueDate = data.dueDate 
-        ? (data.dueDate.toDate ? data.dueDate.toDate().toISOString().split('T')[0] : data.dueDate) 
-        : null;
-        tasks.push({ id: doc.id, ...data, dueDate });
-    });
-    res.status(200).json(tasks);
-} catch (err) {
-    res.status(500).json({ error: err.message });
-}
+    try {
+        const snapshot = await db.collection('tasks').get();
+        const tasks = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            
+            // 🚨 FIX: Standardize all Timestamps to ISO strings for frontend compatibility
+            const formattedData = {
+                ...data,
+                dueDate: formatTimestampToISO(data.dueDate),
+                createdAt: formatTimestampToISO(data.createdAt),
+                updatedAt: formatTimestampToISO(data.updatedAt)
+            };
+            
+            tasks.push({ id: doc.id, ...formattedData });
+        });
+        res.status(200).json(tasks);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 };
    
 
@@ -250,6 +271,10 @@ exports.updateTask = async (req, res) => {
             updateData.dueDate = admin.firestore.Timestamp.fromDate(due);
         }
 
+        // Handle title and priority updates
+        if (title !== undefined) updateData.title = title;
+        if (priority !== undefined) updateData.priority = priority;
+
         await db.collection('tasks').doc(req.params.id).update(updateData);
 
         res.status(200).json({ message: 'Task updated successfully' });
@@ -305,7 +330,10 @@ exports.getAllRecurringTasks = async (req, res) => {
         const snapshot = await db.collection('recurringTasks').get();
         const recurringTasks = snapshot.docs.map(doc => ({
             id: doc.id,
-            ...doc.data()
+            // Convert timestamps here too, just in case the frontend uses this data
+            ...doc.data(),
+            createdAt: formatTimestampToISO(doc.data().createdAt),
+            updatedAt: formatTimestampToISO(doc.data().updatedAt),
         }));
         res.status(200).json(recurringTasks);
     } catch (err) {
@@ -319,16 +347,6 @@ exports.updateRecurringTask = async (req, res) => {
         const recurringTaskId = req.params.id;
         const { userId, recurrence } = req.body;
 
-        // // 1. Only owner can update
-        // const recurringDoc = await db.collection('recurringTasks').doc(recurringTaskId).get();
-        // if (!recurringDoc.exists) {
-        //     return res.status(404).json({ message: 'Recurring task not found' });
-        // }
-        // const recurringData = recurringDoc.data();
-        // if (recurringData.userId !== userId) {
-        //     return res.status(403).json({ message: 'Only the owner can update recurrence rules' });
-        // }
-
         // 2. Update recurrence rules
         await db.collection('recurringTasks').doc(recurringTaskId).update({
             recurrence,
@@ -336,7 +354,6 @@ exports.updateRecurringTask = async (req, res) => {
         });
 
         // 3. Apply changes only to future instances (not past/completed)
-        // Find all future tasks linked to this recurringTaskId that are not completed and not in the past
         const now = new Date();
         const tasksSnapshot = await db.collection('tasks')
             .where('recurringTaskId', '==', recurringTaskId)
@@ -345,13 +362,12 @@ exports.updateRecurringTask = async (req, res) => {
         const batch = db.batch();
         tasksSnapshot.forEach(doc => {
             const data = doc.data();
-            // Only update tasks that are not completed and due in the future
+            // Need a reliable way to get JS Date from Firestore Timestamp object
             const dueDate = data.dueDate && data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
             if (
                 data.status !== 'Completed' &&
                 dueDate >= now
             ) {
-                // Optionally, update the recurrence info on the task (if you store it)
                 batch.update(doc.ref, {
                     recurrence,
                     updatedAt: admin.firestore.Timestamp.now()
