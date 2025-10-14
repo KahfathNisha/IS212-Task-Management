@@ -255,9 +255,11 @@ const onEdit = () => {
   emit('edit', task.value)
 }
 
+// In TaskDetailsDialog.vue (the modal component):
 const onChangeStatus = (newStatus) => {
-  if (!task.value) return
-  emit('change-status', { task: task.value, status: newStatus })
+  if (!task.value || !task.value.id) return;
+  // Ensure this emits a SINGLE object containing the taskId and status:
+  emit('change-status', { taskId: task.value.id, status: newStatus }) 
 }
 
 const onViewParent = () => {

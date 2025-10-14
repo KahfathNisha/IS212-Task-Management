@@ -462,10 +462,6 @@
       />
           
     </div>
-      
-    
-        
-    
 
     <!-- Task Details Dialog -->
     <TaskDetailsDialog
@@ -1156,57 +1152,77 @@ const createTask = async () => {
   }
 }
 
-// Change Task Status Function
-const changeTaskStatus = async (task, newStatus) => {
-  const oldStatus = task.status
-
-  if (oldStatus === newStatus) {
-    showMessage(`Task is already in "${newStatus}" status.`, 'info')
-    return
-  }
-  
-  if (task.isSubtask) {
-      showMessage('Subtask status can only be managed locally for now.', 'info');
-      return;
-  }
-  if (!task.id) {
-      showMessage('Task ID is missing.', 'error');
-      return;
-  }
-
-  try {
-    await axiosClient.put(`/tasks/${task.id}/status`, { status: newStatus }); 
+// In Tasks.vue (replace your existing changeTaskStatus function)
+const changeTaskStatus = async (payload) => {
+    // 1. Correctly unpack the properties from the single payload object
+    const taskId = payload.taskId;
+    const newStatus = payload.status; 
     
-    const taskIndex = tasks.value.findIndex(t => t.id === task.id)
-    if (taskIndex !== -1) {
-      const taskData = tasks.value[taskIndex]
-      const statusHistory = [...(taskData.statusHistory || [])]
-      
-      statusHistory.push({
-        timestamp: new Date().toISOString(),
-        oldStatus: oldStatus,
-        newStatus: newStatus
-      })
-      
-      tasks.value[taskIndex] = {
-        ...taskData,
-        status: newStatus,
-        statusHistory,
-        updatedAt: new Date().toISOString()
-      }
-      
-      selectedTask.value = tasks.value[taskIndex]
-      selectedListTask.value = tasks.value[taskIndex]
+    // 2. Final comprehensive check for a valid, non-synthetic ID
+    if (!taskId || typeof taskId !== 'string' || taskId.includes('subtask')) {
+        console.error('API Update Blocked: Task ID is invalid or missing.', { taskId: payload, newStatus });
+        showMessage('Failed to update: Task ID is invalid or missing.', 'error');
+        return;
+    }
+
+    const task = tasks.value.find(t => t.id === taskId);
+
+    if (!task) {
+        showMessage('Task not found in local data.', 'error');
+        return;
     }
     
-    showMessage('Task status updated!', 'success')
-  } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Failed to update task status on server.';
-    console.error('Error updating task status:', errorMessage, error)
-    showMessage(errorMessage, 'error')
-  }
-}
+    const oldStatus = task.status;
+    
+    if (oldStatus === newStatus) {
+      showMessage(`Task is already in "${newStatus}" status.`, 'info');
+      return;
+    }
+    
+    if (task.isSubtask) {
+        showMessage('Subtask status is managed through the parent task details.', 'info');
+        return;
+    }
 
+    // 3. API call uses the guaranteed-correct taskId
+    try {
+        await axiosClient.put(`/tasks/${taskId}/status`, { status: newStatus }); 
+        
+        // 4. Local state update
+        const taskIndex = tasks.value.findIndex(t => t.id === taskId)
+        if (taskIndex !== -1) {
+          const taskData = tasks.value[taskIndex]
+          const statusHistory = [...(taskData.statusHistory || [])]
+          
+          statusHistory.push({
+            timestamp: new Date().toISOString(),
+            oldStatus: oldStatus,
+            newStatus: newStatus
+          })
+          
+          tasks.value[taskIndex] = {
+            ...taskData,
+            status: newStatus,
+            statusHistory,
+            updatedAt: new Date().toISOString()
+          }
+          
+          selectedTask.value = tasks.value[taskIndex]
+          selectedListTask.value = tasks.value[taskIndex]
+        }
+        
+        showMessage('Task status updated!', 'success')
+    } catch (error) {
+        const errorMessage = error.response?.data?.message || 'Failed to update task status on server.';
+        console.error('Error updating task status:', error.response?.data || error);
+        
+        if (error.response?.status === 404) {
+             showMessage('Update failed: Task ID not found on server.', 'error');
+        } else {
+             showMessage(errorMessage, 'error');
+        }
+    }
+};
 const toggleUpcomingSidebar = () => {
   upcomingSidebarOpen.value = !upcomingSidebarOpen.value
 }
@@ -1630,8 +1646,17 @@ const handleSelectTask = (task) => {
   selectedTaskId.value = task?.id || null 
 }
 
-const handleListStatusChange = ({ task, status }) => {
-  changeTaskStatus(task, status)
+// In Tasks.vue
+const handleListStatusChange = (payload) => {
+  const { taskId, status } = payload;
+  
+  // 🛑 DEFENSIVE CHECK: Ensure taskId is valid before calling changeTaskStatus
+  if (!taskId) {
+      showMessage('Update failed: Task ID is missing or invalid.', 'error');
+      return;
+  }
+  
+  changeTaskStatus(taskId, status); // Pass ID directly
 }
 
 const handleBulkUpdateStatus = async (taskIds) => {
