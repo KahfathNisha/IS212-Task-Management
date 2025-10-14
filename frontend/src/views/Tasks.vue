@@ -1277,6 +1277,19 @@ const getTasksForDate = (dateKey) => {
   let items = []
   tasks.value.forEach(task => {
     if (task.subtasks && task.subtasks.length > 0) {
+      // Check if any subtask matches the date
+      const hasMatchingSubtask = task.subtasks.some(subtask => {
+        const subtaskDate = subtask.dueDate?.split('T')[0]
+        return subtaskDate === dateKey
+      })
+
+      // If parent task has due date matching, or has subtasks on this date, show it
+      const taskDate = task.dueDate?.split('T')[0];
+      if (taskDate === dateKey || hasMatchingSubtask) {
+        items.push(task)
+      }
+
+      // Also add individual matching subtasks
       task.subtasks.forEach((subtask, index) => {
         const subtaskDate = subtask.dueDate?.split('T')[0]
         if (subtaskDate === dateKey) {
@@ -1290,7 +1303,8 @@ const getTasksForDate = (dateKey) => {
         }
       })
     } else {
-      if (task.dueDate === dateKey) {
+      const taskDate = task.dueDate?.split('T')[0];
+      if (taskDate === dateKey) {
         items.push(task)
       }
     }
