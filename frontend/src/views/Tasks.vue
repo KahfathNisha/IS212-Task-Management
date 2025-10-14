@@ -444,22 +444,6 @@
         @bulk-update-status="handleBulkUpdateStatus"
         @bulk-delete="handleBulkDelete"
       />
-
-      <KanbanView
-        v-else-if="viewType === 'list' && currentView === 'kanban'"
-        :tasks="filteredTasksList"
-        :selected-task-id="selectedTaskId"
-        :task-statuses="taskStatuses"
-        :search-query="searchQuery"
-        :current-view="currentView"
-        @change-view="currentView = $event"
-        @select-task="handleSelectTask"
-        @edit-task="editTask"
-        @change-status="handleListStatusChange"
-        @view-parent="viewTaskDetails"
-        @open-attachment="openAttachment"
-        @add-task="showCreateDialog = true"
-      />
           
     </div>
 
@@ -528,7 +512,6 @@ const currentDate = ref(new Date())
 const viewType = ref('calendar')
 const currentView = ref('list') 
 const viewTabs = [
-  { label: 'Overview', value: 'overview' },
   { label: 'Calendar', value: 'calendar' },
   { label: 'Task List', value: 'list' },
   { label: 'Timeline', value: 'timeline' },

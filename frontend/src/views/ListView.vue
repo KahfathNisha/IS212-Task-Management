@@ -673,24 +673,7 @@ defineExpose({
       <!-- View Toggle Bar - SPANS FULL WIDTH ACROSS BOTH PANELS -->
       <div class="view-toggle-bar-wrapper">
         <div class="view-toggle-bar">
-          <div class="view-tabs">
-            <button 
-              class="view-tab"
-              :class="{ active: currentView === 'kanban' }"
-              @click="$emit('change-view', 'kanban')"
-            >
-              <v-icon size="small">mdi-view-column</v-icon>
-              <span>Kanban</span>
-            </button>
-            
-            <button 
-              class="view-tab"
-              :class="{ active: currentView === 'list' }"
-              @click="$emit('change-view', 'list')"
-            >
-              <v-icon size="small">mdi-format-list-bulleted</v-icon>
-              <span>List view</span>
-            </button>
+          <div class="view-tabs">            
           </div>
 
           <div class="view-actions">
