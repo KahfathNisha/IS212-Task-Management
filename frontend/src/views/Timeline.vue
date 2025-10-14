@@ -6,17 +6,12 @@
         <h1>Task Timeline</h1>
         <p class="date-subtitle">Visualize tasks over time with the Frappe Gantt chart</p>
       </div>
-      <div class="header-right">
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="$emit('addTask')" rounded="lg" class="add-task-btn">
-          Add Task
-        </v-btn>
       </div>
-    </div>
 
     <div class="view-controls">
       <div class="controls-row">
         <div class="view-toggle-left">
-          <div class="view-tabs button-spacing-fix">
+          <div class="gantt-toggle-buttons">
             <button 
               v-for="mode in viewModes" 
               :key="mode.value"
@@ -47,7 +42,7 @@
 import { ref, computed, watch, onMounted, defineProps, defineEmits, nextTick } from 'vue';
 import Gantt from 'frappe-gantt';
 
-// 🚨 CSS IMPORT: Using the specific local path you determined.
+// 🚨 CSS IMPORT: Using the deep relative path you determined.
 import '/node_modules/frappe-gantt/dist/frappe-gantt.css'; 
 
 // Define Props and Emits
@@ -85,15 +80,14 @@ const parseGanttDate = (dateString) => {
     let cleanedString = dateString
       .replace(' at ', ' ')
       .replace(' UTC+8', '');
-    
+      
     // Insert a comma before the year/time for better compatibility
     cleanedString = cleanedString.replace(/(\d{1,2}\s+[A-Za-z]+\s+)(\d{4})/, '$1$2,');
-      
+
     const date = new Date(cleanedString);
     
     // 2. Validation and Formatting
     if (isNaN(date) || date.getFullYear() < 2000) {
-        // Logging an error here is crucial for debugging if it still fails
         console.error("Date Validation Failed on cleaned string:", cleanedString);
         return null; 
     } 
@@ -147,7 +141,6 @@ const tasksForGantt = computed(() => {
       const startDateString = parseGanttDate(task.createdAt); 
       const endDateString = parseGanttDate(task.dueDate);
       
-      // CRITICAL CHECK: If parsing failed on either date, return null to filter later.
       if (!startDateString || !endDateString) {
           return null; 
       }
@@ -173,7 +166,6 @@ const tasksForGantt = computed(() => {
         data: task 
       };
     })
-    // Final filter removes any tasks that returned null due to parsing failure
     .filter(task => task !== null); 
 });
 
@@ -183,7 +175,6 @@ const tasksForGantt = computed(() => {
 const initializeGantt = () => {
   if (!ganttChart.value) return;
 
-  // 🚨 CRITICAL FIX: Prevent re-initialization with an empty array
   if (tasksForGantt.value.length === 0) {
     if (ganttInstance.value) {
       ganttChart.value.innerHTML = '';
@@ -199,11 +190,11 @@ const initializeGantt = () => {
 
   // Frappe Gantt Initialization with configuration options
   ganttInstance.value = new Gantt(ganttChart.value, tasksForGantt.value, {
-    // === AESTHETIC ADJUSTMENTS (for better bar visibility) ===
+    // === AESTHETIC ADJUSTMENTS ===
     bar_height: 36,     
     padding: 24,        
-    column_width: 60,   
-    // =======================================================
+    column_width: 100, 
+    // =============================
 
     view_mode: ganttViewMode.value,
     
@@ -276,9 +267,14 @@ watch(ganttViewMode, (newMode) => {
   overflow: hidden;
 }
 
+/* 🚨 UI FIX: Header is now consolidated */
 .view-header {
   padding: 16px 24px 12px 24px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .view-controls {
@@ -290,9 +286,10 @@ watch(ganttViewMode, (newMode) => {
   justify-content: flex-start;
 }
 
-/* 🚨 FIX: Add gap to spread the Day/Week/Month buttons */
-.button-spacing-fix {
-    gap: 16px; 
+/* 🚨 UI FIX: Targets the container of the Day/Week/Month buttons */
+.gantt-toggle-buttons {
+    display: flex; 
+    gap: 20px; 
 }
 
 /* === Frappe Gantt Container Styles === */
@@ -302,28 +299,34 @@ watch(ganttViewMode, (newMode) => {
   padding: 24px;
   position: relative;
   background: var(--bg-secondary);
-  min-height: 400px; /* FIX: Enforce minimum height so the bars can draw */
+  min-height: 400px; 
 }
 
 .gantt-target {
-  min-height: 350px; /* FIX: Enforce minimum height on the SVG target */
+  min-height: 350px; 
 }
 
-/* Custom Status Bar Coloring for Gantt Bars (Requires !important to override defaults) */
-.bar-completed .bar {
+/* 🚨 FINAL COLOR FIX: Target the SVG rect element */
+.bar-completed rect {
   fill: #4caf50 !important; /* Green */
 }
 
-.bar-ongoing .bar {
+.bar-ongoing rect {
   fill: #2196f3 !important; /* Blue */
 }
 
-.bar-pending-review .bar {
+.bar-pending-review rect {
   fill: #ff9800 !important; /* Orange */
 }
 
-.bar-unassigned .bar {
+.bar-unassigned rect {
   fill: #9e9e9e !important; /* Grey */
+}
+
+/* Fix text color visibility on the colored bars */
+.bar-completed .bar-label,
+.bar-ongoing .bar-label {
+    fill: #ffffff !important;
 }
 
 /* Dark mode adjustments for Frappe Gantt */
@@ -363,10 +366,6 @@ watch(ganttViewMode, (newMode) => {
 }
 
 /* View Tabs (reusing existing styles) */
-.view-tabs {
-  border-bottom: none !important;
-}
-
 .view-tab {
   padding: 0 0 4px 0 !important; 
 }
