@@ -607,6 +607,35 @@ const calculateProgress = (task) => {
   return Math.round((completedSubtasks / totalSubtasks) * 100)
 }
 
+// Add this function to your <script setup> block in ListView.vue
+
+// Function to check if a task is overdue (needed locally for styling)
+const isTaskOverdue = (dueDate, status) => {
+  if (status === 'Completed' || !dueDate) return false;
+  
+  const now = new Date();
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDateOnly = new Date(dueDate);
+  
+  return dueDateOnly < todayDateOnly;
+};
+
+
+// New function to determine all CSS classes for a single task card
+const getTaskCardClasses = (task) => {
+  const baseClasses = {
+    'active': props.selectedTaskId === task.id,
+    'bulk-selected': selectedTaskIds.value.includes(task.id)
+  };
+
+  // 🟢 CRITICAL: Add the overdue class if applicable
+  if (isTaskOverdue(task.dueDate, task.status)) {
+    baseClasses['task-overdue'] = true;
+  }
+  
+  return baseClasses;
+};
+
 // ===========================
 // Expose Methods (Optional)
 // ===========================
@@ -814,16 +843,12 @@ defineExpose({
           <!-- Task List Scroll Area -->
           <div class="tasks-list-scroll">
             <!-- Task Cards -->
-            <div 
-              v-for="task in sortedTasks" 
-              :key="task.id"
-              class="task-list-card"
-              :class="{ 
-                'active': selectedTaskId === task.id,
-                'bulk-selected': selectedTaskIds.includes(task.id)
-              }"
-              @click="handleTaskClick(task)"
-            >
+              <div 
+                v-for="task in sortedTasks" 
+                :key="task.id"
+                class="task-list-card"
+                :class="getTaskCardClasses(task)" @click="handleTaskClick(task)"
+              >
               <v-checkbox
                 v-if="bulkSelectMode"
                 :model-value="selectedTaskIds.includes(task.id)"
@@ -1420,7 +1445,32 @@ defineExpose({
   position: relative;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+/* 🟢 OVERDUE FIX: High specificity and appealing style */
+.task-list-card.task-overdue {
+  /* Dashed outline for softer look */
+  border: 1px dashed var(--v-theme-error, #f44336) !important; 
+  /* Subtle light red background */
+  background-color: var(--v-theme-error-lighten5, #fff5f5) !important;
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.3);
+  
+  /* Strong Left Indicator */
+  border-left: 4px solid var(--v-theme-error, #f44336) !important; 
+  opacity: 1 !important;
+}
 
+[data-theme="dark"] .task-list-card.task-overdue {
+  background-color: rgba(244, 67, 54, 0.15) !important; 
+}
+/* Ensure text inside is legible dark red */
+.task-list-card.task-overdue .task-list-title,
+.task-list-card.task-overdue .meta-item,
+.task-list-card.task-overdue .task-list-description {
+    color: var(--v-theme-error-darken2, #c62828) !important;
+}
+.task-list-card.task-overdue .meta-item .v-icon {
+    color: var(--v-theme-error, #f44336) !important;
+}
+/* 🟢 END OF OVERDUE FIX FOR LIST VIEW */
 .task-list-card:hover {
   border-color: #3b82f6;
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);

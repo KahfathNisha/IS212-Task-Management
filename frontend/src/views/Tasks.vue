@@ -333,13 +333,13 @@
               <div class="day-number">{{ date.day }}</div>
               
               <div class="day-tasks">
-                <div 
-                  v-for="task in getTasksForDate(date.dateKey)" 
-                  :key="task.id"
-                  class="task-item"
-                  :class="getTaskStatusClass(task.status)"
-                  @click.stop="viewTaskDetails(task)"
-                >
+                    <div 
+                    v-for="task in getTasksForDate(date.dateKey)" 
+                    :key="task.id"
+                    class="task-item"
+                    :class="getTaskStatusClass(task.status, task.dueDate)" 
+                    @click.stop="viewTaskDetails(task)"
+                  >
                   <div class="task-content">
                     <span class="task-title">{{ truncateTaskTitle(task.isSubtask ? `${task.title} (${task.parentTask.title})` : task.title) }}</span>
                     <div class="task-meta">
@@ -378,7 +378,7 @@
                   v-for="task in getTasksForDate(date.dateKey)" 
                   :key="task.id"
                   class="week-task-item"
-                  :class="getTaskStatusClass(task.status)"
+                  :class="getTaskStatusClass(task.status, task.dueDate)"
                   @click="viewTaskDetails(task)"
                 >
                   <div class="week-task-content">
@@ -863,6 +863,22 @@ const weekDates = computed(() => {
   return dates
 })
 
+const isTaskOverdue = (dueDate, status) => {
+  // 1. Exclude tasks without a due date or tasks that are completed.
+  if (status === 'Completed' || !dueDate) return false;
+  
+  const now = new Date();
+  
+  // 2. Set 'today' to midnight (00:00:00) for a fair comparison.
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // 3. Create Date object from the task's due date string.
+  const dueDateOnly = new Date(dueDate);
+  
+  // 4. Task is overdue if its date is strictly before the start of today.
+  return dueDateOnly < todayDateOnly;
+};
+
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0]
   let filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Completed')
@@ -1341,7 +1357,13 @@ const getTasksForDate = (dateKey) => {
   return items
 }
 
-const getTaskStatusClass = (status) => {
+const getTaskStatusClass = (status, dueDate) => {
+  // 🟢 CRITICAL CHECK: If the task is overdue, assign the overdue class.
+  if (isTaskOverdue(dueDate, status)) {
+    return 'task-overdue'; 
+  }
+  
+  // Regular status classes
   return {
     'task-ongoing': status === 'Ongoing',
     'task-pending': status === 'Pending Review', 
@@ -1961,6 +1983,43 @@ const handleMessage = ({ message, color }) => {
   color: #7b92d1 !important;
   border: 1px solid #5a7a9b !important;
 }
+
+/* Find where your other task styles are (e.g., after .upcoming-task.overdue) */
+
+/* 🟢 START OF OVERDUE FIXES FOR CALENDAR VIEW */
+.task-item.task-overdue,
+.week-task-item.task-overdue {
+  /* Use dashed border for a softer outline */
+  border: 1px dashed var(--v-theme-error, #f44336) !important; 
+  /* Force override background color with a light red */
+  background-color: var(--v-theme-error-lighten5, #fff5f5) !important; 
+  box-shadow: 0 0 5px rgba(244, 67, 54, 0.2);
+  
+  /* Ensure the left border is always RED and prominent */
+  border-left: 4px solid var(--v-theme-error, #f44336) !important; 
+  opacity: 1 !important; 
+}
+
+[data-theme="dark"] .task-item.task-overdue,
+[data-theme="dark"] .week-task-item.task-overdue {
+  background-color: rgba(244, 67, 54, 0.15) !important; 
+  border: 1px dashed var(--v-theme-error, #f44336) !important;
+  border-left: 4px solid var(--v-theme-error, #f44336) !important;
+}
+
+/* Text and Chip Styling inside overdue task to make it legible and prominent */
+.task-overdue .task-title, 
+.task-overdue .week-task-title {
+  color: var(--v-theme-error-darken2, #c62828) !important; 
+}
+
+.task-overdue .v-chip {
+  background-color: var(--v-theme-error, #f44336) !important;
+  color: white !important;
+  font-weight: bold;
+}
+/* 🟢 END OF OVERDUE FIXES */
+
 
 [data-theme="dark"] .filter-btn:hover {
   background: rgba(90, 122, 155, 0.3) !important;

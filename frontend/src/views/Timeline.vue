@@ -110,9 +110,27 @@ const getStatusColor = (status) => {
   return colors[status] || '#9e9e9e';
 };
 
-// Function made robust for status matching (used for bar coloring)
-const getGanttTaskClass = (status) => {
+// 🟢 FIX: Function to check for Overdue status (replicated from Tasks.vue logic)
+const isTaskOverdue = (dueDate, status) => {
+  if (status === 'Completed' || !dueDate) return false;
+  
+  const now = new Date();
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDateOnly = new Date(dueDate);
+  
+  return dueDateOnly < todayDateOnly;
+};
+
+
+// 🟢 FIX: Function made robust for status matching AND Overdue check
+const getGanttTaskClass = (task) => {
+  const status = task.status;
+  const dueDate = task.dueDate;
   const normalizedStatus = status ? status.trim().toLowerCase() : '';
+
+  if (isTaskOverdue(dueDate, status)) {
+    return 'bar-overdue'; // 👈 Apply Overdue class first
+  }
 
   switch (normalizedStatus) {
     case 'completed':
@@ -133,15 +151,23 @@ const tasksForGantt = computed(() => {
     .filter(task => task.dueDate && task.createdAt) 
     .map(task => {
       
-      const startDateString = parseGanttDate(task.createdAt); 
-      const endDateString = parseGanttDate(task.dueDate);
+      let startDateString = parseGanttDate(task.createdAt); 
+      let endDateString = parseGanttDate(task.dueDate);
       
       if (!startDateString || !endDateString) {
           return null; 
       }
-
+      
+      // 🛑 CRITICAL DATE FIX: Ensure start date is NOT after end date
+      const start = new Date(startDateString);
+      const end = new Date(endDateString);
+      
+      if (start > end) {
+        startDateString = endDateString; 
+      }
+      
       const progressToFillBar = 100;
-      const customClass = getGanttTaskClass(task.status);
+      const customClass = getGanttTaskClass(task); // Pass the whole task object now
 
       const ganttTask = {
         id: task.id,
@@ -155,7 +181,6 @@ const tasksForGantt = computed(() => {
       };
 
       // CRITICAL FIX: To stop the progress text from appearing in the pop-up, 
-      // we remove the progress property from the object passed to the Gantt instance
       delete ganttTask.progress;
 
       return ganttTask;
@@ -282,6 +307,15 @@ watch(ganttViewMode, (newMode) => {
 
 /* 🚀 FINAL COLOR FIX (using :deep() for scope bypass) */
 
+/* 🟢 NEW: Overdue Task Bar Styling for Frappe Gantt */
+:deep(.bar-overdue rect), 
+:deep(.bar-overdue .bar-progress) {
+  fill: #f44336 !important; /* Red */
+  stroke: #d32f2f !important; /* Darker red border */
+}
+/* No white label text here, handled by general text rule below */
+
+
 /* 1. Completed Tasks */
 :deep(.bar-completed rect), 
 :deep(.bar-completed .bar-progress) {
@@ -312,13 +346,19 @@ watch(ganttViewMode, (newMode) => {
 }
 
 
-/* 🟢 FIX TASK LABELS: SHIFT LABEL TO THE RIGHT (Outside the bar) */
+/* 🟢 FIX TASK LABELS: SHIFT LABEL TO THE SIDE AND SET DARK COLOR */
 :deep(.name) {
     /* Shifts the name right by the width of the name column plus some buffer. */
     transform: translateX(120px) !important;
     text-anchor: start !important; /* Ensure text starts from the left of the new position */
-    fill: var(--text-primary) !important; 
+    /* FORCE DARK TEXT for readability against the main calendar/list background */
+    fill: #1a202c !important; 
     font-weight: 500;
+}
+
+[data-theme="dark"] :deep(.name) {
+    /* Retain white/light text in dark mode for the side column */
+    fill: var(--text-primary) !important;
 }
 
 /* Dark mode adjustments for Frappe Gantt - using :deep() where necessary */
@@ -336,11 +376,22 @@ watch(ganttViewMode, (newMode) => {
 }
 
 [data-theme="dark"] :deep(.gantt .date), 
-[data-theme="dark"] :deep(.gantt .full-date),
-[data-theme="dark"] :deep(.gantt .bar-label),
-[data-theme="dark"] :deep(.gantt .name) {
+[data-theme="dark"] :deep(.gantt .full-date) {
   fill: var(--text-primary);
 }
+
+/* 🛑 NEW: FORCE DARK TEXT FOR ALL BAR LABELS (TASK NAMES) 
+   This ensures task names inside the bars (when they are long) 
+   and on the side are legible against a light background. 
+   We only keep the white text on the status chip. 
+*/
+:deep(.gantt .bar-label) {
+    fill: #1a202c !important; /* Black/Dark Grey */
+}
+[data-theme="dark"] :deep(.gantt .bar-label) {
+    fill: #ffffff !important; /* White in dark mode */
+}
+
 
 /* Loading/No Tasks Overlay */
 .loading-overlay, .no-tasks-message {
