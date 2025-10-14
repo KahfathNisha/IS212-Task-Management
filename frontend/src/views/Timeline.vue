@@ -71,41 +71,35 @@ const viewModes = [
   { label: 'Month', value: 'Month' },
 ];
 
-// 🚨 ESSENTIAL FIX: Helper function to convert complex date format to YYYY-MM-DD
+// Helper function to convert complex date format to YYYY-MM-DD
 const parseGanttDate = (dateString) => {
   if (!dateString || typeof dateString !== 'string') return null;
 
   try {
-    // 1. Clean the string to prepare for parsing (removes UTC+8, inserts comma)
     let cleanedString = dateString
       .replace(' at ', ' ')
       .replace(' UTC+8', '');
       
-    // Insert a comma before the year/time for better compatibility
     cleanedString = cleanedString.replace(/(\d{1,2}\s+[A-Za-z]+\s+)(\d{4})/, '$1$2,');
 
     const date = new Date(cleanedString);
     
-    // 2. Validation and Formatting
     if (isNaN(date) || date.getFullYear() < 2000) {
-        console.error("Date Validation Failed on cleaned string:", cleanedString);
         return null; 
     } 
 
-    // Format into the required YYYY-MM-DD format
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
 
     return `${year}-${month}-${day}`;
   } catch (e) {
-    console.error("FINAL DATE PARSING CRASH:", dateString, e);
     return null;
   }
 };
 
 
-// Simple helper to get status color
+// Simple helper to get status color (used for pop-up but kept for consistency)
 const getStatusColor = (status) => {
   const colors = {
     'Ongoing': '#2196f3',
@@ -116,16 +110,18 @@ const getStatusColor = (status) => {
   return colors[status] || '#9e9e9e';
 };
 
-// Function to map your status to a CSS class for coloring
+// Function made robust for status matching (used for bar coloring)
 const getGanttTaskClass = (status) => {
-  switch (status) {
-    case 'Completed':
+  const normalizedStatus = status ? status.trim().toLowerCase() : '';
+
+  switch (normalizedStatus) {
+    case 'completed':
       return 'bar-completed';
-    case 'Ongoing':
+    case 'ongoing':
       return 'bar-ongoing';
-    case 'Pending Review':
+    case 'pending review':
       return 'bar-pending-review';
-    case 'Unassigned':
+    case 'unassigned':
     default:
       return 'bar-unassigned';
   }
@@ -137,7 +133,6 @@ const tasksForGantt = computed(() => {
     .filter(task => task.dueDate && task.createdAt) 
     .map(task => {
       
-      // ✅ CORRECT LOGIC: Start Date = createdAt, End Date = dueDate
       const startDateString = parseGanttDate(task.createdAt); 
       const endDateString = parseGanttDate(task.dueDate);
       
@@ -145,30 +140,31 @@ const tasksForGantt = computed(() => {
           return null; 
       }
 
-      let progress = 0;
-      if (task.subtasks && task.subtasks.length > 0) {
-        const completed = task.subtasks.filter(s => s.status === 'Completed').length;
-        progress = Math.round((completed / task.subtasks.length) * 100);
-      } else if (task.status === 'Completed') {
-        progress = 100;
-      }
-      
+      const progressToFillBar = 100;
       const customClass = getGanttTaskClass(task.status);
 
-      return {
+      const ganttTask = {
         id: task.id,
         name: task.title,
         start: startDateString,
         end: endDateString,
-        progress: progress,
+        progress: progressToFillBar, 
         custom_class: customClass,
         dependencies: task.dependsOn || '', 
         data: task 
       };
+
+      // CRITICAL FIX: To stop the progress text from appearing in the pop-up, 
+      // we remove the progress property from the object passed to the Gantt instance
+      delete ganttTask.progress;
+
+      return ganttTask;
     })
     .filter(task => task !== null); 
 });
 
+// Since the JS attempt failed, we rely purely on the Unscoped CSS now.
+const removeTooltip = () => { /* No action needed here, relies on CSS */ }
 
 // === Methods ===
 
@@ -190,12 +186,9 @@ const initializeGantt = () => {
 
   // Frappe Gantt Initialization with configuration options
   ganttInstance.value = new Gantt(ganttChart.value, tasksForGantt.value, {
-    // === AESTHETIC ADJUSTMENTS ===
     bar_height: 36,     
     padding: 24,        
     column_width: 100, 
-    // =============================
-
     view_mode: ganttViewMode.value,
     
     on_click: (task) => {
@@ -209,26 +202,7 @@ const initializeGantt = () => {
       console.log(`Task ${task.name} moved to Start: ${start}, End: ${end}`);
     },
     
-    on_progress_change: (task, progress) => {
-      console.log(`Task ${task.name} progress updated to: ${progress}%`);
-    },
-
-    custom_popup_html: (task) => {
-      const originalTask = props.tasks.find(t => t.id === task.id);
-      const statusColor = getStatusColor(originalTask?.status || 'Unassigned');
-      
-      return `
-        <div class="details-container">
-          <h5>${task.name}</h5>
-          <p>Assigned to: ${originalTask?.assignedTo || 'N/A'}</p>
-          <p>Priority: ${originalTask?.priority || 'N/A'}</p>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: ${statusColor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">${originalTask?.status || 'N/A'}</span>
-            <span style="font-size: 10px; color: #7f8c8d;">Progress: ${task.progress}%</span>
-          </div>
-        </div>
-      `;
-    }
+    // custom_popup_html option is removed
   });
 
   ganttInstance.value.change_view_mode(ganttViewMode.value);
@@ -257,8 +231,8 @@ watch(ganttViewMode, (newMode) => {
 </script>
 
 <style scoped>
-/* NOTE: These styles rely on CSS variables (like --bg-secondary) 
-   defined in your global styles or parent component. */
+/* NOTE: All custom Frappe Gantt color/position overrides are in this scoped block, 
+   except for the final tooltip kill CSS which is unscoped below. */
 
 .main-view-area {
   flex: 1;
@@ -306,47 +280,65 @@ watch(ganttViewMode, (newMode) => {
   min-height: 350px; 
 }
 
-/* 🚨 FINAL COLOR FIX: Target the SVG rect element */
-.bar-completed rect {
+/* 🚀 FINAL COLOR FIX (using :deep() for scope bypass) */
+
+/* 1. Completed Tasks */
+:deep(.bar-completed rect), 
+:deep(.bar-completed .bar-progress) {
   fill: #4caf50 !important; /* Green */
 }
 
-.bar-ongoing rect {
+/* 2. Ongoing Tasks */
+:deep(.bar-ongoing rect), 
+:deep(.bar-ongoing .bar-progress) {
   fill: #2196f3 !important; /* Blue */
 }
 
-.bar-pending-review rect {
+/* 3. Pending Review Tasks */
+:deep(.bar-pending-review rect), 
+:deep(.bar-pending-review .bar-progress) {
   fill: #ff9800 !important; /* Orange */
 }
 
-.bar-unassigned rect {
+/* 4. Unassigned/Default Tasks */
+:deep(.bar-unassigned rect), 
+:deep(.bar-unassigned .bar-progress) {
   fill: #9e9e9e !important; /* Grey */
 }
 
-/* Fix text color visibility on the colored bars */
-.bar-completed .bar-label,
-.bar-ongoing .bar-label {
-    fill: #ffffff !important;
+/* Hide the progress percentage text */
+:deep(.bar-progress-text) {
+  display: none !important;
 }
 
-/* Dark mode adjustments for Frappe Gantt */
+
+/* 🟢 FIX TASK LABELS: SHIFT LABEL TO THE RIGHT (Outside the bar) */
+:deep(.name) {
+    /* Shifts the name right by the width of the name column plus some buffer. */
+    transform: translateX(120px) !important;
+    text-anchor: start !important; /* Ensure text starts from the left of the new position */
+    fill: var(--text-primary) !important; 
+    font-weight: 500;
+}
+
+/* Dark mode adjustments for Frappe Gantt - using :deep() where necessary */
 [data-theme="dark"] .gantt-chart-container {
   background: transparent;
 }
 
-[data-theme="dark"] .gantt .grid-header {
+[data-theme="dark"] :deep(.gantt .grid-header) {
   fill: #2c3e50; 
 }
 
-[data-theme="dark"] .gantt .grid-row, 
-[data-theme="dark"] .gantt .grid-header {
+[data-theme="dark"] :deep(.gantt .grid-row), 
+[data-theme="dark"] :deep(.gantt .grid-header) {
   stroke: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="dark"] .gantt .date, 
-[data-theme="dark"] .gantt .full-date,
-[data-theme="dark"] .gantt .bar-label,
-[data-theme="dark"] .gantt .name {
+[data-theme="dark"] :deep(.gantt .date), 
+[data-theme="dark"] :deep(.gantt .full-date),
+[data-theme="dark"] :deep(.gantt .bar-label),
+[data-theme="dark"] :deep(.gantt .name) {
   fill: var(--text-primary);
 }
 
@@ -368,5 +360,14 @@ watch(ganttViewMode, (newMode) => {
 /* View Tabs (reusing existing styles) */
 .view-tab {
   padding: 0 0 4px 0 !important; 
+}
+</style>
+
+<style>
+/* Targeting the element that Frappe Gantt uses for its default tooltip */
+.gantt-details-container {
+    display: none !important;
+    visibility: hidden !important; 
+    opacity: 0 !important;
 }
 </style>
