@@ -218,13 +218,30 @@
           {{ task.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
         </v-btn>
         <v-spacer />
+        <v-btn color="error" @click="onArchive" prepend-icon="mdi-archive" rounded="lg">
+          Archive
+        </v-btn>
       </v-card-actions>
+
+      <v-dialog v-model="showArchiveConfirm" max-width="400">
+        <v-card class="archive-confirm-card">
+          <v-card-title>Archive Task?</v-card-title>
+          <v-card-text>
+            Are you sure you want to archive this task? You can unarchive it later from the archived tasks list.
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn color="grey" variant="text" @click="showArchiveConfirm = false">Cancel</v-btn>
+            <v-btn color="error" variant="text" @click="confirmArchive">Archive</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-card>
   </v-dialog>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import '../assets/styles.css';
 
 const props = defineProps({
@@ -234,10 +251,12 @@ const props = defineProps({
   parentTaskProgress: { type: Number, default: 0 }
 })
 
-const emit = defineEmits(['update:show', 'edit', 'change-status', 'view-parent', 'open-attachment'])
+const emit = defineEmits(['update:show', 'edit', 'change-status', 'view-parent', 'open-attachment', 'archive'])
 
 const task = computed(() => props.model)
 const parentProgress = computed(() => props.parentTaskProgress || 0)
+
+const showArchiveConfirm = ref(false)
 
 const getStatusColor = (status) => {
   return status === 'To Do' ? 'orange' : status === 'In Progress' ? 'blue' : 'green'
@@ -255,10 +274,8 @@ const onEdit = () => {
   emit('edit', task.value)
 }
 
-// In TaskDetailsDialog.vue (the modal component):
 const onChangeStatus = (newStatus) => {
   if (!task.value || !task.value.id) return;
-  // Ensure this emits a SINGLE object containing the taskId and status:
   emit('change-status', { taskId: task.value.id, status: newStatus }) 
 }
 
@@ -270,6 +287,17 @@ const onViewParent = () => {
 const onOpenAttachment = (url) => {
   if (!url) return
   emit('open-attachment', url)
+}
+
+const onArchive = () => {
+  showArchiveConfirm.value = true
+}
+
+const confirmArchive = () => {
+  showArchiveConfirm.value = false
+  if (task.value && task.value.id) {
+    emit('archive', task.value.id)
+  }
 }
 </script>
 <style scoped>
@@ -637,5 +665,12 @@ const onOpenAttachment = (url) => {
 :deep(.v-col) {
   padding-top: 8px;
   padding-bottom: 8px;
+}
+
+.archive-confirm-card {
+  background: #fff !important;
+}
+.v-overlay__scrim {
+  background: rgba(30, 30, 30, 0.7) !important;
 }
 </style>

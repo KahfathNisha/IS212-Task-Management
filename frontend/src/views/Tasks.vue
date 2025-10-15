@@ -478,6 +478,7 @@
       @change-status="changeTaskStatus"
       @view-parent="viewTaskDetails"
       @open-attachment="openAttachment" 
+      @archive="archiveTask"
     />
 
     <!-- Create Task Dialog -->
@@ -1095,6 +1096,19 @@ const updateTask = async (taskId, updatedData) => {
     return false;
   }
 };
+
+const archiveTask = async (taskId) => {
+  await axios.put(`http://localhost:3000/tasks/${taskId}/archive`)
+    .then(() => {
+      tasks.value = tasks.value.filter(task => task.id !== taskId);
+      showMessage('Task archived successfully!', 'success');
+      showDetailsDialog.value = false;
+    })
+    .catch(error => {
+      const errorMessage = error.response?.data?.message || 'Failed to archive task';
+      showMessage(errorMessage, 'error');
+    });
+}
 
 // Create Task Function
 const createTask = async () => {
