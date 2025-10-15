@@ -101,9 +101,29 @@
           </div>
           
           <div class="header-right">
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="showCreateDialog = true" rounded="lg" class="add-task-btn">
+            <v-btn
+              color="primary"
+              prepend-icon="mdi-plus"
+              @click="showCreateDialog = true"
+              rounded="lg"
+              class="add-task-btn"
+            >
               Add Task
             </v-btn>
+            <v-menu v-model="menu" :close-on-content-click="false" offset-y>
+              <template #activator="{ props }">
+                <v-btn icon v-bind="props" variant="text" class="triple-dot-btn">
+                  <v-icon>mdi-dots-vertical</v-icon>
+                </v-btn>
+              </template>
+              <v-list>
+                <v-list-item @click="showArchived = true">
+                  <v-list-item-title>Archived Tasks</v-list-item-title>
+                  <!-- Archived Tasks Component -->
+                <ArchivedTasks :show="showArchived" @close="showArchived = false" />
+                </v-list-item>
+              </v-list>
+            </v-menu>
           </div>
         </div>
 
@@ -498,6 +518,7 @@ import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
 import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
+import ArchivedTasks from '../components/ArchivedTasks.vue'
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -568,6 +589,9 @@ const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
 const departmentFilterOptions = departments.map(dept => ({ title: dept, value: dept }))
+
+const menu = ref(false)
+const showArchived = ref(false)
 
 const tasks = ref([
   {
@@ -1855,7 +1879,7 @@ const handleMessage = ({ message, color }) => {
 .view-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   padding: 16px 24px 12px 24px;
   background: transparent;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -1909,9 +1933,8 @@ const handleMessage = ({ message, color }) => {
 }
 
 .header-right {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 /* ===========================
@@ -2187,7 +2210,7 @@ const handleMessage = ({ message, color }) => {
   align-items: center;
   gap: 8px;
   position: absolute;
-  left: 50%;
+   left: 50%;
   transform: translateX(-50%);
   z-index: 1;
 }
@@ -2205,7 +2228,7 @@ const handleMessage = ({ message, color }) => {
   gap: 4px;
   background: transparent !important;
   box-shadow: none !important;
-  display: inline-flex !important;
+ display: inline-flex !important;
   width: auto !important;
 }
 
@@ -2606,6 +2629,12 @@ const handleMessage = ({ message, color }) => {
   background: #5a8a5a !important;
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(107, 155, 107, 0.3) !important;
+}
+
+.triple-dot-btn {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #424242 !important;
 }
 
 [data-theme="dark"] .add-task-btn {

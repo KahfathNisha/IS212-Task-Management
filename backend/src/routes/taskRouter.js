@@ -23,6 +23,9 @@ router.put('/:id/assign', taskController.assignTask);
 // Archive (soft-delete) a task
 router.put('/:id/archive', taskController.archiveTask);
 
+// Unarchive a task
+router.put('/:id/unarchive', taskController.unarchiveTask);
+
 // Add this line to your routes file
 router.put('/:id', taskController.updateTask);
 

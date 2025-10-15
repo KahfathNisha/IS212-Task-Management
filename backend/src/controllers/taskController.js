@@ -341,6 +341,19 @@ exports.archiveTask = async (req, res) => {
     }
 };
 
+// Unarchive task
+exports.unarchiveTask = async (req, res) => {
+    try {
+        await db.collection('tasks').doc(req.params.id).update({
+            archived: false,
+            updatedAt: admin.firestore.Timestamp.now()
+        });
+        res.status(200).json({ message: 'Task unarchived' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // Get All Recurring Tasks
 exports.getAllRecurringTasks = async (req, res) => {
     try {
