@@ -1,1070 +1,2405 @@
 <template>
   <div class="projects-container">
     <div class="projects-page">
-      <!-- Main Content -->
-      <main class="main-content">
-        <!-- Projects List View -->
-        <div class="projects-view">
-          <!-- Header -->
-          <header class="content-header">
-            <div class="header-top">
-              <div>
-                <h1>Projects</h1>
-                <p>View and Manage your teams projects.</p>
-              </div>
-              <button class="btn btn-primary" @click="createProject">
-                + Add project
+      <!-- Header -->
+      <header class="page-header">
+        <div class="header-left">
+          <h1>Project Overview</h1>
+          <p class="subtitle">Monitor team workload and manage project categories</p>
+        </div>
+        
+        <div class="header-right">
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-plus"
+            @click="showCreateDialog = true"
+            rounded="lg"
+            class="add-project-btn"
+          >
+            New Project
+          </v-btn>
+        </div>
+      </header>
+
+      <!-- Filters -->
+      <div class="view-controls">
+        <div class="controls-row">
+          <div class="view-toggle-left">
+            <div class="view-tabs">
+              <button 
+                v-for="tab in viewTabs" 
+                :key="tab.value"
+                @click="currentView = tab.value"
+                :class="['view-tab', { 'active': currentView === tab.value }]"
+              >
+                {{ tab.label }}
               </button>
             </div>
-
-            <div class="header-controls">
-              <div class="view-toggle">
-                <button 
-                    class="view-btn" 
-                    :class="{ active: viewMode === 'dashboard' }"
-                    @click="viewMode = 'dashboard'"
-                >
-                    Dashboard
-                </button>
-                <button 
-                    class="view-btn" 
-                    :class="{ active: viewMode === 'team' }"
-                    @click="viewMode = 'team'"
-                >
-                    Team View
-                </button>
-                <button 
-                    class="view-btn"
-                    :class="{ active: viewMode === 'kanban' }"
-                    @click="viewMode = 'kanban'"
-                >
-                    Kanban View
-                </button>
-                </div>
-              <div class="search-filter">
-                <div class="search-box">
-                  <span class="search-icon">🔍</span>
-                  <input 
-                    type="text" 
-                    placeholder="Search for projects"
-                    v-model="searchQuery"
-                    class="search-input"
-                  />
-                </div>
-                <button class="btn btn-secondary">
-                  <span>⚙</span> Filters
-                </button>
-              </div>
-            </div>
-          </header>
-
-          <!-- Dashboard View -->
-        <div v-if="viewMode === 'dashboard'" class="dashboard-container">
-        <div class="dashboard-stats">
-            <div class="stat-card">
-            <div class="stat-number">{{ projects.length }}</div>
-            <div class="stat-label">Total Projects</div>
-            <div class="stat-change">Active workspace</div>
-            </div>
-            
-            <div class="stat-card">
-            <div class="stat-number">{{ getProjectsByStatus('Ongoing').length }}</div>
-            <div class="stat-label">In Progress</div>
-            <div class="stat-change">{{ getProjectsByStatus('Ongoing').length > 0 ? '+' + Math.round((getProjectsByStatus('Ongoing').length / projects.length) * 100) + '% of total' : 'No active projects' }}</div>
-            </div>
-            
-            <div class="stat-card">
-            <div class="stat-number">{{ getProjectsByStatus('Pending Review').length }}</div>
-            <div class="stat-label">Pending Review</div>
-            <div class="stat-change">Awaiting approval</div>
-            </div>
-            
-            <div class="stat-card">
-            <div class="stat-number">{{ getProjectsByStatus('Completed').length }}</div>
-            <div class="stat-label">Completed</div>
-            <div class="stat-change">{{ Math.round((getProjectsByStatus('Completed').length / projects.length) * 100) }}% completion rate</div>
-            </div>
-        </div>
-
-        <div class="dashboard-content">
-            <div class="dashboard-main">
-            <div class="dashboard-section">
-                <h3>Project Overview</h3>
-                <div class="recent-projects">
-                <div 
-                    v-for="project in projects.slice(0, 5)" 
-                    :key="project.id"
-                    class="recent-project-card"
-                    @click="selectProject(project)"
-                >
-                    <div class="recent-project-header">
-                    <div class="project-icon-small" :style="{ background: project.color }">
-                        {{ project.icon }}
-                    </div>
-                    <span class="status-badge small" :class="getStatusClass(project.status)">
-                        {{ project.status }}
-                    </span>
-                    </div>
-                    <div class="recent-project-title">{{ project.name }}</div>
-                    <div class="recent-project-about">{{ project.about }}</div>
-                    <div class="recent-project-footer">
-                    <div class="avatars">
-                        <div 
-                        v-for="(member, index) in project.members.slice(0, 3)" 
-                        :key="index"
-                        class="avatar small"
-                        >
-                        {{ member }}
-                        </div>
-                    </div>
-                    <div class="progress-mini">
-                        <span>{{ project.progress }}%</span>
-                    </div>
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-
-            <div class="dashboard-sidebar">
-            <div class="dashboard-section">
-                <h3>Status Distribution</h3>
-                <div class="status-breakdown">
-                <div class="status-item">
-                    <div class="status-info">
-                    <span class="status-dot ongoing"></span>
-                    <span>Ongoing</span>
-                    </div>
-                    <span class="status-count">{{ getProjectsByStatus('Ongoing').length }}</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-info">
-                    <span class="status-dot pending"></span>
-                    <span>Pending Review</span>
-                    </div>
-                    <span class="status-count">{{ getProjectsByStatus('Pending Review').length }}</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-info">
-                    <span class="status-dot completed"></span>
-                    <span>Completed</span>
-                    </div>
-                    <span class="status-count">{{ getProjectsByStatus('Completed').length }}</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-info">
-                    <span class="status-dot unassigned"></span>
-                    <span>Unassigned</span>
-                    </div>
-                    <span class="status-count">{{ getProjectsByStatus('Unassigned').length }}</span>
-                </div>
-                </div>
-            </div>
-
-            <div class="dashboard-section">
-                <h3>Quick Actions</h3>
-                <div class="quick-actions">
-                <button class="quick-action-btn" @click="viewMode = 'team'">
-                    <span>📋</span>
-                    <span>View All Projects</span>
-                </button>
-                <button class="quick-action-btn" @click="viewMode = 'kanban'">
-                    <span>📊</span>
-                    <span>Kanban Board</span>
-                </button>
-                <button class="quick-action-btn" @click="createProject">
-                    <span>➕</span>
-                    <span>New Project</span>
-                </button>
-                </div>
-            </div>
-            </div>
-        </div>
-        </div>
-
-          <!-- Team View -->
-          <div v-if="viewMode === 'team'" class="table-container">
-            <div class="table-header-section">
-              <h2>All Projects</h2>
-            </div>
-
-            <table class="projects-table">
-              <thead>
-                <tr>
-                  <th class="th-name">
-                    <span>Name</span>
-                    <span class="sort-icon">↓</span>
-                  </th>
-                  <th>Status</th>
-                  <th>About</th>
-                  <th>Members</th>
-                  <th>Progress</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr 
-                  v-for="project in filteredProjects" 
-                  :key="project.id"
-                  class="project-row"
-                  @click="selectProject(project)"
-                >
-                  <td class="td-name">
-                    <div class="project-name-cell">
-                      <div class="project-icon" :style="{ background: project.color }">
-                        {{ project.icon }}
-                      </div>
-                      <div class="project-info">
-                        <div class="project-title">{{ project.name }}</div>
-                        <div class="project-url">{{ project.url }}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="status-badge" :class="getStatusClass(project.status)">
-                      {{ project.status }}
-                    </span>
-                  </td>
-                  <td class="td-about">
-                    <div class="about-cell">
-                      <div class="about-title">{{ project.about }}</div>
-                      <div class="about-description">{{ project.description }}</div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="members-cell">
-                      <div class="avatars">
-                        <div 
-                          v-for="(member, index) in project.members.slice(0, 4)" 
-                          :key="index"
-                          class="avatar"
-                          :title="member"
-                        >
-                          {{ member }}
-                        </div>
-                        <div v-if="project.extraMembers > 0" class="avatar avatar-more">
-                          +{{ project.extraMembers }}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="td-progress">
-                    <div class="progress-cell">
-                      <div class="progress-bar-wrapper">
-                        <div class="progress-bar">
-                          <div 
-                            class="progress-fill" 
-                            :style="{ width: project.progress + '%', background: getProgressColor(project.progress) }"
-                          ></div>
-                        </div>
-                      </div>
-                      <span class="progress-percentage">{{ project.progress }}%</span>
-                    </div>
-                  </td>
-                  <td class="td-actions">
-                    <button class="more-btn" @click.stop>⋮</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
 
-          <!-- Kanban View -->
-        <div v-if="viewMode === 'kanban'" class="kanban-container">
-            <div class="kanban-columns">
-              <div 
-                v-for="column in kanbanColumns" 
-                :key="column.status"
-                class="kanban-column"
-              >
-                <div class="kanban-column-header">
-                  <h3>{{ column.status }}</h3>
-                  <span class="kanban-count">{{ getProjectsByStatus(column.status).length }}</span>
-                </div>
-                <div class="kanban-cards">
-                  <div 
-                    v-for="project in getProjectsByStatus(column.status)" 
-                    :key="project.id"
-                    class="kanban-card"
-                    @click="selectProject(project)"
-                  >
-                    <div class="kanban-card-header">
-                      <div class="project-icon-small" :style="{ background: project.color }">
-                        {{ project.icon }}
-                      </div>
-                      <button class="more-btn" @click.stop>⋮</button>
-                    </div>
-                    
-                    <div class="kanban-card-title">{{ project.name }}</div>
-                    <div class="kanban-card-url">{{ project.url }}</div>
-                    
-                    <div class="kanban-card-about">
-                      <div class="about-title">{{ project.about }}</div>
-                      <div class="about-description">{{ project.description }}</div>
-                    </div>
+          <div class="filters-right">
+            <div class="filter-label">Filters</div>
+            
+            <v-btn
+              color="primary"
+              rounded="pill"
+              @click.stop="toggleCategoryMenu"
+              ref="categoryBtnRef"
+              class="filter-btn"
+            >
+              Category{{ selectedCategories.length > 0 ? ` (${selectedCategories.length})` : '' }}
+              <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+            </v-btn>
 
-                    <div class="kanban-card-footer">
-                      <div class="avatars">
-                        <div 
-                          v-for="(member, index) in project.members.slice(0, 3)" 
-                          :key="index"
-                          class="avatar small"
-                          :title="member"
-                        >
-                          {{ member }}
-                        </div>
-                        <div v-if="project.extraMembers > 0" class="avatar small avatar-more">
-                          +{{ project.extraMembers }}
+            <v-btn
+              color="primary"
+              rounded="pill"
+              @click.stop="toggleStatusMenu"
+              ref="statusBtnRef"
+              class="filter-btn"
+            >
+              Status{{ selectedStatuses.length > 0 ? ` (${selectedStatuses.length})` : '' }}
+              <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+            </v-btn>
+
+            <v-btn
+              color="primary"
+              rounded="pill"
+              @click.stop="toggleDepartmentMenu"
+              ref="departmentBtnRef"
+              class="filter-btn"
+            >
+              Department{{ selectedDepartments.length > 0 ? ` (${selectedDepartments.length})` : '' }}
+              <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+            </v-btn>
+
+            <v-btn
+              variant="outlined"
+              @click="resetFilters"
+              class="reset-btn"
+              :disabled="selectedStatuses.length === 0 && selectedDepartments.length === 0 && selectedCategories.length === 0"
+            >
+              Reset filters
+            </v-btn>
+          </div>
+
+          <!-- Category Dropdown -->
+          <div
+            v-show="categoryMenuOpen"
+            class="custom-filter-dropdown"
+            :style="{ top: categoryDropdownTop + 'px', left: categoryDropdownLeft + 'px' }"
+            ref="categoryDropdownRef"
+          >
+            <div class="dropdown-body">
+              <input
+                v-model="searchCategory"
+                type="text"
+                placeholder="Search categories"
+                class="search-input"
+              />
+              <div class="filter-options-list">
+                <label
+                  v-for="option in filteredCategoryOptions"
+                  :key="option.value"
+                  class="filter-option-item"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="tempSelectedCategories.includes(option.value)"
+                    @change="toggleCategory(option.value)"
+                    class="custom-checkbox"
+                  />
+                  <span class="option-text">{{ option.title }}</span>
+                </label>
+              </div>
+            </div>
+            <div class="dropdown-footer">
+              <v-btn @click="closeCategoryMenu" variant="outlined">Close</v-btn>
+              <v-btn @click="applyCategoryFilter" color="primary">Apply</v-btn>
+            </div>
+          </div>
+
+          <!-- Status Dropdown -->
+          <div
+            v-show="statusMenuOpen"
+            class="custom-filter-dropdown"
+            :style="{ top: statusDropdownTop + 'px', left: statusDropdownLeft + 'px' }"
+            ref="statusDropdownRef"
+          >
+            <div class="dropdown-body">
+              <input
+                v-model="searchStatus"
+                type="text"
+                placeholder="Search status"
+                class="search-input"
+              />
+              <div class="filter-options-list">
+                <label
+                  v-for="option in filteredStatusOptions"
+                  :key="option.value"
+                  class="filter-option-item"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="tempSelectedStatuses.includes(option.value)"
+                    @change="toggleStatus(option.value)"
+                    class="custom-checkbox"
+                  />
+                  <span class="option-text">{{ option.title }}</span>
+                </label>
+              </div>
+            </div>
+            <div class="dropdown-footer">
+              <v-btn @click="closeStatusMenu" variant="outlined">Close</v-btn>
+              <v-btn @click="applyStatusFilter" color="primary">Apply</v-btn>
+            </div>
+          </div>
+
+          <!-- Department Dropdown -->
+          <div
+            v-show="departmentMenuOpen"
+            class="custom-filter-dropdown"
+            :style="{ top: departmentDropdownTop + 'px', left: departmentDropdownLeft + 'px' }"
+            ref="departmentDropdownRef"
+          >
+            <div class="dropdown-body">
+              <input
+                v-model="searchDepartment"
+                type="text"
+                placeholder="Search departments"
+                class="search-input"
+              />
+              <div class="filter-options-list">
+                <label
+                  v-for="option in filteredDepartmentOptions"
+                  :key="option.value"
+                  class="filter-option-item"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="tempSelectedDepartments.includes(option.value)"
+                    @change="toggleDepartment(option.value)"
+                    class="custom-checkbox"
+                  />
+                  <span class="option-text">{{ option.title }}</span>
+                </label>
+              </div>
+            </div>
+            <div class="dropdown-footer">
+              <v-btn @click="closeDepartmentMenu" variant="outlined">Close</v-btn>
+              <v-btn @click="applyDepartmentFilter" color="primary">Apply</v-btn>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Chips -->
+      <div class="filter-chips" v-if="selectedFilters.length > 0">
+        <v-chip
+          v-for="filter in selectedFilters"
+          :key="filter.key"
+          closable
+          @click:close="removeFilter(filter)"
+          class="filter-chip"
+        >
+          {{ filter.label }}
+        </v-chip>
+      </div>
+
+      <!-- PROJECTS VIEW -->
+      <div v-if="currentView === 'projects'" class="projects-list">
+        <div 
+          v-for="project in filteredProjects" 
+          :key="project.id" 
+          class="project-card"
+        >
+          <!-- Project Header -->
+          <div class="project-header" @click="toggleProject(project.id)">
+            <div class="project-header-left">
+              <button class="expand-btn">
+                <v-icon size="20">
+                  {{ expandedProjects.includes(project.id) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}
+                </v-icon>
+              </button>
+              <h3 class="project-name">{{ project.name }}</h3>
+              <v-chip 
+                :color="getStatusColor(project.status)" 
+                size="small"
+                class="status-chip"
+              >
+                {{ project.status }}
+              </v-chip>
+              <v-chip 
+                size="small"
+                class="department-chip"
+              >
+                {{ project.department }}
+              </v-chip>
+            </div>
+            <div class="project-header-right">
+              <v-btn 
+                icon="mdi-pencil" 
+                size="small" 
+                variant="text"
+                @click.stop="editProject(project)"
+              />
+              <v-btn 
+                icon="mdi-dots-vertical" 
+                size="small" 
+                variant="text"
+                @click.stop
+              />
+            </div>
+          </div>
+
+          <!-- Project Summary -->
+          <div class="project-summary">
+            <p class="project-description">{{ project.description }}</p>
+            
+            <!-- Categories -->
+            <div class="project-categories" v-if="project.categories?.length">
+              <v-chip 
+                v-for="category in project.categories" 
+                :key="category"
+                size="small"
+                class="category-chip"
+                :color="getCategoryColor(category)"
+              >
+                <v-icon size="14" start>mdi-tag</v-icon>
+                {{ category }}
+              </v-chip>
+            </div>
+
+            <div class="project-meta">
+              <div class="meta-item">
+                <v-icon size="18" class="meta-icon">mdi-account-multiple</v-icon>
+                <span>{{ project.members.length }} members</span>
+              </div>
+              <div class="meta-item">
+                <v-icon size="18" class="meta-icon">mdi-checkbox-marked-circle-outline</v-icon>
+                <span>{{ project.completedTasks }}/{{ project.totalTasks }} tasks</span>
+              </div>
+              <div class="meta-item">
+                <v-icon size="18" class="meta-icon">mdi-calendar</v-icon>
+                <span>{{ formatDate(project.dueDate) }}</span>
+              </div>
+              <div class="progress-container">
+                <div class="progress-bar">
+                  <div 
+                    class="progress-fill" 
+                    :style="{ width: project.progress + '%' }"
+                  ></div>
+                </div>
+                <span class="progress-text">{{ project.progress }}%</span>
+              </div>
+            </div>
+            <div class="avatars">
+              <v-tooltip
+                v-for="(member, idx) in project.members.slice(0, 5)" 
+                :key="idx"
+                :text="member.name"
+              >
+                <template v-slot:activator="{ props }">
+                  <div 
+                    v-bind="props"
+                    class="avatar"
+                    :style="{ background: getAvatarColor(idx) }"
+                  >
+                    {{ member.initials }}
+                  </div>
+                </template>
+              </v-tooltip>
+              <div v-if="project.members.length > 5" class="avatar avatar-more">
+                +{{ project.members.length - 5 }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Expanded Details -->
+          <div v-if="expandedProjects.includes(project.id)" class="project-details">
+            <!-- Tasks by Category -->
+            <div class="details-section">
+              <div class="section-header">
+                <h4>Tasks by Category</h4>
+                <v-btn 
+                  size="small" 
+                  variant="text" 
+                  prepend-icon="mdi-tag-plus"
+                  @click="manageCategoriesForProject(project)"
+                >
+                  Manage Categories
+                </v-btn>
+              </div>
+
+              <div v-if="project.categories?.length" class="categories-section">
+                <div 
+                  v-for="category in project.categories" 
+                  :key="category"
+                  class="category-group"
+                >
+                  <div class="category-header">
+                    <v-chip 
+                      size="small"
+                      :color="getCategoryColor(category)"
+                    >
+                      <v-icon size="14" start>mdi-tag</v-icon>
+                      {{ category }}
+                    </v-chip>
+                    <span class="task-count">{{ getTasksByCategory(project, category).length }} tasks</span>
+                  </div>
+
+                  <div class="category-tasks">
+                    <div 
+                      v-for="task in getTasksByCategory(project, category)" 
+                      :key="task.id"
+                      class="task-item"
+                    >
+                      <v-icon size="20" class="task-icon">mdi-checkbox-blank-circle-outline</v-icon>
+                      <div class="task-content">
+                        <div class="task-title">{{ task.title }}</div>
+                        <div class="task-meta">
+                          <span>{{ task.assignedTo }}</span>
+                          <span>•</span>
+                          <span>Due: {{ formatDate(task.dueDate) }}</span>
                         </div>
                       </div>
-                      <div class="progress-indicator">
-                        <div class="progress-bar small">
-                          <div 
-                            class="progress-fill" 
-                            :style="{ width: project.progress + '%', background: getProgressColor(project.progress) }"
-                          ></div>
-                        </div>
-                        <span class="progress-text">{{ project.progress }}%</span>
-                      </div>
+                      <v-chip 
+                        :color="getStatusColor(task.status)" 
+                        size="small"
+                      >
+                        {{ task.status }}
+                      </v-chip>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="no-categories">
+                <v-icon size="48" color="grey-lighten-1">mdi-tag-outline</v-icon>
+                <p>No categories assigned</p>
+                <v-btn 
+                  size="small" 
+                  variant="text" 
+                  prepend-icon="mdi-tag-plus"
+                  @click="manageCategoriesForProject(project)"
+                >
+                  Add Categories
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- Team Members Section -->
+            <div class="details-section">
+              <h4>Team Members</h4>
+              <div class="team-members">
+                <div 
+                  v-for="(member, idx) in project.members" 
+                  :key="idx" 
+                  class="team-member"
+                >
+                  <div 
+                    class="avatar avatar-large"
+                    :style="{ background: getAvatarColor(idx) }"
+                  >
+                    {{ member.initials }}
+                  </div>
+                  <div class="member-info">
+                    <div class="member-name">{{ member.name }}</div>
+                    <div class="member-role">{{ member.role }}</div>
+                    <div class="member-tasks">{{ getMemberTaskCount(project, member.name) }} tasks</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </main>
+
+        <!-- Empty State -->
+        <div v-if="filteredProjects.length === 0" class="empty-state">
+          <v-icon size="64" color="grey-lighten-1">mdi-folder-outline</v-icon>
+          <h3>No projects found</h3>
+          <p>Adjust your filters or create a new project</p>
+        </div>
+      </div>
+
+      <!-- CATEGORY VIEW -->
+      <div v-else-if="currentView === 'categories'" class="categories-view">
+        <div class="category-cards">
+          <div 
+            v-for="category in allCategories" 
+            :key="category"
+            class="category-card"
+          >
+            <div class="category-card-header">
+              <v-chip 
+                :color="getCategoryColor(category)"
+                size="large"
+              >
+                <v-icon size="20" start>mdi-tag</v-icon>
+                {{ category }}
+              </v-chip>
+              <v-btn 
+                icon="mdi-filter" 
+                size="small" 
+                variant="text"
+                @click="filterByCategory(category)"
+              />
+            </div>
+
+            <div class="category-stats">
+              <div class="stat-item">
+                <span class="stat-value">{{ getProjectsByCategory(category).length }}</span>
+                <span class="stat-label">Projects</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ getTasksCountByCategory(category) }}</span>
+                <span class="stat-label">Tasks</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ getCompletionRateByCategory(category) }}%</span>
+                <span class="stat-label">Completion</span>
+              </div>
+            </div>
+
+            <div class="category-projects">
+              <h5>Projects</h5>
+              <div class="project-tags">
+                <v-chip 
+                  v-for="project in getProjectsByCategory(category).slice(0, 5)" 
+                  :key="project.id"
+                  size="small"
+                  @click="scrollToProject(project.id)"
+                  class="project-tag"
+                >
+                  {{ project.name }}
+                </v-chip>
+                <v-chip 
+                  v-if="getProjectsByCategory(category).length > 5"
+                  size="small"
+                  class="project-tag-more"
+                >
+                  +{{ getProjectsByCategory(category).length - 5 }} more
+                </v-chip>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Category Card -->
+          <div class="category-card add-category-card" @click="showAddCategoryDialog = true">
+            <v-icon size="48" color="grey-lighten-1">mdi-plus-circle-outline</v-icon>
+            <p>Add New Category</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- WORKLOAD VIEW -->
+      <div v-else-if="currentView === 'workload'" class="workload-view">
+        <div class="workload-grid">
+          <div 
+            v-for="dept in departments" 
+            :key="dept"
+            class="department-card"
+          >
+            <div class="dept-header">
+              <h3>{{ dept }}</h3>
+              <v-chip size="small">
+                {{ getProjectsByDepartment(dept).length }} projects
+              </v-chip>
+            </div>
+
+            <div class="dept-stats">
+              <div class="stat-row">
+                <span class="stat-label">Total Tasks</span>
+                <span class="stat-value">{{ getTotalTasksByDepartment(dept) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Completed</span>
+                <span class="stat-value">{{ getCompletedTasksByDepartment(dept) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">In Progress</span>
+                <span class="stat-value">{{ getOngoingTasksByDepartment(dept) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Team Members</span>
+                <span class="stat-value">{{ getTeamMembersByDepartment(dept) }}</span>
+              </div>
+            </div>
+
+            <div class="dept-progress">
+              <div class="progress-label">
+                <span>Overall Progress</span>
+                <span>{{ getDepartmentProgress(dept) }}%</span>
+              </div>
+              <div class="progress-bar progress-bar-large">
+                <div 
+                  class="progress-fill" 
+                  :style="{ width: getDepartmentProgress(dept) + '%' }"
+                ></div>
+              </div>
+            </div>
+
+            <v-btn 
+              variant="outlined" 
+              block
+              @click="filterByDepartment(dept)"
+              class="mt-2"
+            >
+              View Projects
+            </v-btn>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Create/Edit Project Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="700px">
+      <v-card class="create-project-card">
+        <v-card-title class="dialog-header">
+          <span class="dialog-title">{{ isEditing ? 'Edit Project' : 'Create New Project' }}</span>
+          <v-btn icon="mdi-close" variant="text" @click="cancelCreate" />
+        </v-card-title>
+
+        <v-card-text class="dialog-content">
+          <v-text-field
+            v-model="newProject.name"
+            label="Project Name"
+            variant="outlined"
+            required
+          />
+
+          <v-textarea
+            v-model="newProject.description"
+            label="Description"
+            variant="outlined"
+            rows="3"
+          />
+
+          <div class="form-row">
+            <v-select
+              v-model="newProject.status"
+              label="Status"
+              :items="projectStatuses"
+              variant="outlined"
+            />
+
+            <v-select
+              v-model="newProject.department"
+              label="Department"
+              :items="departments"
+              variant="outlined"
+            />
+          </div>
+
+          <v-text-field
+            v-model="newProject.dueDate"
+            label="Due Date"
+            type="date"
+            variant="outlined"
+          />
+
+          <!-- Categories Section -->
+          <div class="categories-input">
+            <label class="input-label">Categories</label>
+            <div class="selected-categories">
+              <v-chip 
+                v-for="category in newProject.categories" 
+                :key="category"
+                closable
+                @click:close="removeCategory(category)"
+                :color="getCategoryColor(category)"
+                size="small"
+              >
+                <v-icon size="14" start>mdi-tag</v-icon>
+                {{ category }}
+              </v-chip>
+            </div>
+            <div class="category-input-row">
+              <v-combobox
+                v-model="newCategoryInput"
+                :items="allCategories"
+                label="Add Category"
+                variant="outlined"
+                density="compact"
+                hide-details
+                @keyup.enter="addCategory"
+              />
+              <v-btn 
+                color="primary" 
+                @click="addCategory"
+                :disabled="!newCategoryInput"
+              >
+                Add
+              </v-btn>
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="dialog-actions">
+          <v-spacer />
+          <v-btn variant="outlined" @click="cancelCreate">Cancel</v-btn>
+          <v-btn color="primary" @click="saveProject">
+            {{ isEditing ? 'Update' : 'Create' }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Manage Categories Dialog -->
+    <v-dialog v-model="showManageCategoriesDialog" max-width="600px">
+      <v-card>
+        <v-card-title class="dialog-header">
+          <span class="dialog-title">Manage Project Categories</span>
+          <v-btn icon="mdi-close" variant="text" @click="showManageCategoriesDialog = false" />
+        </v-card-title>
+
+        <v-card-text class="dialog-content">
+          <p class="mb-4">Project: <strong>{{ selectedProjectForCategories?.name }}</strong></p>
+          
+          <div class="categories-input">
+            <label class="input-label">Current Categories</label>
+            <div class="selected-categories">
+              <v-chip 
+                v-for="category in selectedProjectForCategories?.categories" 
+                :key="category"
+                closable
+                @click:close="removeCategoryFromProject(category)"
+                :color="getCategoryColor(category)"
+              >
+                <v-icon size="14" start>mdi-tag</v-icon>
+                {{ category }}
+              </v-chip>
+              <span v-if="!selectedProjectForCategories?.categories?.length" class="empty-text">
+                No categories assigned
+              </span>
+            </div>
+            
+            <div class="category-input-row">
+              <v-combobox
+                v-model="newCategoryInput"
+                :items="allCategories"
+                label="Add Category"
+                variant="outlined"
+                density="compact"
+                hide-details
+                @keyup.enter="addCategoryToProject"
+              />
+              <v-btn 
+                color="primary" 
+                @click="addCategoryToProject"
+                :disabled="!newCategoryInput"
+              >
+                Add
+              </v-btn>
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="dialog-actions">
+          <v-spacer />
+          <v-btn color="primary" @click="showManageCategoriesDialog = false">Done</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Add Category Dialog -->
+    <v-dialog v-model="showAddCategoryDialog" max-width="400px">
+      <v-card>
+        <v-card-title class="dialog-header">
+          <span class="dialog-title">Create New Category</span>
+          <v-btn icon="mdi-close" variant="text" @click="showAddCategoryDialog = false" />
+        </v-card-title>
+
+        <v-card-text class="dialog-content">
+          <v-text-field
+            v-model="newGlobalCategory"
+            label="Category Name"
+            variant="outlined"
+            placeholder="e.g., Feature, Bug, Enhancement"
+          />
+        </v-card-text>
+
+        <v-card-actions class="dialog-actions">
+          <v-spacer />
+          <v-btn variant="outlined" @click="showAddCategoryDialog = false">Cancel</v-btn>
+          <v-btn 
+            color="primary" 
+            @click="createGlobalCategory"
+            :disabled="!newGlobalCategory"
+          >
+            Create
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-snackbar
+      v-model="showSnackbar"
+      :color="snackbarColor"
+      timeout="3000"
+    >
+      {{ snackbarMessage }}
+    </v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 // State
-// State
-const viewMode = ref('dashboard')
-const searchQuery = ref('')
-const selectedProject = ref(null)
+const expandedProjects = ref([])
+const currentView = ref('projects')
+const showCreateDialog = ref(false)
+const showManageCategoriesDialog = ref(false)
+const showAddCategoryDialog = ref(false)
+const showWorkloadDialog = ref(false)
+const isEditing = ref(false)
+const showSnackbar = ref(false)
+const snackbarMessage = ref('')
+const snackbarColor = ref('success')
+const selectedProjectForCategories = ref(null)
+const newCategoryInput = ref('')
+const newGlobalCategory = ref('')
 
-// Kanban columns
-const kanbanColumns = [
-  { status: 'Ongoing' },
-  { status: 'Pending Review' },
-  { status: 'Completed' },
-  { status: 'Unassigned' }
+// View tabs
+const viewTabs = [
+  { label: 'Projects', value: 'projects' },
+  { label: 'Categories', value: 'categories' },
+  { label: 'Workload', value: 'workload' }
 ]
 
-// Mock Data
+// Filter states
+const selectedStatuses = ref([])
+const selectedDepartments = ref([])
+const selectedCategories = ref([])
+const tempSelectedStatuses = ref([])
+const tempSelectedDepartments = ref([])
+const tempSelectedCategories = ref([])
+const searchStatus = ref('')
+const searchDepartment = ref('')
+const searchCategory = ref('')
+const statusMenuOpen = ref(false)
+const departmentMenuOpen = ref(false)
+const categoryMenuOpen = ref(false)
+const statusDropdownTop = ref(0)
+const statusDropdownLeft = ref(0)
+const departmentDropdownTop = ref(0)
+const departmentDropdownLeft = ref(0)
+const categoryDropdownTop = ref(0)
+const categoryDropdownLeft = ref(0)
+const statusBtnRef = ref(null)
+const departmentBtnRef = ref(null)
+const categoryBtnRef = ref(null)
+const statusDropdownRef = ref(null)
+const departmentDropdownRef = ref(null)
+const categoryDropdownRef = ref(null)
+
+// Constants
+const projectStatuses = ['Ongoing', 'Pending Review', 'Completed', 'Unassigned']
+const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
+
+const statusFilterOptions = projectStatuses.map(status => ({ 
+  title: status, 
+  value: status
+}))
+
+const departmentFilterOptions = departments.map(dept => ({ 
+  title: dept, 
+  value: dept 
+}))
+
+// New project form
+const newProject = ref({
+  name: '',
+  description: '',
+  status: 'Ongoing',
+  department: 'Engineering',
+  dueDate: '',
+  members: [],
+  tasks: [],
+  categories: [],
+  progress: 0,
+  completedTasks: 0,
+  totalTasks: 0
+})
+
+// Mock data
 const projects = ref([
   {
     id: 1,
-    name: 'Iconly Pro',
-    url: 'iconly.pro',
-    icon: '🔷',
-    status: 'Completed',
-    about: 'Icon Design',
-    description: 'Design icons in various styles.',
-    members: ['JD', 'SM', 'MJ', 'SL'],
-    extraMembers: 3,
-    progress: 100,
-    color: '#6366f1'
+    name: 'Website Redesign',
+    status: 'Ongoing',
+    department: 'Engineering',
+    description: 'Complete overhaul of company website with modern design and improved UX',
+    completedTasks: 2,
+    totalTasks: 6,
+    dueDate: '2025-11-30',
+    progress: 65,
+    categories: ['Feature', 'UI/UX', 'Performance'],
+    members: [
+      { initials: 'SC', name: 'Sarah Chen', role: 'Lead Developer' },
+      { initials: 'MJ', name: 'Mike Johnson', role: 'Designer' },
+      { initials: 'DK', name: 'David Kim', role: 'Backend Dev' }
+    ],
+    tasks: [
+      {
+        id: 't1',
+        title: 'Implement user authentication',
+        description: 'Add OAuth 2.0 login functionality',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-10-20',
+        status: 'Ongoing',
+        priority: 1,
+        categories: ['Feature']
+      },
+      {
+        id: 't2',
+        title: 'Design new homepage layout',
+        description: 'Create modern responsive layout',
+        assignedTo: 'Mike Johnson',
+        dueDate: '2025-10-25',
+        status: 'Completed',
+        priority: 2,
+        categories: ['UI/UX']
+      },
+      {
+        id: 't3',
+        title: 'Optimize database queries',
+        description: 'Improve query performance',
+        assignedTo: 'David Kim',
+        dueDate: '2025-10-28',
+        status: 'Ongoing',
+        priority: 3,
+        categories: ['Performance']
+      },
+      {
+        id: 't4',
+        title: 'Add dark mode support',
+        description: 'Implement theme switching',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-11-05',
+        status: 'Pending Review',
+        priority: 4,
+        categories: ['Feature', 'UI/UX']
+      },
+      {
+        id: 't5',
+        title: 'Setup CDN for assets',
+        description: 'Configure CloudFront distribution',
+        assignedTo: 'David Kim',
+        dueDate: '2025-11-10',
+        status: 'Unassigned',
+        priority: 5,
+        categories: ['Performance']
+      },
+      {
+        id: 't6',
+        title: 'Mobile responsive testing',
+        description: 'Test on various devices',
+        assignedTo: 'Mike Johnson',
+        dueDate: '2025-11-15',
+        status: 'Completed',
+        priority: 2,
+        categories: ['UI/UX']
+      }
+    ]
   },
   {
     id: 2,
-    name: 'Skale',
-    url: 'skale.space',
-    icon: '🔵',
+    name: 'Mobile App',
     status: 'Ongoing',
-    about: 'Website Design',
-    description: 'Redesign the skale website.',
-    members: ['TB', 'LW', 'EC', 'DP'],
-    extraMembers: 2,
-    progress: 90,
-    color: '#3b82f6'
+    department: 'Engineering',
+    description: 'Native mobile application for iOS and Android',
+    completedTasks: 3,
+    totalTasks: 7,
+    dueDate: '2025-12-31',
+    progress: 45,
+    categories: ['Feature', 'Bug', 'Testing'],
+    members: [
+      { initials: 'SC', name: 'Sarah Chen', role: 'Lead Developer' },
+      { initials: 'DK', name: 'David Kim', role: 'Backend Dev' },
+      { initials: 'LP', name: 'Lisa Park', role: 'iOS Developer' }
+    ],
+    tasks: [
+      {
+        id: 't7',
+        title: 'Set up navigation system',
+        description: 'Implement React Navigation',
+        assignedTo: 'Lisa Park',
+        dueDate: '2025-10-25',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Feature']
+      },
+      {
+        id: 't8',
+        title: 'Fix login crash',
+        description: 'Debug authentication flow',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-10-22',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Bug']
+      },
+      {
+        id: 't9',
+        title: 'Write unit tests',
+        description: 'Add test coverage for core modules',
+        assignedTo: 'David Kim',
+        dueDate: '2025-11-01',
+        status: 'Pending Review',
+        priority: 3,
+        categories: ['Testing']
+      },
+      {
+        id: 't10',
+        title: 'Implement push notifications',
+        description: 'Setup Firebase messaging',
+        assignedTo: 'Lisa Park',
+        dueDate: '2025-11-08',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Feature']
+      },
+      {
+        id: 't11',
+        title: 'Fix memory leak',
+        description: 'Resolve memory issues in chat view',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-11-12',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Bug']
+      },
+      {
+        id: 't12',
+        title: 'Integration testing',
+        description: 'E2E tests for critical flows',
+        assignedTo: 'David Kim',
+        dueDate: '2025-11-20',
+        status: 'Unassigned',
+        priority: 4,
+        categories: ['Testing']
+      },
+      {
+        id: 't13',
+        title: 'Biometric authentication',
+        description: 'Add Face ID and fingerprint support',
+        assignedTo: 'Lisa Park',
+        dueDate: '2025-12-01',
+        status: 'Completed',
+        priority: 2,
+        categories: ['Feature']
+      }
+    ]
   },
   {
     id: 3,
-    name: 'Localy 2.0',
-    url: 'Localy.io',
-    icon: '🟠',
+    name: 'Q4 Campaign',
     status: 'Pending Review',
-    about: 'Map Kit',
-    description: 'Minimal maps in 5 styles.',
-    members: ['AM', 'JL', 'KR'],
-    extraMembers: 0,
+    department: 'Marketing',
+    description: 'Multi-channel marketing campaign for Q4 product launch',
+    completedTasks: 4,
+    totalTasks: 8,
+    dueDate: '2025-12-31',
     progress: 50,
-    color: '#f59e0b'
+    categories: ['Content', 'Social Media', 'Analytics'],
+    members: [
+      { initials: 'LP', name: 'Lisa Park', role: 'Marketing Lead' },
+      { initials: 'MJ', name: 'Mike Johnson', role: 'Content Creator' },
+      { initials: 'ED', name: 'Emma Davis', role: 'Social Media Manager' }
+    ],
+    tasks: [
+      {
+        id: 't14',
+        title: 'Create campaign assets',
+        description: 'Design social media graphics and videos',
+        assignedTo: 'Mike Johnson',
+        dueDate: '2025-11-15',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Content']
+      },
+      {
+        id: 't15',
+        title: 'Schedule social posts',
+        description: 'Plan and schedule content calendar',
+        assignedTo: 'Emma Davis',
+        dueDate: '2025-11-18',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Social Media']
+      },
+      {
+        id: 't16',
+        title: 'Setup tracking pixels',
+        description: 'Configure analytics and conversion tracking',
+        assignedTo: 'Lisa Park',
+        dueDate: '2025-11-20',
+        status: 'Completed',
+        priority: 3,
+        categories: ['Analytics']
+      },
+      {
+        id: 't17',
+        title: 'Write blog posts',
+        description: 'Create SEO-optimized content',
+        assignedTo: 'Mike Johnson',
+        dueDate: '2025-11-25',
+        status: 'Pending Review',
+        priority: 2,
+        categories: ['Content']
+      },
+      {
+        id: 't18',
+        title: 'Launch Instagram campaign',
+        description: 'Deploy paid ads and organic posts',
+        assignedTo: 'Emma Davis',
+        dueDate: '2025-12-01',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Social Media']
+      },
+      {
+        id: 't19',
+        title: 'A/B test landing pages',
+        description: 'Test variations and analyze results',
+        assignedTo: 'Lisa Park',
+        dueDate: '2025-12-05',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Analytics']
+      },
+      {
+        id: 't20',
+        title: 'Email newsletter design',
+        description: 'Create responsive email templates',
+        assignedTo: 'Mike Johnson',
+        dueDate: '2025-12-10',
+        status: 'Completed',
+        priority: 3,
+        categories: ['Content']
+      },
+      {
+        id: 't21',
+        title: 'Influencer outreach',
+        description: 'Contact and coordinate with influencers',
+        assignedTo: 'Emma Davis',
+        dueDate: '2025-12-15',
+        status: 'Unassigned',
+        priority: 4,
+        categories: ['Social Media']
+      }
+    ]
   },
   {
     id: 4,
-    name: 'Iconly Animation',
-    url: 'iconly.pro',
-    icon: '🔵',
+    name: 'Customer Portal',
     status: 'Ongoing',
-    about: 'Animated Icons',
-    description: 'Animated Iconly icons.',
-    members: ['RK', 'PP', 'MM'],
-    extraMembers: 0,
-    progress: 80,
-    color: '#3b82f6'
+    department: 'Engineering',
+    description: 'Self-service customer portal with account management',
+    completedTasks: 5,
+    totalTasks: 12,
+    dueDate: '2025-11-15',
+    progress: 42,
+    categories: ['Feature', 'Bug', 'Security'],
+    members: [
+      { initials: 'DK', name: 'David Kim', role: 'Backend Lead' },
+      { initials: 'SC', name: 'Sarah Chen', role: 'Frontend Dev' },
+      { initials: 'JW', name: 'John Wang', role: 'QA Engineer' },
+      { initials: 'AM', name: 'Alex Martinez', role: 'DevOps' }
+    ],
+    tasks: [
+      {
+        id: 't22',
+        title: 'User dashboard',
+        description: 'Create main dashboard view',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-10-28',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Feature']
+      },
+      {
+        id: 't23',
+        title: 'Payment integration',
+        description: 'Integrate Stripe payment processing',
+        assignedTo: 'David Kim',
+        dueDate: '2025-11-02',
+        status: 'Ongoing',
+        priority: 1,
+        categories: ['Feature']
+      },
+      {
+        id: 't24',
+        title: 'Fix session timeout',
+        description: 'Resolve premature logout issue',
+        assignedTo: 'David Kim',
+        dueDate: '2025-10-30',
+        status: 'Completed',
+        priority: 2,
+        categories: ['Bug']
+      },
+      {
+        id: 't25',
+        title: 'Implement 2FA',
+        description: 'Add two-factor authentication',
+        assignedTo: 'Alex Martinez',
+        dueDate: '2025-11-05',
+        status: 'Pending Review',
+        priority: 1,
+        categories: ['Security']
+      },
+      {
+        id: 't26',
+        title: 'Support ticket system',
+        description: 'Build ticket submission and tracking',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-11-08',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Feature']
+      },
+      {
+        id: 't27',
+        title: 'Load testing',
+        description: 'Perform stress tests on API',
+        assignedTo: 'John Wang',
+        dueDate: '2025-11-10',
+        status: 'Completed',
+        priority: 3,
+        categories: ['Feature']
+      },
+      {
+        id: 't28',
+        title: 'Fix file upload bug',
+        description: 'Resolve large file upload failures',
+        assignedTo: 'David Kim',
+        dueDate: '2025-11-12',
+        status: 'Completed',
+        priority: 2,
+        categories: ['Bug']
+      },
+      {
+        id: 't29',
+        title: 'SSL certificate renewal',
+        description: 'Update SSL certs before expiry',
+        assignedTo: 'Alex Martinez',
+        dueDate: '2025-11-14',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Security']
+      },
+      {
+        id: 't30',
+        title: 'Notification preferences',
+        description: 'Add user notification settings',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-11-18',
+        status: 'Unassigned',
+        priority: 3,
+        categories: ['Feature']
+      },
+      {
+        id: 't31',
+        title: 'Security audit',
+        description: 'Conduct comprehensive security review',
+        assignedTo: 'John Wang',
+        dueDate: '2025-11-20',
+        status: 'Ongoing',
+        priority: 1,
+        categories: ['Security']
+      },
+      {
+        id: 't32',
+        title: 'Fix mobile layout',
+        description: 'Resolve responsive design issues',
+        assignedTo: 'Sarah Chen',
+        dueDate: '2025-11-22',
+        status: 'Pending Review',
+        priority: 2,
+        categories: ['Bug']
+      },
+      {
+        id: 't33',
+        title: 'Activity logs',
+        description: 'Implement user activity tracking',
+        assignedTo: 'David Kim',
+        dueDate: '2025-11-25',
+        status: 'Unassigned',
+        priority: 4,
+        categories: ['Feature']
+      }
+    ]
   },
   {
     id: 5,
-    name: 'Cultivate',
-    url: 'Cultivate.io',
-    icon: '🟣',
-    status: 'Pending Review',
-    about: 'Web app integrations',
-    description: 'Connect web apps seamlessly',
-    members: ['EW', 'NB', 'GH', 'VD'],
-    extraMembers: 0,
-    progress: 20,
-    color: '#a855f7'
+    name: 'Sales Training Program',
+    status: 'Ongoing',
+    department: 'Sales',
+    description: 'Comprehensive training program for new sales representatives',
+    completedTasks: 2,
+    totalTasks: 5,
+    dueDate: '2025-11-30',
+    progress: 40,
+    categories: ['Training', 'Documentation'],
+    members: [
+      { initials: 'RJ', name: 'Robert Johnson', role: 'Sales Director' },
+      { initials: 'KL', name: 'Karen Lee', role: 'Training Coordinator' }
+    ],
+    tasks: [
+      {
+        id: 't34',
+        title: 'Create training materials',
+        description: 'Develop comprehensive training documentation',
+        assignedTo: 'Karen Lee',
+        dueDate: '2025-11-08',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Documentation']
+      },
+      {
+        id: 't35',
+        title: 'Schedule training sessions',
+        description: 'Coordinate with new hires',
+        assignedTo: 'Robert Johnson',
+        dueDate: '2025-11-12',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Training']
+      },
+      {
+        id: 't36',
+        title: 'Setup CRM training',
+        description: 'Teach Salesforce best practices',
+        assignedTo: 'Karen Lee',
+        dueDate: '2025-11-18',
+        status: 'Pending Review',
+        priority: 1,
+        categories: ['Training']
+      },
+      {
+        id: 't37',
+        title: 'Create knowledge base',
+        description: 'Build internal wiki for sales team',
+        assignedTo: 'Karen Lee',
+        dueDate: '2025-11-22',
+        status: 'Completed',
+        priority: 3,
+        categories: ['Documentation']
+      },
+      {
+        id: 't38',
+        title: 'Conduct mock calls',
+        description: 'Role-play customer interactions',
+        assignedTo: 'Robert Johnson',
+        dueDate: '2025-11-28',
+        status: 'Unassigned',
+        priority: 2,
+        categories: ['Training']
+      }
+    ]
   },
   {
     id: 6,
-    name: 'Quotient',
-    url: 'quotient.co',
-    icon: '🟣',
-    status: 'Unassigned',
-    about: 'Sales CRM',
-    description: 'Web-based sales doc management',
-    members: ['XY', 'ZA', 'BC', 'DE'],
-    extraMembers: 6,
-    progress: 0,
-    color: '#8b5cf6'
-  },
-  {
-    id: 7,
-    name: 'Mask World',
-    url: 'maskworld.io',
-    icon: '⚡',
-    status: 'Ongoing',
-    about: 'NFT project',
-    description: 'A large collection of Jordi Mola\'s art.',
-    members: ['FG', 'HI', 'JK'],
-    extraMembers: 0,
-    progress: 40,
-    color: '#10b981'
+    name: 'HR System Upgrade',
+    status: 'Pending Review',
+    department: 'HR',
+    description: 'Upgrade HRIS system and migrate employee data',
+    completedTasks: 6,
+    totalTasks: 8,
+    dueDate: '2025-10-31',
+    progress: 75,
+    categories: ['Migration', 'Testing', 'Training'],
+    members: [
+      { initials: 'JD', name: 'Jennifer Davis', role: 'HR Manager' },
+      { initials: 'TS', name: 'Tom Smith', role: 'IT Specialist' }
+    ],
+    tasks: [
+      {
+        id: 't39',
+        title: 'Data migration plan',
+        description: 'Plan employee data migration strategy',
+        assignedTo: 'Tom Smith',
+        dueDate: '2025-10-20',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Migration']
+      },
+      {
+        id: 't40',
+        title: 'Test new system',
+        description: 'Conduct UAT with HR team',
+        assignedTo: 'Jennifer Davis',
+        dueDate: '2025-10-25',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Testing']
+      },
+      {
+        id: 't41',
+        title: 'Employee training',
+        description: 'Train staff on new HRIS',
+        assignedTo: 'Jennifer Davis',
+        dueDate: '2025-10-28',
+        status: 'Ongoing',
+        priority: 2,
+        categories: ['Training']
+      },
+      {
+        id: 't42',
+        title: 'Data validation',
+        description: 'Verify migrated data accuracy',
+        assignedTo: 'Tom Smith',
+        dueDate: '2025-10-29',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Migration']
+      },
+      {
+        id: 't43',
+        title: 'System configuration',
+        description: 'Configure workflows and permissions',
+        assignedTo: 'Tom Smith',
+        dueDate: '2025-10-30',
+        status: 'Completed',
+        priority: 2,
+        categories: ['Migration']
+      },
+      {
+        id: 't44',
+        title: 'Integration testing',
+        description: 'Test integrations with payroll',
+        assignedTo: 'Tom Smith',
+        dueDate: '2025-10-31',
+        status: 'Completed',
+        priority: 1,
+        categories: ['Testing']
+      },
+      {
+        id: 't45',
+        title: 'Create user guides',
+        description: 'Document system procedures',
+        assignedTo: 'Jennifer Davis',
+        dueDate: '2025-10-31',
+        status: 'Completed',
+        priority: 3,
+        categories: ['Training']
+      },
+      {
+        id: 't46',
+        title: 'Go-live preparation',
+        description: 'Final checks before launch',
+        assignedTo: 'Tom Smith',
+        dueDate: '2025-10-31',
+        status: 'Pending Review',
+        priority: 1,
+        categories: ['Migration']
+      }
+    ]
   }
 ])
 
-// Computed Properties
-const filteredProjects = computed(() => {
-  if (!searchQuery.value) return projects.value
-  
-  const query = searchQuery.value.toLowerCase()
-  return projects.value.filter(project => 
-    project.name.toLowerCase().includes(query) ||
-    project.about.toLowerCase().includes(query) ||
-    project.description.toLowerCase().includes(query)
+// Computed
+const allCategories = computed(() => {
+  const categories = new Set()
+  projects.value.forEach(project => {
+    if (project.categories) {
+      project.categories.forEach(cat => categories.add(cat))
+    }
+  })
+  return Array.from(categories).sort()
+})
+
+const categoryFilterOptions = computed(() => {
+  return allCategories.value.map(cat => ({ title: cat, value: cat }))
+})
+
+const filteredCategoryOptions = computed(() => {
+  return categoryFilterOptions.value.filter(opt => 
+    opt.title.toLowerCase().includes(searchCategory.value.toLowerCase())
   )
 })
 
-// Methods
-const selectProject = (project) => {
-  selectedProject.value = project
-}
+const filteredStatusOptions = computed(() => {
+  return statusFilterOptions.filter(opt => 
+    opt.title.toLowerCase().includes(searchStatus.value.toLowerCase())
+  )
+})
 
-const getStatusClass = (status) => {
-  const statusMap = {
-    'Ongoing': 'status-ongoing',
-    'Pending Review': 'status-pending',
-    'Completed': 'status-completed',
-    'Unassigned': 'status-unassigned'
+const filteredDepartmentOptions = computed(() => {
+  return departmentFilterOptions.filter(opt => 
+    opt.title.toLowerCase().includes(searchDepartment.value.toLowerCase())
+  )
+})
+
+const selectedFilters = computed(() => {
+  return [
+    ...selectedCategories.value.map(c => ({ 
+      key: `category-${c}`, 
+      label: c, 
+      type: 'category', 
+      value: c 
+    })),
+    ...selectedStatuses.value.map(s => ({ 
+      key: `status-${s}`, 
+      label: s, 
+      type: 'status', 
+      value: s 
+    })),
+    ...selectedDepartments.value.map(d => ({ 
+      key: `department-${d}`, 
+      label: d, 
+      type: 'department', 
+      value: d 
+    }))
+  ]
+})
+
+const filteredProjects = computed(() => {
+  let filtered = projects.value
+
+  if (selectedStatuses.value.length > 0) {
+    filtered = filtered.filter(project => 
+      selectedStatuses.value.includes(project.status)
+    )
   }
-  return statusMap[status] || 'status-default'
+
+  if (selectedDepartments.value.length > 0) {
+    filtered = filtered.filter(project => 
+      selectedDepartments.value.includes(project.department)
+    )
+  }
+
+  if (selectedCategories.value.length > 0) {
+    filtered = filtered.filter(project => 
+      project.categories?.some(cat => selectedCategories.value.includes(cat))
+    )
+  }
+
+  return filtered
+})
+
+// Methods
+const toggleProject = (projectId) => {
+  if (expandedProjects.value.includes(projectId)) {
+    expandedProjects.value = expandedProjects.value.filter(id => id !== projectId)
+  } else {
+    expandedProjects.value.push(projectId)
+  }
 }
 
-const getProgressColor = (progress) => {
-  if (progress === 100) return '#6b9b6b'
-  if (progress >= 80) return '#6b9b6b'
-  if (progress >= 50) return '#f59e0b'
-  if (progress >= 20) return '#f59e0b'
-  return '#ef4444'
+const getStatusColor = (status) => {
+  const colors = {
+    'Ongoing': 'blue',
+    'Pending Review': 'orange',
+    'Completed': 'green',
+    'Unassigned': 'grey'
+  }
+  return colors[status] || 'grey'
 }
 
-const getProjectsByStatus = (status) => {
-  return projects.value.filter(project => project.status === status)
+const getCategoryColor = (category) => {
+  const colors = {
+    'Feature': 'blue',
+    'Bug': 'red',
+    'UI/UX': 'purple',
+    'Performance': 'orange',
+    'Testing': 'cyan',
+    'Content': 'pink',
+    'Social Media': 'indigo',
+    'Analytics': 'teal',
+    'Security': 'deep-orange',
+    'Training': 'amber',
+    'Documentation': 'lime',
+    'Migration': 'deep-purple'
+  }
+  return colors[category] || 'grey'
 }
 
-const createProject = () => {
-  alert('Create Project functionality - to be implemented')
+const getAvatarColor = (index) => {
+  const colors = [
+    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+  ]
+  return colors[index % colors.length]
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const getTasksByCategory = (project, category) => {
+  if (!project.tasks) return []
+  return project.tasks.filter(task => task.categories?.includes(category))
+}
+
+const getMemberTaskCount = (project, memberName) => {
+  if (!project.tasks) return 0
+  return project.tasks.filter(task => task.assignedTo === memberName).length
+}
+
+const getProjectsByCategory = (category) => {
+  return projects.value.filter(project => project.categories?.includes(category))
+}
+
+const getTasksCountByCategory = (category) => {
+  let count = 0
+  projects.value.forEach(project => {
+    if (project.categories?.includes(category) && project.tasks) {
+      count += project.tasks.filter(task => task.categories?.includes(category)).length
+    }
+  })
+  return count
+}
+
+const getCompletionRateByCategory = (category) => {
+  let total = 0
+  let completed = 0
+  projects.value.forEach(project => {
+    if (project.categories?.includes(category) && project.tasks) {
+      const categoryTasks = project.tasks.filter(task => task.categories?.includes(category))
+      total += categoryTasks.length
+      completed += categoryTasks.filter(task => task.status === 'Completed').length
+    }
+  })
+  return total > 0 ? Math.round((completed / total) * 100) : 0
+}
+
+const getProjectsByDepartment = (department) => {
+  return projects.value.filter(project => project.department === department)
+}
+
+const getTotalTasksByDepartment = (department) => {
+  return getProjectsByDepartment(department).reduce((sum, project) => sum + project.totalTasks, 0)
+}
+
+const getCompletedTasksByDepartment = (department) => {
+  return getProjectsByDepartment(department).reduce((sum, project) => sum + project.completedTasks, 0)
+}
+
+const getOngoingTasksByDepartment = (department) => {
+  let count = 0
+  getProjectsByDepartment(department).forEach(project => {
+    if (project.tasks) {
+      count += project.tasks.filter(task => task.status === 'Ongoing').length
+    }
+  })
+  return count
+}
+
+const getTeamMembersByDepartment = (department) => {
+  const members = new Set()
+  getProjectsByDepartment(department).forEach(project => {
+    project.members.forEach(member => members.add(member.name))
+  })
+  return members.size
+}
+
+const getDepartmentProgress = (department) => {
+  const deptProjects = getProjectsByDepartment(department)
+  if (deptProjects.length === 0) return 0
+  const totalProgress = deptProjects.reduce((sum, project) => sum + project.progress, 0)
+  return Math.round(totalProgress / deptProjects.length)
+}
+
+const filterByCategory = (category) => {
+  currentView.value = 'projects'
+  selectedCategories.value = [category]
+}
+
+const filterByDepartment = (department) => {
+  currentView.value = 'projects'
+  selectedDepartments.value = [department]
+}
+
+const scrollToProject = (projectId) => {
+  currentView.value = 'projects'
+  nextTick(() => {
+    expandedProjects.value = [projectId]
+  })
+}
+
+const editProject = (project) => {
+  newProject.value = { ...project }
+  isEditing.value = true
+  showCreateDialog.value = true
+}
+
+const manageCategoriesForProject = (project) => {
+  selectedProjectForCategories.value = project
+  showManageCategoriesDialog.value = true
+}
+
+const addCategory = () => {
+  if (!newCategoryInput.value) return
+  
+  const category = newCategoryInput.value.trim()
+  if (category && !newProject.value.categories.includes(category)) {
+    newProject.value.categories.push(category)
+  }
+  newCategoryInput.value = ''
+}
+
+const removeCategory = (category) => {
+  newProject.value.categories = newProject.value.categories.filter(c => c !== category)
+}
+
+const addCategoryToProject = () => {
+  if (!newCategoryInput.value || !selectedProjectForCategories.value) return
+  
+  const category = newCategoryInput.value.trim()
+  if (category && !selectedProjectForCategories.value.categories.includes(category)) {
+    selectedProjectForCategories.value.categories.push(category)
+    
+    // Update in main projects array
+    const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
+    if (index !== -1) {
+      projects.value[index].categories.push(category)
+    }
+  }
+  newCategoryInput.value = ''
+}
+
+const removeCategoryFromProject = (category) => {
+  if (!selectedProjectForCategories.value) return
+  
+  selectedProjectForCategories.value.categories = 
+    selectedProjectForCategories.value.categories.filter(c => c !== category)
+  
+  // Update in main projects array
+  const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
+  if (index !== -1) {
+    projects.value[index].categories = 
+      projects.value[index].categories.filter(c => c !== category)
+  }
+}
+
+const createGlobalCategory = () => {
+  if (!newGlobalCategory.value) return
+  
+  const category = newGlobalCategory.value.trim()
+  if (category && !allCategories.value.includes(category)) {
+    showMessage(`Category "${category}" created successfully`, 'success')
+  }
+  
+  showAddCategoryDialog.value = false
+  newGlobalCategory.value = ''
+}
+
+const saveProject = () => {
+  if (!newProject.value.name) {
+    showMessage('Please enter a project name', 'error')
+    return
+  }
+
+  if (isEditing.value) {
+    const index = projects.value.findIndex(p => p.id === newProject.value.id)
+    if (index !== -1) {
+      projects.value[index] = { ...newProject.value }
+      showMessage('Project updated successfully', 'success')
+    }
+  } else {
+    const newId = Math.max(...projects.value.map(p => p.id), 0) + 1
+    projects.value.push({
+      ...newProject.value,
+      id: newId,
+      members: [],
+      tasks: [],
+      progress: 0,
+      completedTasks: 0,
+      totalTasks: 0
+    })
+    showMessage('Project created successfully', 'success')
+  }
+
+  showCreateDialog.value = false
+  resetForm()
+}
+
+const cancelCreate = () => {
+  showCreateDialog.value = false
+  resetForm()
+}
+
+const resetForm = () => {
+  newProject.value = {
+    name: '',
+    description: '',
+    status: 'Ongoing',
+    department: 'Engineering',
+    dueDate: '',
+    members: [],
+    tasks: [],
+    categories: [],
+    progress: 0,
+    completedTasks: 0,
+    totalTasks: 0
+  }
+  isEditing.value = false
+  newCategoryInput.value = ''
+}
+
+const showMessage = (message, color = 'success') => {
+  snackbarMessage.value = message
+  snackbarColor.value = color
+  showSnackbar.value = true
+}
+
+// Category Filter Methods
+const toggleCategoryMenu = () => {
+  if (categoryMenuOpen.value) {
+    closeCategoryMenu()
+  } else {
+    closeStatusMenu()
+    closeDepartmentMenu()
+    openCategoryMenu()
+  }
+}
+
+const openCategoryMenu = () => {
+  tempSelectedCategories.value = [...selectedCategories.value]
+  searchCategory.value = ''
+
+  nextTick(() => {
+    if (categoryBtnRef.value) {
+      const rect = categoryBtnRef.value.$el.getBoundingClientRect()
+      categoryDropdownTop.value = rect.bottom + 4
+      categoryDropdownLeft.value = rect.left
+    }
+  })
+
+  categoryMenuOpen.value = true
+
+  nextTick(() => {
+    document.addEventListener('click', handleCategoryClickOutside)
+  })
+}
+
+const closeCategoryMenu = () => {
+  categoryMenuOpen.value = false
+  document.removeEventListener('click', handleCategoryClickOutside)
+}
+
+const handleCategoryClickOutside = (event) => {
+  if (categoryDropdownRef.value && !categoryDropdownRef.value.contains(event.target)) {
+    closeCategoryMenu()
+  }
+}
+
+const applyCategoryFilter = () => {
+  selectedCategories.value = [...tempSelectedCategories.value]
+  closeCategoryMenu()
+}
+
+const toggleCategory = (value) => {
+  if (tempSelectedCategories.value.includes(value)) {
+    tempSelectedCategories.value = tempSelectedCategories.value.filter(v => v !== value)
+  } else {
+    tempSelectedCategories.value.push(value)
+  }
+}
+
+// Status Filter Methods
+const toggleStatusMenu = () => {
+  if (statusMenuOpen.value) {
+    closeStatusMenu()
+  } else {
+    closeCategoryMenu()
+    closeDepartmentMenu()
+    openStatusMenu()
+  }
+}
+
+const openStatusMenu = () => {
+  tempSelectedStatuses.value = [...selectedStatuses.value]
+  searchStatus.value = ''
+
+  nextTick(() => {
+    if (statusBtnRef.value) {
+      const rect = statusBtnRef.value.$el.getBoundingClientRect()
+      statusDropdownTop.value = rect.bottom + 4
+      statusDropdownLeft.value = rect.left
+    }
+  })
+
+  statusMenuOpen.value = true
+
+  nextTick(() => {
+    document.addEventListener('click', handleStatusClickOutside)
+  })
+}
+
+const closeStatusMenu = () => {
+  statusMenuOpen.value = false
+  document.removeEventListener('click', handleStatusClickOutside)
+}
+
+const handleStatusClickOutside = (event) => {
+  if (statusDropdownRef.value && !statusDropdownRef.value.contains(event.target)) {
+    closeStatusMenu()
+  }
+}
+
+const applyStatusFilter = () => {
+  selectedStatuses.value = [...tempSelectedStatuses.value]
+  closeStatusMenu()
+}
+
+const toggleStatus = (value) => {
+  if (tempSelectedStatuses.value.includes(value)) {
+    tempSelectedStatuses.value = tempSelectedStatuses.value.filter(v => v !== value)
+  } else {
+    tempSelectedStatuses.value.push(value)
+  }
+}
+
+// Department Filter Methods
+const toggleDepartmentMenu = () => {
+  if (departmentMenuOpen.value) {
+    closeDepartmentMenu()
+  } else {
+    closeCategoryMenu()
+    closeStatusMenu()
+    openDepartmentMenu()
+  }
+}
+
+const openDepartmentMenu = () => {
+  tempSelectedDepartments.value = [...selectedDepartments.value]
+  searchDepartment.value = ''
+
+  nextTick(() => {
+    if (departmentBtnRef.value) {
+      const rect = departmentBtnRef.value.$el.getBoundingClientRect()
+      departmentDropdownTop.value = rect.bottom + 4
+      departmentDropdownLeft.value = rect.left
+    }
+  })
+
+  departmentMenuOpen.value = true
+
+  nextTick(() => {
+    document.addEventListener('click', handleDepartmentClickOutside)
+  })
+}
+
+const closeDepartmentMenu = () => {
+  departmentMenuOpen.value = false
+  document.removeEventListener('click', handleDepartmentClickOutside)
+}
+
+const handleDepartmentClickOutside = (event) => {
+  if (departmentDropdownRef.value && !departmentDropdownRef.value.contains(event.target)) {
+    closeDepartmentMenu()
+  }
+}
+
+const applyDepartmentFilter = () => {
+  selectedDepartments.value = [...tempSelectedDepartments.value]
+  closeDepartmentMenu()
+}
+
+const toggleDepartment = (value) => {
+  if (tempSelectedDepartments.value.includes(value)) {
+    tempSelectedDepartments.value = tempSelectedDepartments.value.filter(v => v !== value)
+  } else {
+    tempSelectedDepartments.value.push(value)
+  }
+}
+
+// Filter Management
+const removeFilter = (filter) => {
+  if (filter.type === 'category') {
+    selectedCategories.value = selectedCategories.value.filter(c => c !== filter.value)
+  } else if (filter.type === 'status') {
+    selectedStatuses.value = selectedStatuses.value.filter(s => s !== filter.value)
+  } else if (filter.type === 'department') {
+    selectedDepartments.value = selectedDepartments.value.filter(d => d !== filter.value)
+  }
+}
+
+const resetFilters = () => {
+  selectedStatuses.value = []
+  selectedDepartments.value = []
+  selectedCategories.value = []
 }
 </script>
 
 <style scoped>
-
 /* ===========================
-   Responsive Zoom Scaling
-   =========================== */
-@media (min-width: 1920px) {
-  .projects-container {
-    font-size: 16px;
-  }
-}
-
-@media (max-width: 1600px) {
-  .projects-container {
-    font-size: 15px;
-  }
-}
-
-@media (max-width: 1366px) {
-  .projects-container {
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 1024px) {
-  .projects-container {
-    font-size: 13px;
-  }
-}
-/* ===========================
-   Main Container
+   Base Container
    =========================== */
 .projects-container {
   width: 100%;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: transparent;
-}
-
-/* ============================================
-   MAIN LAYOUT
-   ============================================ */
-.projects-page {
-  display: flex;
-  flex: 1;
+  min-height: 100vh;
   background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
-.main-content {
-  flex: 1;
+.projects-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
-.projects-view {
+/* ===========================
+   Page Header
+   =========================== */
+.page-header {
   display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-/* ============================================
-   HEADER
-   ============================================ */
-.content-header {
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px 12px 24px;
   background: transparent;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 16px 24px;
-  flex-shrink: 0;
 }
 
-[data-theme="dark"] .content-header {
+[data-theme="dark"] .page-header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  margin-bottom: 16px;
-}
-
-.header-top h1 {
-  font-size: 22px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 2px 0;
-}
-
-[data-theme="dark"] .header-top h1 {
-  color: #f7fafc;
-}
-
-.header-top p {
-  font-size: 13px;
-  color: #6b7280;
+.header-left h1 {
   margin: 0;
-}
-
-[data-theme="dark"] .header-top p {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: #6b9b6b;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #5a8a5a;
-}
-
-[data-theme="dark"] .btn-primary {
-  background: #5a7a9b;
-  color: white;
-}
-
-[data-theme="dark"] .btn-primary:hover {
-  background: #7b92d1;
-}
-
-.btn-secondary {
-  background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-secondary:hover {
-  background: #f9fafb;
-}
-
-[data-theme="dark"] .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.header-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.view-toggle {
-  display: flex;
-  gap: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-[data-theme="dark"] .view-toggle {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.view-btn {
-  padding: 6px 14px;
-  background: white;
-  border: none;
-  cursor: pointer;
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s;
-  border-right: 1px solid #e5e7eb;
-}
-
-.view-btn:last-child {
-  border-right: none;
-}
-
-[data-theme="dark"] .view-btn {
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.6);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.view-btn:hover {
-  background: #f9fafb;
-}
-
-[data-theme="dark"] .view-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.view-btn.active {
-  background: #c5d49a;
-  color: #3d3d3d;
+  font-size: 24px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
-[data-theme="dark"] .view-btn.active {
-  background: rgba(123, 146, 209, 0.3);
-  color: #7b92d1;
-  font-weight: 600;
-}
-
-.search-filter {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  color: #9ca3af;
+.subtitle {
+  margin: 4px 0 0 0;
+  color: #7f8c8d;
   font-size: 14px;
 }
 
-.search-input {
-  padding: 7px 10px 7px 32px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 13px;
-  width: 240px;
-  outline: none;
-  transition: border-color 0.2s;
-  background: white;
-  color: #111827;
+.header-right {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
-[data-theme="dark"] .search-input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f7fafc;
+.workload-btn {
+  background: transparent !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  color: var(--text-primary) !important;
 }
 
-.search-input:focus {
-  border-color: #d1d5db;
+.workload-btn:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
 }
 
-[data-theme="dark"] .search-input:focus {
-  border-color: rgba(255, 255, 255, 0.2);
+[data-theme="dark"] .workload-btn {
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
-.search-input::placeholder {
-  color: #9ca3af;
+[data-theme="dark"] .workload-btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
 }
 
-[data-theme="dark"] .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-/* ============================================
-   TABLE VIEW (TEAM VIEW)
-   ============================================ */
-.table-container {
-  flex: 1;
-  padding: 20px 24px;
-  overflow-y: auto;
+/* ===========================
+   View Controls & Filters
+   =========================== */
+.view-controls {
+  padding: 10px 24px;
   background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.table-header-section {
-  margin-bottom: 16px;
-}
-
-.table-header-section h2 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-}
-
-[data-theme="dark"] .table-header-section h2 {
-  color: #f7fafc;
-}
-
-.projects-table {
-  width: 100%;
-  background: var(--bg-secondary, white);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-[data-theme="dark"] .projects-table {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.projects-table thead {
-  background: transparent;
-}
-
-[data-theme="dark"] .projects-table thead {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.projects-table th {
-  padding: 12px 20px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-[data-theme="dark"] .projects-table th {
-  color: rgba(255, 255, 255, 0.5);
+[data-theme="dark"] .view-controls {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.projects-table th:first-child {
-  border-top-left-radius: 12px;
-}
-
-.projects-table th:last-child {
-  border-top-right-radius: 12px;
-}
-
-.th-name {
+.controls-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 4px;
+  width: 100%;
 }
 
-.sort-icon {
-  color: #9ca3af;
-  font-size: 10px;
-}
-
-.projects-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-[data-theme="dark"] .projects-table tbody tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.projects-table tbody tr:hover {
-  background: rgba(0, 0, 0, 0.02);
-}
-
-[data-theme="dark"] .projects-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.projects-table tbody tr:last-child {
+.view-toggle-left {
   border-bottom: none;
 }
 
-.projects-table td {
-  padding: 16px 20px;
+.view-tabs {
+  display: flex;
+  gap: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+}
+
+.view-tab {
+  all: unset;
+  padding: 14px 0;
   font-size: 14px;
-  color: #374151;
-  vertical-align: middle;
+  font-weight: 500;
+  color: #8b95a0;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+  border-bottom: 3px solid transparent;
 }
 
-[data-theme="dark"] .projects-table td {
-  color: rgba(255, 255, 255, 0.8);
+.view-tab:hover {
+  color: #4a5568;
 }
 
-.td-name {
-  width: 25%;
+.view-tab.active {
+  color: #1a202c;
+  border-bottom-color: #6b9b6b;
 }
 
-.project-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.project-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.project-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.project-title {
-  font-weight: 600;
-  color: #111827;
-  font-size: 14px;
-}
-
-[data-theme="dark"] .project-title {
+[data-theme="dark"] .view-tab.active {
   color: #f7fafc;
+  border-bottom-color: #5a7a9b;
 }
 
-.project-url {
-  font-size: 13px;
-  color: #9ca3af;
+.filters-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-[data-theme="dark"] .project-url {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.status-badge {
-  padding: 5px 12px;
-  border-radius: 6px;
+.filter-label {
   font-size: 12px;
-  font-weight: 500;
-  display: inline-block;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 8px;
 }
 
-.status-ongoing {
-  background: rgba(107, 155, 107, 0.15);
-  color: #4a7a4a;
+.filter-btn {
+  min-width: 120px;
+  background: #e8f5e8 !important;
+  color: #4a7c4a !important;
+  border: 1px solid #6b9b6b !important;
 }
 
-[data-theme="dark"] .status-ongoing {
-  background: rgba(33, 150, 243, 0.2);
-  color: #90caf9;
+.filter-btn:hover {
+  background: #d4ead4 !important;
+  border-color: #5a8a5a !important;
 }
 
-.status-pending {
-  background: #fef3c7;
-  color: #92400e;
+[data-theme="dark"] .filter-btn {
+  background: rgba(90, 122, 155, 0.2) !important;
+  color: #7b92d1 !important;
+  border: 1px solid #5a7a9b !important;
 }
 
-[data-theme="dark"] .status-pending {
-  background: rgba(255, 152, 0, 0.2);
-  color: #ffb74d;
+[data-theme="dark"] .filter-btn:hover {
+  background: rgba(90, 122, 155, 0.3) !important;
+  border-color: #7b92d1 !important;
 }
 
-.status-completed {
-  background: rgba(107, 155, 107, 0.25);
-  color: #3d6b3d;
+.reset-btn {
+  color: #666;
 }
 
-[data-theme="dark"] .status-completed {
-  background: rgba(76, 175, 80, 0.2);
-  color: #81c784;
+/* Filter Chips */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.status-unassigned {
-  background: #fee2e2;
-  color: #991b1b;
+[data-theme="dark"] .filter-chips {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-[data-theme="dark"] .status-unassigned {
-  background: rgba(244, 67, 54, 0.2);
-  color: #e57373;
+.filter-chip {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
 }
 
-.td-about {
-  width: 28%;
+[data-theme="dark"] .filter-chip {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.about-cell {
+/* Custom Filter Dropdowns */
+.custom-filter-dropdown {
+  position: fixed;
+  z-index: 1000;
+  min-width: 250px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+[data-theme="dark"] .custom-filter-dropdown {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-body {
+  padding: 8px 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-input {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.filter-options-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.filter-option-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.filter-option-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .filter-option-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.custom-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #1976d2;
+}
+
+.option-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.dropdown-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .dropdown-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ===========================
+   Projects List
+   =========================== */
+.projects-list {
+  flex: 1;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 16px;
+  overflow-y: auto;
 }
 
-.about-title {
-  font-weight: 500;
-  color: #111827;
-  font-size: 13px;
+/* ===========================
+   Project Card
+   =========================== */
+.project-card {
+  background: var(--bg-primary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s;
 }
 
-[data-theme="dark"] .about-title {
-  color: #f7fafc;
+[data-theme="dark"] .project-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.about-description {
-  font-size: 13px;
-  color: #9ca3af;
+.project-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-[data-theme="dark"] .about-description {
-  color: rgba(255, 255, 255, 0.4);
+[data-theme="dark"] .project-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.members-cell {
+/* Project Header */
+.project-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.avatars {
-  display: flex;
-  margin-left: -4px;
+[data-theme="dark"] .project-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid white;
-  margin-left: -4px;
-  flex-shrink: 0;
+.project-header:hover {
+  background: rgba(0, 0, 0, 0.02);
 }
 
-[data-theme="dark"] .avatar {
-  border: 2px solid #1e1e28;
+[data-theme="dark"] .project-header:hover {
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.avatar.small {
-  width: 28px;
-  height: 28px;
-  font-size: 10px;
-}
-
-.avatar-more {
-  background: #e5e7eb;
-  color: #6b7280;
-}
-
-[data-theme="dark"] .avatar-more {
-  background: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.td-progress {
-  width: 18%;
-}
-
-.progress-cell {
+.project-header-left {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.progress-bar-wrapper {
   flex: 1;
 }
 
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: #f3f4f6;
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  transition: all 0.2s;
   border-radius: 4px;
+}
+
+[data-theme="dark"] .expand-btn {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.expand-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .expand-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.project-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.status-chip,
+.department-chip {
+  text-transform: capitalize;
+  font-weight: 500;
+}
+
+.department-chip {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .department-chip {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.project-header-right {
+  display: flex;
+  gap: 4px;
+}
+
+/* Project Summary */
+.project-summary {
+  padding: 16px 20px 16px 56px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .project-summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.project-description {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .project-description {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.project-categories {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.category-chip {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+[data-theme="dark"] .meta-item {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.meta-icon {
+  color: #9ca3af;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.progress-bar {
+  width: 120px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -1072,594 +2407,651 @@ const createProject = () => {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.progress-bar.small {
-  height: 6px;
-}
-
 .progress-fill {
   height: 100%;
-  background: #10b981;
+  background: #6b9b6b;
+  border-radius: 3px;
   transition: width 0.3s;
-  border-radius: 4px;
 }
 
-.progress-percentage {
+[data-theme="dark"] .progress-fill {
+  background: #5a7a9b;
+}
+
+.progress-text {
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-primary);
   min-width: 38px;
-  text-align: right;
 }
 
-[data-theme="dark"] .progress-percentage {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.td-actions {
-  width: 40px;
-  text-align: center;
-}
-
-.more-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 8px;
-  color: #9ca3af;
-  font-size: 18px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.more-btn:hover {
-  background: #f3f4f6;
-  color: #111827;
-}
-
-[data-theme="dark"] .more-btn {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme="dark"] .more-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-}
-
-/* ============================================
-   KANBAN VIEW
-   ============================================ */
-.kanban-container {
-  flex: 1;
-  padding: 20px 24px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  background: transparent;
-}
-
-.kanban-columns {
+.avatars {
   display: flex;
-  gap: 20px;
-  height: 100%;
-  min-width: min-content;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.kanban-column {
-  flex: 0 0 320px;
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-primary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-large {
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+}
+
+.avatar-more {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .avatar-more {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ===========================
+   Project Details (Expanded)
+   =========================== */
+.project-details {
+  padding: 20px 20px 20px 56px;
+  background: rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 12px;
-  padding: 16px;
-  max-height: calc(100vh - 220px);
+  gap: 24px;
 }
 
-[data-theme="dark"] .kanban-column {
-  background: rgba(255, 255, 255, 0.03);
+[data-theme="dark"] .project-details {
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.kanban-column-header {
+.details-section {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #e5e7eb;
+  flex-direction: column;
+  gap: 12px;
 }
 
-[data-theme="dark"] .kanban-column-header {
-  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
-}
-
-.kanban-column-header h3 {
+.details-section h4 {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-[data-theme="dark"] .kanban-column-header h3 {
-  color: #f7fafc;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.kanban-count {
-  background: #e5e7eb;
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 12px;
-}
-
-[data-theme="dark"] .kanban-count {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.kanban-cards {
-  flex: 1;
-  overflow-y: auto;
+/* Categories Section */
+.categories-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.kanban-card {
-  background: var(--bg-secondary, white);
+.category-group {
+  background: var(--bg-primary);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
+  border-radius: 8px;
+  padding: 12px;
 }
 
-[data-theme="dark"] .kanban-card {
-  background: rgba(255, 255, 255, 0.05);
+[data-theme="dark"] .category-group {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.kanban-card:hover {
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.task-count {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.category-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.no-categories {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.no-categories p {
+  margin: 8px 0 12px 0;
+  font-size: 14px;
+}
+
+/* Team Members */
+.team-members {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.team-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+}
+
+[data-theme="dark"] .team-member {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.member-role {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+[data-theme="dark"] .member-role {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.member-tasks {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* Tasks */
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+[data-theme="dark"] .task-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.task-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.task-icon {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.task-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.task-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  align-items: center;
+}
+
+[data-theme="dark"] .task-meta {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===========================
+   Categories View
+   =========================== */
+.categories-view {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.category-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.category-card {
+  background: var(--bg-primary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+[data-theme="dark"] .category-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.category-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
 }
 
-[data-theme="dark"] .kanban-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.kanban-card-header {
+.category-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: start;
-  margin-bottom: 12px;
-}
-
-.project-icon-small {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 16px;
-}
-
-.kanban-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 2px;
-}
-
-[data-theme="dark"] .kanban-card-title {
-  color: #f7fafc;
-}
-
-.kanban-card-url {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-bottom: 12px;
-}
-
-[data-theme="dark"] .kanban-card-url {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.kanban-card-about {
   margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f3f4f6;
 }
 
-[data-theme="dark"] .kanban-card-about {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.kanban-card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.progress-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-
-.progress-indicator .progress-bar {
-  flex: 1;
-}
-
-.progress-text {
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  min-width: 32px;
-}
-
-[data-theme="dark"] .progress-text {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* ============================================
-   RESPONSIVE
-   ============================================ */
-@media (max-width: 1024px) {
-  .dashboard-content {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-stats {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  }
-
-  .header-controls {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-  }
-
-  .search-filter {
-    justify-content: space-between;
-  }
-
-  .kanban-column {
-    flex: 0 0 280px;
-  }
-}
-
-/* ============================================
-   DASHBOARD VIEW
-   ============================================ */
-.dashboard-container {
-  flex: 1;
-  padding: 20px 24px;
-  overflow-y: auto;
-  background: transparent;
-}
-
-.dashboard-stats {
+.category-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
-.stat-card {
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
-  padding: 18px;
-  transition: all 0.2s;
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-[data-theme="dark"] .stat-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.stat-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
-}
-
-[data-theme="dark"] .stat-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.stat-number {
-  font-size: 28px;
+.stat-value {
+  font-size: 24px;
   font-weight: 700;
-  color: #111827;
-  margin-bottom: 6px;
-  line-height: 1;
-}
-
-[data-theme="dark"] .stat-number {
-  color: #f7fafc;
+  color: var(--text-primary);
 }
 
 .stat-label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
   color: #6b7280;
-  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-[data-theme="dark"] .stat-label {
-  color: rgba(255, 255, 255, 0.6);
+.category-projects h5 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.stat-change {
-  font-size: 11px;
-  color: #9ca3af;
-}
-[data-theme="dark"] .stat-change {
-  color: rgba(255, 255, 255, 0.4);
+.project-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.dashboard-content {
+.project-tag {
+  cursor: pointer;
+}
+
+.project-tag:hover {
+  opacity: 0.8;
+}
+
+.project-tag-more {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .project-tag-more {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.add-category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px dashed rgba(0, 0, 0, 0.2);
+  background: transparent;
+}
+
+[data-theme="dark"] .add-category-card {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+}
+
+.add-category-card:hover {
+  border-color: var(--primary);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] .add-category-card:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.add-category-card p {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ===========================
+   Workload View
+   =========================== */
+.workload-view {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.workload-grid {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 20px;
 }
 
-.dashboard-section {
-  background: white;
+.department-card {
+  background: var(--bg-primary);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
-  padding: 18px;
-  margin-bottom: 16px;
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.2s;
 }
 
-[data-theme="dark"] .dashboard-section {
-  background: rgba(255, 255, 255, 0.03);
+[data-theme="dark"] .department-card {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.dashboard-section h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 14px 0;
+.department-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-[data-theme="dark"] .dashboard-section h3 {
-  color: #f7fafc;
-}
-
-.recent-projects {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.recent-project-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-[data-theme="dark"] .recent-project-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.recent-project-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
-  border-color: #d1d5db;
-}
-
-[data-theme="dark"] .recent-project-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.recent-project-header {
+.dept-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.status-badge.small {
-  padding: 3px 8px;
-  font-size: 11px;
+[data-theme="dark"] .dept-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.recent-project-title {
-  font-size: 15px;
+.dept-header h3 {
+  margin: 0;
+  font-size: 18px;
   font-weight: 600;
-  color: #111827;
-  margin-bottom: 4px;
+  color: var(--text-primary);
 }
 
-[data-theme="dark"] .recent-project-title {
-  color: #f7fafc;
+.dept-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.recent-project-about {
-  font-size: 13px;
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-row .stat-label {
+  font-size: 14px;
   color: #6b7280;
+}
+
+.stat-row .stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dept-progress {
   margin-bottom: 16px;
 }
 
-[data-theme="dark"] .recent-project-about {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.recent-project-footer {
+.progress-label {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-}
-
-[data-theme="dark"] .recent-project-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.progress-mini {
+  margin-bottom: 8px;
   font-size: 13px;
-  font-weight: 600;
   color: #6b7280;
 }
 
-[data-theme="dark"] .progress-mini {
-  color: rgba(255, 255, 255, 0.6);
+.progress-bar-large {
+  width: 100%;
+  height: 8px;
 }
 
-.status-breakdown {
+/* ===========================
+   Empty State
+   =========================== */
+.empty-state {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
 }
 
-.status-item {
+.empty-state h3 {
+  margin: 16px 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+/* ===========================
+   Dialog Styles
+   =========================== */
+.create-project-card {
+  background: var(--bg-primary) !important;
+}
+
+.dialog-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-[data-theme="dark"] .status-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+[data-theme="dark"] .dialog-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.status-item:last-child {
-  border-bottom: none;
-}
-
-.status-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: #374151;
-}
-
-[data-theme="dark"] .status-info {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.status-dot.ongoing {
-  background: #6b9b6b;
-}
-
-.status-dot.pending {
-  background: #f59e0b;
-}
-
-.status-dot.completed {
-  background: #6b9b6b;
-}
-
-.status-dot.unassigned {
-  background: #ef4444;
-}
-
-[data-theme="dark"] .status-dot.ongoing {
-  background: #7b92d1;
-}
-
-[data-theme="dark"] .status-dot.completed {
-  background: #7b92d1;
-}
-
-.status-count {
+.dialog-title {
+  font-size: 20px;
   font-weight: 600;
-  color: #111827;
-  font-size: 16px;
+  color: var(--text-primary);
 }
 
-[data-theme="dark"] .status-count {
-  color: #f7fafc;
-}
-
-.quick-actions {
+.dialog-content {
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
 }
 
-.quick-action-btn {
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.categories-input {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
-  padding: 12px 16px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+}
+
+.input-label {
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: left;
+  color: var(--text-primary);
 }
 
-[data-theme="dark"] .quick-action-btn {
+.selected-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 32px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .selected-categories {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
 }
 
-.quick-action-btn:hover {
-  background: white;
-  border-color: #d1d5db;
-  transform: translateX(2px);
+.empty-text {
+  font-size: 13px;
+  color: #9ca3af;
 }
 
-[data-theme="dark"] .quick-action-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+.category-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
 }
 
-.quick-action-btn span:first-child {
-  font-size: 18px;
+.category-input-row .v-combobox {
+  flex: 1;
 }
 
+.dialog-actions {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .dialog-actions {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ===========================
+   Dark Mode
+   =========================== */
+[data-theme="dark"] .create-project-card {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] :deep(.v-field) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] :deep(.v-field input),
+[data-theme="dark"] :deep(.v-field textarea) {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] :deep(.v-field__outline) {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ===========================
+   Responsive
+   =========================== */
 @media (max-width: 768px) {
-  .content-header {
-    padding: 20px;
+  .projects-list,
+  .categories-view,
+  .workload-view {
+    padding: 16px;
   }
 
-  .header-top {
+  .project-summary {
+    padding-left: 20px;
+  }
+
+  .project-details {
+    padding-left: 20px;
+  }
+
+  .team-members {
     flex-direction: column;
-    gap: 16px;
   }
 
-  .table-container {
-    padding: 20px;
-    overflow-x: auto;
+  .project-meta {
+    flex-wrap: wrap;
   }
 
-  .projects-table {
-    min-width: 800px;
+  .form-row {
+    grid-template-columns: 1fr;
   }
 
-  .kanban-container {
-    padding: 20px;
+  .category-cards {
+    grid-template-columns: 1fr;
   }
 
-  .kanban-column {
-    flex: 0 0 260px;
+  .workload-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .controls-row {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .view-toggle-left,
+  .filters-right {
+    width: 100%;
+  }
+
+  .filters-right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 </style>

@@ -36,6 +36,14 @@
                   </v-chip>
                 </div>
                 <span class="task-time">{{ formatTime(task.dueDate) }}</span>
+                <v-chip 
+                  v-if="task.recurrence && task.recurrence.enabled"
+                  color="purple"
+                  size="x-small"
+                  class="recurring-badge"
+                >
+                  Recurring
+                </v-chip>
               </div>
             </div>
           </div>
@@ -59,6 +67,14 @@
                   </v-chip>
                 </div>
                 <span class="task-date">{{ formatShortDate(task.dueDate) }}</span>
+                <v-chip 
+                  v-if="task.recurrence && task.recurrence.enabled"
+                  color="purple"
+                  size="x-small"
+                  class="recurring-badge"
+                >
+                  Recurring
+                </v-chip>
               </div>
             </div>
           </div>
@@ -79,6 +95,14 @@
                   </v-chip>
                 </div>
                 <span class="task-date">{{ formatShortDate(task.dueDate) }}</span>
+                <v-chip 
+                  v-if="task.recurrence && task.recurrence.enabled"
+                  color="purple"
+                  size="x-small"
+                  class="recurring-badge"
+                >
+                  Recurring
+                </v-chip>
               </div>
             </div>
           </div>
@@ -88,8 +112,7 @@
           <v-icon size="24" class="collapsed-icon">mdi-clock-outline</v-icon>
         </div>
       </div>
-      <!-- Recuurent Tasks Sidebar-->
-      <RecurringTasksSidebar @select="viewTaskDetails" />
+      
 
       <!-- Main Content Area -->
       <div class="main-view-area">
@@ -518,7 +541,6 @@ import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
 import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
-import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
 import ArchivedTasks from '../components/ArchivedTasks.vue'
 
 // Axios client configuration
@@ -537,7 +559,6 @@ const viewTabs = [
   { label: 'Calendar', value: 'calendar' },
   { label: 'Task List', value: 'list' },
   { label: 'Timeline', value: 'timeline' },
-  { label: 'Projects', value: 'projects' },
   { label: 'Team', value: 'team' }
 ]
 const selectedTask = ref(null)
@@ -802,7 +823,11 @@ onMounted(async () => {
     const uniqueTasks = response.data.filter((task, index, self) =>
       index === self.findIndex(t => t.id === task.id)
     );
-    tasks.value = uniqueTasks;
+    // Ensure recurrence property exists on all tasks
+    tasks.value = uniqueTasks.map(task => ({
+      ...task,
+      recurrence: task.recurrence || { enabled: false }
+    }));
   } catch (error) {
     showMessage('Failed to load tasks', 'error');
   }
@@ -1838,6 +1863,7 @@ const handleMessage = ({ message, color }) => {
   border: 1px solid rgba(0, 0, 0, 0.08);
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 [data-theme="dark"] .upcoming-task {
@@ -1871,10 +1897,14 @@ const handleMessage = ({ message, color }) => {
   margin-right: 8px;
 }
 
-.task-time,
-.task-date {
-  font-size: 12px;
-  color: #7f8c8d;
+/* Recurring Badge in Sidebar */
+.recurring-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 9px !important;
+  height: 16px !important;
+  padding: 0 6px !important;
 }
 
 /* ===========================

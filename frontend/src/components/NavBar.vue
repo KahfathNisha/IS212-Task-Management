@@ -36,9 +36,7 @@ const menuItems = [
   { title: 'Projects', path: '/projects', icon: 'mdi-folder-multiple' },
   { title: 'Tasks', path: '/tasks', icon: 'mdi-clipboard-list' },
   { title: 'Reports', path: '/reports', icon: 'mdi-file-document' },
-  { title: 'Dashboards', path: '/dashboards', icon: 'mdi-chart-line' },
   { title: 'Notifications', path: '/notifications', icon: 'mdi-bell' },
-  { title: 'Profile', path: '/profile', icon: 'mdi-account' }
 ]
 
 const pageTitle = computed(() => {
