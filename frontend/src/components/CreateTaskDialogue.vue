@@ -65,6 +65,18 @@
             />
           </div>
           
+          <div class="mb-4">
+            <v-autocomplete
+              v-model="localTask.taskOwner"
+              label="Task Owner *"
+              :items="teamMembers"
+              :rules="[v => !!v || 'Task Owner is required']"
+              required
+              placeholder="Search and select task owner"
+              variant="outlined"
+            />
+          </div>
+          
           <div class="d-flex ga-4 mb-4">
             <v-autocomplete
               v-model="localTask.assignedTo"
@@ -322,7 +334,6 @@ const props = defineProps({
 const emit = defineEmits(['update:show', 'save', 'cancel'])
 
 const showMessage = (message, color = 'success') => {
-  // Emit a message event that can be handled by the parent
   emit('message', { message, color })
 }
 
@@ -333,7 +344,6 @@ const localShow = computed({
 
 const normalizeCollaborators = (collabs) => {
   const normalized = (collabs || []).map(c => typeof c === 'string' ? { name: c, permission: 'view' } : c)
-  // Remove duplicates based on name
   const seen = new Set()
   return normalized.filter(c => {
     if (seen.has(c.name)) return false
@@ -348,22 +358,40 @@ const collaboratorPermissions = ref(normalizeCollaborators(localTask.value.colla
 const formValid = ref(false)
 const taskForm = ref(null)
 
+// ===== THIS IS THE UPDATED BLOCK =====
 watch(() => props.model, (v) => {
-  localTask.value = { ...v }
+  // Use a fresh copy of the incoming data
+  const taskData = { ...v };
+
+  // --- FIX FOR DATE ---
+  // If a due date exists, format it to YYYY-MM-DD
+  if (taskData.dueDate) {
+    taskData.dueDate = taskData.dueDate.split('T')[0];
+  }
+
+  // --- FIX FOR TASK OWNER (and all other fields) ---
+  // This explicit assignment ensures taskOwner is populated
+  localTask.value = taskData;
+  
+  // Debugging: Check if taskOwner is present in the incoming data
+  console.log('Populating form with model:', v);
+
   collaboratorPermissions.value = normalizeCollaborators(v.collaborators)
-  localTask.value.collaborators = [...new Set(collaboratorPermissions.value.map(c => c.name))] // Deduplicate names
-  console.log('Setting localTask.collaborators:', localTask.value.collaborators)
+  localTask.value.collaborators = [...new Set(collaboratorPermissions.value.map(c => c.name))] 
+
   subtasks.value = v?.subtasks ? v.subtasks.map(s => {
+    // --- FIX FOR SUBTASK DATES ---
+    if (s.dueDate) {
+      s.dueDate = s.dueDate.split('T')[0];
+    }
     const collabPerms = normalizeCollaborators(s.collaborators)
     const dedupedCollabs = [...new Set(collabPerms.map(c => c.name))]
-    console.log('Subtask collaborators after dedup:', dedupedCollabs)
     return { ...s, collaborators: dedupedCollabs, collaboratorPermissions: collabPerms }
   }) : []
 }, { immediate: true })
 
 const showRecurrence = ref(false);
 
-// Ensure localTask.recurrence always exists and is reactive
 watch(localTask, (val) => {
   if (!val.recurrence) {
     val.recurrence = { enabled: false, type: '', interval: 1, endDate: '' }
@@ -389,18 +417,15 @@ const addSubtask = () => {
   })
 }
 
-// Sync main task collaborator permissions
 watch(() => localTask.value.collaborators, (newCollabs, oldCollabs) => {
   if (!newCollabs) return
-  const newNames = [...new Set(newCollabs || [])] // Ensure unique names
-  const oldNames = [...new Set(oldCollabs || [])] // Ensure unique old names
+  const newNames = [...new Set(newCollabs || [])] 
+  const oldNames = [...new Set(oldCollabs || [])] 
   const added = newNames.filter(n => !oldNames.includes(n))
   const removed = oldNames.filter(n => !newNames.includes(n))
 
-  // Remove collaborators that are no longer selected
   collaboratorPermissions.value = collaboratorPermissions.value.filter(p => !removed.includes(p.name))
 
-  // Add new collaborators with default 'view' permission, but only if they don't already exist
   added.forEach(name => {
     if (!collaboratorPermissions.value.some(p => p.name === name)) {
       collaboratorPermissions.value.push({ name, permission: 'view' })
@@ -408,19 +433,16 @@ watch(() => localTask.value.collaborators, (newCollabs, oldCollabs) => {
   })
 }, { deep: true })
 
-// Sync subtask collaborator permissions
 watchEffect(() => {
   subtasks.value.forEach(subtask => {
     if (!subtask.collaboratorPermissions) subtask.collaboratorPermissions = []
-    const currentNames = [...new Set(subtask.collaborators || [])] // Ensure unique names
+    const currentNames = [...new Set(subtask.collaborators || [])] 
     const existingNames = subtask.collaboratorPermissions.map(p => p.name)
     const added = currentNames.filter(n => !existingNames.includes(n))
     const removed = existingNames.filter(n => !currentNames.includes(n))
 
-    // Remove collaborators that are no longer selected
     subtask.collaboratorPermissions = subtask.collaboratorPermissions.filter(p => !removed.includes(p.name))
 
-    // Add new collaborators with default 'view' permission, but only if they don't already exist
     added.forEach(name => {
       if (!subtask.collaboratorPermissions.some(p => p.name === name)) {
         subtask.collaboratorPermissions.push({ name, permission: 'view' })
@@ -435,18 +457,15 @@ const onCancel = () => {
 }
 
 const onSave = () => {
-  // Validate form
   if (!taskForm.value.validate()) {
     return
   }
 
-  // Validate main task title
   if (!localTask.value.title || localTask.value.title.trim() === '') {
     showMessage('Task title is required', 'error')
     return
   }
 
-  // Validate subtasks
   for (let i = 0; i < subtasks.value.length; i++) {
     const subtask = subtasks.value[i]
     if (!subtask.title || subtask.title.trim() === '') {
@@ -461,7 +480,6 @@ const onSave = () => {
       showMessage(`Subtask ${i + 1}: Priority is required`, 'error')
       return
     }
-    // Check if due date is in the past
     const subDueDate = new Date(subtask.dueDate)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -471,13 +489,12 @@ const onSave = () => {
     }
   }
 
-  // Ensure recurrence.enabled is set correctly
   if (localTask.value.recurrence && localTask.value.recurrence.type) {
     localTask.value.recurrence.enabled = true
   } else {
     localTask.value.recurrence = { enabled: false, type: '', interval: 1, startDate: '', endDate: '' }
   }
-  // merge subtasks and collaborators with permissions
+  
   const dedupedCollaborators = collaboratorPermissions.value.filter((perm, index, self) =>
     index === self.findIndex(p => p.name === perm.name)
   )
@@ -491,12 +508,10 @@ const onSave = () => {
       )
     }))
   }
-  console.log('Final payload collaborators:', payload.collaborators)
-  console.log('Final payload subtasks collaborators:', payload.subtasks.map(s => s.collaborators))
+
   emit('save', payload)
   emit('update:show', false)
 }
-
 </script>
 
 <style scoped>

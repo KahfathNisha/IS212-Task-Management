@@ -13,10 +13,16 @@ const formatTimestampToISO = (timestamp) => {
 // Create Task
 exports.createTask = async (req, res) => {
     try {
-        const { dueDate, assigneeId, title, priority, subtasks } = req.body;
+        // === MODIFIED: Added taskOwner to destructuring ===
+        const { dueDate, assigneeId, title, priority, subtasks, taskOwner } = req.body;
 
         if (!title || title.trim() === '') {
             return res.status(400).json({ message: "Title is required" });
+        }
+        
+        // === ADDED: Validation for taskOwner ===
+        if (!taskOwner) {
+            return res.status(400).json({ message: "Task Owner is required" });
         }
 
         if (!dueDate) {
@@ -75,8 +81,10 @@ exports.createTask = async (req, res) => {
             const recurrence = task.recurrence;
 
             // 1. Create the recurringTasks entry
+            // === MODIFIED: Added taskOwner to the recurring task template ===
             const recurringTaskRef = await db.collection('recurringTasks').add({
                 userId: assigneeId,
+                taskOwner: task.taskOwner, // Save task owner here
                 recurrence: recurrence,
                 title: task.title,
                 description: task.description,
@@ -202,7 +210,8 @@ exports.getAllTasks = async (req, res) => {
 // Update entire task
 exports.updateTask = async (req, res) => {
     try {
-        const { dueDate, priority, subtasks, title, collaborators, ...otherFields } = req.body;
+        // === MODIFIED: Added taskOwner to destructuring ===
+        const { dueDate, priority, subtasks, title, collaborators, taskOwner, ...otherFields } = req.body;
 
         const updateData = {
             ...otherFields,
@@ -218,6 +227,11 @@ exports.updateTask = async (req, res) => {
         // Validate title
         if (title !== undefined && (!title || title.trim() === '')) {
             return res.status(400).json({ message: "title is required" });
+        }
+        
+        // === ADDED: Validation for taskOwner ===
+        if (taskOwner !== undefined && !taskOwner) {
+            return res.status(400).json({ message: "Task Owner is required" });
         }
 
         // Validate priority
@@ -277,9 +291,11 @@ exports.updateTask = async (req, res) => {
             updateData.dueDate = admin.firestore.Timestamp.fromDate(due);
         }
 
-        // Handle title and priority updates
+        // Handle title, priority, and taskOwner updates
         if (title !== undefined) updateData.title = title;
         if (priority !== undefined) updateData.priority = priority;
+        // === ADDED: Handle taskOwner update ===
+        if (taskOwner !== undefined) updateData.taskOwner = taskOwner;
 
         // Remove fields that shouldn't be updated
         const { id, createdAt, ...finalUpdateData } = updateData;
@@ -375,33 +391,44 @@ exports.getAllRecurringTasks = async (req, res) => {
 exports.updateRecurringTask = async (req, res) => {
     try {
         const recurringTaskId = req.params.id;
-        const { userId, recurrence } = req.body;
+        // === MODIFIED: Added taskOwner to destructuring ===
+        const { userId, recurrence, taskOwner } = req.body;
 
         // 2. Update recurrence rules
-        await db.collection('recurringTasks').doc(recurringTaskId).update({
+        // === MODIFIED: Build update object dynamically ===
+        const recurringUpdateData = {
             recurrence,
             updatedAt: admin.firestore.Timestamp.now()
-        });
+        };
+        if (taskOwner) {
+            recurringUpdateData.taskOwner = taskOwner;
+        }
+        await db.collection('recurringTasks').doc(recurringTaskId).update(recurringUpdateData);
 
         // 3. Apply changes only to future instances (not past/completed)
         const now = new Date();
         const tasksSnapshot = await db.collection('tasks')
             .where('recurringTaskId', '==', recurringTaskId)
             .get();
+        
+        // === MODIFIED: Build update object for batch dynamically ===
+        const futureInstanceUpdate = {
+            recurrence,
+            updatedAt: admin.firestore.Timestamp.now()
+        };
+        if (taskOwner) {
+            futureInstanceUpdate.taskOwner = taskOwner;
+        }
 
         const batch = db.batch();
         tasksSnapshot.forEach(doc => {
             const data = doc.data();
-            // Need a reliable way to get JS Date from Firestore Timestamp object
             const dueDate = data.dueDate && data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
             if (
                 data.status !== 'Completed' &&
                 dueDate >= now
             ) {
-                batch.update(doc.ref, {
-                    recurrence,
-                    updatedAt: admin.firestore.Timestamp.now()
-                });
+                batch.update(doc.ref, futureInstanceUpdate);
             }
         });
         await batch.commit();
