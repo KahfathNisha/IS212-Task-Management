@@ -87,18 +87,18 @@
             </v-card-text>
 
             <!-- Demo Credentials -->
-            <v-card-text class="px-8 pb-8 pt-0">
-              <v-divider class="mb-4" />
-              <div class="text-center text-caption text-medium-emphasis">
-                <div class="font-weight-bold mb-2">Demo Credentials:</div>
-                <div class="mb-1">
-                  <strong>Staff:</strong> john.doe@company.com / TestPassword123!
-                </div>
-                <div>
-                  <strong>Manager:</strong> jane.smith@company.com / AdminPass456!
-                </div>
-              </div>
-            </v-card-text>
+            <v-card-text class="text-caption text-grey">
+            <v-divider class="mb-3" />
+            <div class="text-center" style="line-height: 1.6;">
+              <strong>Demo Credentials:</strong><br>
+              <strong>Director:</strong> jack.sim@company.com / Password123!<br>
+              <strong>Manager:</strong> michael.brown@company.com / Password123!<br>
+              <strong>HR:</strong> sally.loh@company.com / Password123!<br>
+              <strong>Staff 1:</strong> john.doe@company.com / TestPassword123!<br>
+              <strong>Staff 2:</strong> jane.smith@company.com / AdminPass456!<br>
+              <strong>Staff 3:</strong> alice.johnson@company.com / Password123!
+            </div>
+          </v-card-text>
           </v-card>
         </v-col>
       </v-row>
