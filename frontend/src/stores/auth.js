@@ -8,7 +8,7 @@ import axios from 'axios'; // Import axios
 
 // Create a dedicated API client for your auth routes
 const authApiClient = axios.create({
-  baseURL: "http://localhost:3000/auth",
+  baseURL: "http://localhost:3000/api/auth",
 });
 
 export const useAuthStore = defineStore("auth", () => {
@@ -57,6 +57,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       // 1. Check for account lockout (this part is correct)
       const checkResponse = await authApiClient.post('/check-lockout', { email });
+
       const checkData = await checkResponse.data;
       if (checkData.isLocked) {
         throw new Error(checkData.message || 'Account is locked.');
