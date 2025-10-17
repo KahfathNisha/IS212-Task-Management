@@ -61,9 +61,8 @@ app.get('/health', (req, res) => {
 
 // Use individual routers for API routes
 app.use('/tasks', taskRouter);
-// --- THIS IS THE FIX ---
-// The path now correctly matches what the frontend is calling: /api/auth
-app.use('/auth', authRouter);
+
+app.use('/api/auth', authRouter);
 app.use('/api/fcm', fcmRouter);
 
 console.log('✅ Routes configured');
