@@ -8,7 +8,7 @@ import axios from 'axios'; // Import axios
 
 // Create a dedicated API client for your auth routes
 const authApiClient = axios.create({
-  baseURL: "http://localhost:3000/api/auth",
+  baseURL: "http://localhost:3000/auth",
 });
 
 export const useAuthStore = defineStore("auth", () => {

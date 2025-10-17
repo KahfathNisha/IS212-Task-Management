@@ -525,7 +525,7 @@ import ListView from './ListView.vue'
 import ArchivedTasks from '../components/ArchivedTasks.vue'
 import { useAuthStore } from '@/stores/auth'; // Import your auth store
 
-// Axios client configuration
+// Axios client configuration (this is correct)
 const axiosClient = axios.create({
     baseURL: 'http://localhost:3000', 
     headers: {
@@ -533,7 +533,7 @@ const axiosClient = axios.create({
     },
 });
 
-// This interceptor automatically adds the auth token to every request.
+// Axios interceptor to send the token (this is correct)
 axiosClient.interceptors.request.use(config => {
   const token = localStorage.getItem('firebaseIdToken');
   if (token) {
@@ -544,12 +544,97 @@ axiosClient.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
-// --- THIS SECTION IS UPDATED ---
-// Get an instance of the auth store
+// Get an instance of the auth store (this is correct)
 const authStore = useAuthStore();
-// Create a computed property to get the logged-in user's data reactively
+// Create a computed property to get the logged-in user's data (this is correct)
 const currentUser = computed(() => authStore.userData);
 
+const tasks = ref([]) // This will hold ALL tasks from the backend
+
+// --- 1. THIS IS THE NEW CENTRAL FILTER ---
+// This computed property returns only the tasks that the current user should see.
+const userVisibleTasks = computed(() => {
+  if (!currentUser.value || !currentUser.value.name) {
+    // If there's no user logged in, show no tasks.
+    return [];
+  }
+  
+  const userName = currentUser.value.name;
+
+  return tasks.value.filter(task => {
+    // Check if the user is the task owner
+    const isOwner = task.taskOwner === userName;
+    
+    // Check if the user is the assignee
+    const isAssignee = task.assignedTo === userName;
+
+    // Check if the user is a collaborator
+    const isCollaborator = Array.isArray(task.collaborators) && 
+                           task.collaborators.some(c => c.name === userName);
+
+    // The task is visible if ANY of these conditions are true
+    return isOwner || isAssignee || isCollaborator;
+  });
+});
+
+
+// --- 2. ALL OTHER COMPUTED PROPERTIES ARE NOW UPDATED ---
+// They now use 'userVisibleTasks' as their starting point instead of the raw 'tasks' list.
+
+const todayTasks = computed(() => {
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = userVisibleTasks.value.filter(task => task.dueDate === today && task.status !== 'Completed');
+  return filterTasks(filtered); // Applies secondary filters like priority, etc.
+})
+
+const weekTasks = computed(() => {
+  const today = new Date();
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 7);
+  const filtered = userVisibleTasks.value.filter(task => {
+    if (!task.dueDate || task.status === 'Completed') return false;
+    const taskDate = new Date(task.dueDate);
+    return taskDate > today && taskDate <= nextWeek;
+  });
+  return filterTasks(filtered);
+})
+
+const overdueTasks = computed(() => {
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = userVisibleTasks.value.filter(task => task.dueDate && task.dueDate < today && task.status !== 'Completed');
+  return filterTasks(filtered);
+})
+
+const filteredTasksList = computed(() => {
+  // The list view should show only visible tasks, plus any other active filters
+  return filterTasks(userVisibleTasks.value);
+})
+
+
+// --- 3. THE 'getTasksForDate' FUNCTION IS ALSO UPDATED ---
+const getTasksForDate = (dateKey) => {
+  let items = [];
+  // We iterate over the pre-filtered visible tasks list
+  userVisibleTasks.value.forEach(task => {
+    const taskDate = task.dueDate?.split('T')[0];
+    if (task.subtasks && task.subtasks.length > 0) {
+      const hasMatchingSubtask = task.subtasks.some(sub => sub.dueDate?.split('T')[0] === dateKey);
+      if (taskDate === dateKey || hasMatchingSubtask) items.push(task);
+      task.subtasks.forEach((subtask, index) => {
+        if (subtask.dueDate?.split('T')[0] === dateKey) {
+          items.push({ ...subtask, id: `${task.id}-subtask-${index}`, isSubtask: true, parentTask: task });
+        }
+      });
+    } else if (taskDate === dateKey) {
+      items.push(task);
+    }
+  });
+  // Secondary filters (priority, etc.) are still applied at the end
+  return filterTasks(items);
+}
+
+
+// --- The rest of your script setup remains unchanged ---
 const viewMode = ref('month')
 const currentDate = ref(new Date())
 const viewType = ref('calendar')
@@ -613,8 +698,6 @@ const departmentFilterOptions = departments.map(dept => ({ title: dept, value: d
 
 const menu = ref(false)
 const showArchived = ref(false)
-
-const tasks = ref([])
 
 const newTask = ref({
   title: '',
@@ -744,30 +827,6 @@ const filterTasks = (taskArray) => {
     return filtered;
 }
 
-const todayTasks = computed(() => {
-  const today = new Date().toISOString().split('T')[0];
-  const filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Completed');
-  return filterTasks(filtered);
-})
-
-const weekTasks = computed(() => {
-  const today = new Date();
-  const nextWeek = new Date(today);
-  nextWeek.setDate(today.getDate() + 7);
-  const filtered = tasks.value.filter(task => {
-    if (!task.dueDate || task.status === 'Completed') return false;
-    const taskDate = new Date(task.dueDate);
-    return taskDate > today && taskDate <= nextWeek;
-  });
-  return filterTasks(filtered);
-})
-
-const overdueTasks = computed(() => {
-  const today = new Date().toISOString().split('T')[0];
-  const filtered = tasks.value.filter(task => task.dueDate && task.dueDate < today && task.status !== 'Completed');
-  return filterTasks(filtered);
-})
-
 const parentTaskProgress = computed(() => {
   const task = selectedTask.value;
   if (!task || !task.subtasks || task.subtasks.length === 0) return 0;
@@ -796,10 +855,6 @@ const selectedFilters = computed(() => {
     ...selectedPriorities.value.map(p => ({ key: `priority-${p}`, label: priorityFilterOptions.find(o => o.value === p)?.title || p, type: 'priority', value: p })),
     ...selectedAssignees.value.map(a => ({ key: `assignee-${a}`, label: assigneeFilterOptions.find(o => o.value === a)?.title || a, type: 'assignee', value: a }))
   ]
-})
-
-const filteredTasksList = computed(() => {
-  return filterTasks(tasks.value);
 })
 
 const validateDueDate = (dateString) => {
@@ -1017,25 +1072,6 @@ const addTaskForSelectedDate = () => {
 const addTaskForDate = (dateKey) => {
   newTask.value.dueDate = dateKey
   showCreateDialog.value = true
-}
-
-const getTasksForDate = (dateKey) => {
-  let items = [];
-  tasks.value.forEach(task => {
-    const taskDate = task.dueDate?.split('T')[0];
-    if (task.subtasks && task.subtasks.length > 0) {
-      const hasMatchingSubtask = task.subtasks.some(sub => sub.dueDate?.split('T')[0] === dateKey);
-      if (taskDate === dateKey || hasMatchingSubtask) items.push(task);
-      task.subtasks.forEach((subtask, index) => {
-        if (subtask.dueDate?.split('T')[0] === dateKey) {
-          items.push({ ...subtask, id: `${task.id}-subtask-${index}`, isSubtask: true, parentTask: task });
-        }
-      });
-    } else if (taskDate === dateKey) {
-      items.push(task);
-    }
-  });
-  return filterTasks(items);
 }
 
 const getTaskStatusClass = (status, dueDate) => {
