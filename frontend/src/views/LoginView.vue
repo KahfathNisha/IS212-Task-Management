@@ -131,6 +131,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+// This tells Vue to look inside the 'src' folder for 'stores/auth.js'
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();

@@ -56,12 +56,24 @@
           <v-col cols="6">
             <div class="detail-section">
               <div class="detail-section-icon-row">
+                <v-icon size="small" class="detail-icon">mdi-account-star</v-icon>
+                <h4>Task Owner</h4>
+              </div>
+              <p>{{ task.taskOwner || 'Not set' }}</p>
+            </div>
+          </v-col>
+          <v-col cols="6">
+            <div class="detail-section">
+              <div class="detail-section-icon-row">
                 <v-icon size="small" class="detail-icon">mdi-account</v-icon>
                 <h4>Assigned To</h4>
               </div>
               <p>{{ task.assignedTo || 'Unassigned' }}</p>
             </div>
           </v-col>
+        </v-row>
+
+        <v-row>
           <v-col cols="6">
             <div class="detail-section">
               <div class="detail-section-icon-row">
@@ -71,8 +83,8 @@
               <p>{{ task.priority || 'Not set' }}</p>
             </div>
           </v-col>
+          <v-col cols="6"></v-col>
         </v-row>
-
         <v-row>
           <v-col cols="12">
             <div class="detail-section">

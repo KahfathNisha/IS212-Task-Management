@@ -1,8 +1,6 @@
 <template>
   <div class="tasks-container">
-    <!-- Main Content Area -->
     <div class="content-layout">
-      <!-- Upcoming Tasks Sidebar -->
       <div class="upcoming-sidebar" :class="{ 'sidebar-collapsed': !upcomingSidebarOpen }">
         <div class="sidebar-header">
           <h3 v-if="upcomingSidebarOpen">Upcoming Tasks</h3>
@@ -114,13 +112,11 @@
       </div>
       
 
-      <!-- Main Content Area -->
       <div class="main-view-area">
-        <!-- Header - Always Visible -->
         <div class="view-header">
           <div class="header-left">
-            <h1>Good Morning, John!</h1>
-            <p class="date-subtitle">It's Saturday, 27 September 2025</p>
+            <h1>Good Morning, {{ currentUser?.name || 'User' }}!</h1>
+            <p class="date-subtitle">It's Friday, 17 October 2025</p>
           </div>
           
           <div class="header-right">
@@ -142,18 +138,15 @@
               <v-list>
                 <v-list-item @click="showArchived = true">
                   <v-list-item-title>Archived Tasks</v-list-item-title>
-                  <!-- Archived Tasks Component -->
-                <ArchivedTasks :show="showArchived" @close="showArchived = false" />
+                  <ArchivedTasks :show="showArchived" @close="showArchived = false" />
                 </v-list-item>
               </v-list>
             </v-menu>
           </div>
         </div>
 
-        <!-- Controls - Always Visible -->
         <div class="view-controls">
           <div class="controls-row">
-            <!-- Left side: View toggle -->
             <div class="view-toggle-left">
               <div class="view-tabs">
                 <button 
@@ -167,7 +160,6 @@
               </div>
             </div>
 
-            <!-- Right side: Filters -->
             <div class="filters-right">
               <div class="filter-label">Filters</div>
               
@@ -214,7 +206,6 @@
               </v-btn>
             </div>
 
-            <!-- Department Dropdown -->
             <div
               v-show="departmentMenuOpen"
               class="custom-filter-dropdown"
@@ -245,12 +236,11 @@
                 </div>
               </div>
               <div class="dropdown-footer">
-                <v-btn @click="closeDepartmentMenu" variant="outlined">Close</v-btn>
+                <v-btn @click="closeAllFilterMenus" variant="outlined">Close</v-btn>
                 <v-btn @click="applyDepartmentFilter" color="primary">Apply</v-btn>
               </div>
             </div>
 
-            <!-- Priority Dropdown -->
             <div
               v-show="priorityMenuOpen"
               class="custom-filter-dropdown"
@@ -281,12 +271,11 @@
                 </div>
               </div>
               <div class="dropdown-footer">
-                <v-btn @click="closePriorityMenu" variant="outlined">Close</v-btn>
+                <v-btn @click="closeAllFilterMenus" variant="outlined">Close</v-btn>
                 <v-btn @click="applyPriorityFilter" color="primary">Apply</v-btn>
               </div>
             </div>
 
-            <!-- Assignee Dropdown -->
             <div
               v-show="assigneeMenuOpen"
               class="custom-filter-dropdown"
@@ -317,14 +306,13 @@
                 </div>
               </div>
               <div class="dropdown-footer">
-                <v-btn @click="closeAssigneeMenu" variant="outlined">Close</v-btn>
+                <v-btn @click="closeAllFilterMenus" variant="outlined">Close</v-btn>
                 <v-btn @click="applyAssigneeFilter" color="primary">Apply</v-btn>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Filter Chips -->
         <div class="filter-chips" v-if="selectedFilters.length > 0">
           <v-chip
             v-for="filter in selectedFilters"
@@ -337,7 +325,6 @@
           </v-chip>
         </div>
 
-        <!-- CALENDAR VIEW ONLY -->
         <div v-if="viewType === 'calendar'" class="calendar-content">
           <div class="calendar-nav">
             <v-btn icon="mdi-chevron-left" variant="text" @click="previousPeriod" rounded="lg" class="nav-arrow-left"></v-btn>
@@ -353,7 +340,6 @@
             <v-btn icon="mdi-chevron-right" variant="text" @click="nextPeriod" rounded="lg" class="nav-arrow-right"></v-btn>
           </div>
 
-                  <!-- Month Calendar View -->
         <div v-if="viewMode === 'month'" class="calendar-grid">
           <div class="calendar-header-row">
             <div v-for="day in weekDays" :key="day" class="day-header">
@@ -402,7 +388,6 @@
           </div>
         </div>
 
-        <!-- Week Calendar View -->
         <div v-else-if="viewMode === 'week'" class="weekly-view">
           <div class="week-container">
             <div 
@@ -465,7 +450,6 @@
           @add-task="showCreateDialog = true"
         />
 
-      <!-- LIST VIEW ONLY -->
       <ListView
         v-if="viewType === 'list' && currentView === 'list'"
         :tasks="filteredTasksList"
@@ -490,7 +474,6 @@
           
     </div>
 
-    <!-- Task Details Dialog -->
     <TaskDetailsDialog
       :show="showDetailsDialog"
       @update:show="showDetailsDialog = $event"
@@ -504,7 +487,6 @@
       @archive="archiveTask"
     />
 
-    <!-- Create Task Dialog -->
     <CreateTaskDialogue
       v-model="showCreateDialog"
       :model="newTask"
@@ -513,11 +495,11 @@
       :priorities="priorities"
       :teamMembers="teamMembers"
       :todayDate="todayDate"
+      :currentUser="currentUser"  
       @save="isEditing ? updateTask(newTask.id, $event) : handleCreateSave($event)"
       @cancel="cancelCreate"
       @message="handleMessage"
     />
-
     <v-snackbar
       v-model="showSnackbar"
       :color="snackbarColor"
@@ -528,7 +510,6 @@
 
     </div>
   </div>
-
 </template>
 
 <script setup>
@@ -542,6 +523,7 @@ import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
 import ArchivedTasks from '../components/ArchivedTasks.vue'
+import { useAuthStore } from '@/stores/auth'; // Import your auth store
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -550,6 +532,23 @@ const axiosClient = axios.create({
         'Content-Type': 'application/json',
     },
 });
+
+// This interceptor automatically adds the auth token to every request.
+axiosClient.interceptors.request.use(config => {
+  const token = localStorage.getItem('firebaseIdToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, error => {
+  return Promise.reject(error);
+});
+
+// --- THIS SECTION IS UPDATED ---
+// Get an instance of the auth store
+const authStore = useAuthStore();
+// Create a computed property to get the logged-in user's data reactively
+const currentUser = computed(() => authStore.userData);
 
 const viewMode = ref('month')
 const currentDate = ref(new Date())
@@ -615,170 +614,7 @@ const departmentFilterOptions = departments.map(dept => ({ title: dept, value: d
 const menu = ref(false)
 const showArchived = ref(false)
 
-const tasks = ref([
-  {
-    id: '1',
-    title: 'Complete project proposal',
-    description: 'Write and finalize the Q4 project proposal for the new marketing campaign',
-    dueDate: '2025-09-27',
-    assignedTo: 'John Doe',
-    status: 'Ongoing',
-    priority: 1,
-    attachments: [],
-    startTime: '2025-09-25T14:30:00',
-    endTime: '2025-09-27T11:00:00',
-    createdAt: '2025-09-25T14:30:00',
-    updatedAt: '2025-09-26T10:15:00',
-    statusHistory: [
-      {
-        timestamp: '2025-09-25T14:30:00',
-        oldStatus: null,
-        newStatus: 'Ongoing'
-      }
-    ],
-    subtasks: [
-      {
-        title: 'Research market trends',
-        description: 'Gather data on current market trends',
-        assignedTo: 'Jane Smith',
-        startTime: '2025-09-27T09:00:00',
-        endTime: '2025-09-27T17:00:00',
-        dueDate: '2025-09-27',
-        status: 'Ongoing',
-        priority: 2,
-        createdAt: '2025-09-25T15:00:00',
-        statusHistory: [
-          {
-            timestamp: '2025-09-25T15:00:00',
-            oldStatus: null,
-            newStatus: 'Ongoing'
-          }
-        ],
-        attachments: []
-      },
-      {
-        title: 'Write draft proposal',
-        description: 'Create the initial draft of the proposal',
-        assignedTo: 'John Doe',
-        startTime: '2025-09-26T10:00:00',
-        endTime: '2025-09-27T11:00:00',
-        dueDate: '2025-09-27',
-        status: 'Pending Review',
-        priority: 2,
-        createdAt: '2025-09-26T10:00:00',
-        statusHistory: [
-          {
-            timestamp: '2025-09-26T10:00:00',
-            oldStatus: null,
-            newStatus: 'Ongoing'
-          },
-          {
-            timestamp: '2025-09-26T12:00:00',
-            oldStatus: 'Ongoing',
-            newStatus: 'Pending Review'
-          }
-        ],
-        attachments: []
-      }
-    ]
-  },
-  {
-    id: '2',
-    title: 'Review quarterly reports',
-    description: 'Review and approve the quarterly financial reports',
-    dueDate: '2025-09-28',
-    assignedTo: 'Jane Smith',
-    status: 'Ongoing',
-    priority: 7,
-    attachments: [],
-    startTime: '2025-09-28T14:00:00',
-    endTime: '2025-09-28T16:00:00',
-    createdAt: '2025-09-24T11:20:00',
-    updatedAt: '2025-09-24T11:20:00',
-    statusHistory: [
-      {
-        timestamp: '2025-09-24T11:20:00',
-        oldStatus: null,
-        newStatus: 'Ongoing'
-      }
-    ],
-    subtasks: []
-  },
-  {
-    id: '3',
-    title: 'Update website content',
-    description: 'Update the company website with new product information',
-    dueDate: '2025-09-24',
-    assignedTo: 'Alice Johnson',
-    status: 'Unassigned',
-    priority: 6,
-    attachments: [],
-    startTime: '2025-09-24T10:00:00',
-    endTime: '2025-09-24T12:00:00',
-    createdAt: '2025-09-22T16:45:00',
-    updatedAt: '2025-09-23T08:30:00',
-    statusHistory: [
-      {
-        timestamp: '2025-09-22T16:45:00',
-        oldStatus: null,
-        newStatus: 'Unassigned'
-      }
-    ],
-    subtasks: [
-      {
-        title: 'Design new banner',
-        description: 'Create a new banner for the homepage',
-        assignedTo: 'Alice Johnson',
-        startTime: '2025-09-24T10:00:00',
-        endTime: '2025-09-24T11:00:00',
-        dueDate: '2025-09-24',
-        status: 'Ongoing',
-        priority: 5,
-        createdAt: '2025-09-23T09:15:00',
-        statusHistory: [
-          {
-            timestamp: '2025-09-23T09:15:00',
-            oldStatus: null,
-            newStatus: 'Ongoing'
-          }
-        ],
-        attachments: []
-      }
-    ]
-  },
-  {
-    id: '4',
-    title: 'Prepare presentation slides',
-    description: 'Create slides for the upcoming client presentation',
-    dueDate: '2025-10-02',
-    assignedTo: 'John Doe',
-    status: 'Completed',
-    priority: 2,
-    attachments: [],
-    startTime: '2025-10-02T13:00:00',
-    endTime: '2025-10-02T15:00:00',
-    createdAt: '2025-09-26T12:00:00',
-    updatedAt: '2025-09-29T17:30:00',
-    statusHistory: [
-      {
-        timestamp: '2025-09-26T12:00:00',
-        oldStatus: null,
-        newStatus: 'Ongoing'
-      },
-      {
-        timestamp: '2025-09-27T14:20:00',
-        oldStatus: 'Ongoing',
-        newStatus: 'Pending Review'
-      },
-      {
-        timestamp: '2025-09-29T17:30:00',
-        oldStatus: 'Pending Review',
-        newStatus: 'Completed'
-      }
-    ],
-    subtasks: []
-  }
-])
+const tasks = ref([])
 
 const newTask = ref({
   title: '',
@@ -819,21 +655,18 @@ const subtasks = ref([])
 onMounted(async () => {
   try {
     const response = await axiosClient.get('/tasks');
-    // Remove duplicates based on id before setting tasks
     const uniqueTasks = response.data.filter((task, index, self) =>
       index === self.findIndex(t => t.id === task.id)
     );
-    // Ensure recurrence property exists on all tasks
     tasks.value = uniqueTasks.map(task => ({
       ...task,
       recurrence: task.recurrence || { enabled: false }
     }));
   } catch (error) {
-    showMessage('Failed to load tasks', 'error');
+    showMessage('Failed to load tasks. You may need to log in.', 'error');
   }
 });
 
-// Get today's date in YYYY-MM-DD format for min date validation
 const todayDate = computed(() => {
   return new Date().toISOString().split('T')[0]
 })
@@ -842,16 +675,13 @@ const calendarDates = computed(() => {
   const dates = []
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
-
   const firstDay = new Date(year, month, 1)
   const startDate = new Date(firstDay)
   const dayOfWeek = (firstDay.getDay() + 6) % 7
   startDate.setDate(firstDay.getDate() - dayOfWeek)
-
   for (let i = 0; i < 42; i++) {
     const date = new Date(startDate)
     date.setDate(startDate.getDate() + i)
-
     const today = new Date()
     dates.push({
       date: date,
@@ -864,7 +694,6 @@ const calendarDates = computed(() => {
       isWeekend: date.getDay() === 0 || date.getDay() === 6
     })
   }
-
   return dates
 })
 
@@ -875,11 +704,9 @@ const weekDates = computed(() => {
   const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay
   const monday = new Date(referenceDate)
   monday.setDate(referenceDate.getDate() + mondayOffset)
-
   for (let i = 0; i < 7; i++) {
     const date = new Date(monday)
     date.setDate(monday.getDate() + i)
-
     const today = new Date()
     dates.push({
       date: date,
@@ -892,90 +719,58 @@ const weekDates = computed(() => {
       isWeekend: date.getDay() === 0 || date.getDay() === 6
     })
   }
-
   return dates
 })
 
 const isTaskOverdue = (dueDate, status) => {
-  // 1. Exclude tasks without a due date or tasks that are completed.
   if (status === 'Completed' || !dueDate) return false;
-  
   const now = new Date();
-  
-  // 2. Set 'today' to midnight (00:00:00) for a fair comparison.
   const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
-  // 3. Create Date object from the task's due date string.
   const dueDateOnly = new Date(dueDate);
-  
-  // 4. Task is overdue if its date is strictly before the start of today.
   return dueDateOnly < todayDateOnly;
 };
 
+const filterTasks = (taskArray) => {
+    let filtered = taskArray;
+    if (selectedPriorities.value.length > 0) {
+        filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority));
+    }
+    if (selectedAssignees.value.length > 0) {
+        filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo));
+    }
+    if (selectedDepartments.value.length > 0) {
+        filtered = filtered.filter(task => selectedDepartments.value.includes(task.department));
+    }
+    return filtered;
+}
+
 const todayTasks = computed(() => {
-  const today = new Date().toISOString().split('T')[0]
-  let filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Completed')
-
-  if (selectedPriorities.value.length > 0) {
-    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
-  }
-  if (selectedAssignees.value.length > 0) {
-    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
-  }
-  if (selectedDepartments.value.length > 0) {
-    filtered = filtered.filter(task => selectedDepartments.value.includes(task.department))
-  }
-
-  return filtered
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = tasks.value.filter(task => task.dueDate === today && task.status !== 'Completed');
+  return filterTasks(filtered);
 })
 
 const weekTasks = computed(() => {
-  const today = new Date()
-  const nextWeek = new Date(today)
-  nextWeek.setDate(today.getDate() + 7)
-
-  let filtered = tasks.value.filter(task => {
-    if (!task.dueDate || task.status === 'Completed') return false
-    const taskDate = new Date(task.dueDate)
-    return taskDate > today && taskDate <= nextWeek
-  })
-
-  if (selectedPriorities.value.length > 0) {
-    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
-  }
-  if (selectedAssignees.value.length > 0) {
-    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
-  }
-  if (selectedDepartments.value.length > 0) {
-    filtered = filtered.filter(task => selectedDepartments.value.includes(task.department))
-  }
-
-  return filtered
+  const today = new Date();
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 7);
+  const filtered = tasks.value.filter(task => {
+    if (!task.dueDate || task.status === 'Completed') return false;
+    const taskDate = new Date(task.dueDate);
+    return taskDate > today && taskDate <= nextWeek;
+  });
+  return filterTasks(filtered);
 })
 
 const overdueTasks = computed(() => {
-  const today = new Date().toISOString().split('T')[0]
-  let filtered = tasks.value.filter(task => {
-    return task.dueDate && task.dueDate < today && task.status !== 'Completed'
-  })
-
-  if (selectedPriorities.value.length > 0) {
-    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
-  }
-  if (selectedAssignees.value.length > 0) {
-    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
-  }
-  if (selectedDepartments.value.length > 0) {
-    filtered = filtered.filter(task => selectedDepartments.value.includes(task.department))
-  }
-
-  return filtered
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = tasks.value.filter(task => task.dueDate && task.dueDate < today && task.status !== 'Completed');
+  return filterTasks(filtered);
 })
 
 const parentTaskProgress = computed(() => {
   const task = selectedTask.value;
   if (!task || !task.subtasks || task.subtasks.length === 0) return 0;
-
   const totalSubtasks = task.subtasks.length;
   const completedSubtasks = task.subtasks.filter(subtask => subtask.status === 'Completed').length;
   return Math.round((completedSubtasks / totalSubtasks) * 100);
@@ -997,60 +792,28 @@ const filteredDepartmentOptions = computed(() => {
 
 const selectedFilters = computed(() => {
   return [
-    ...selectedDepartments.value.map(d => ({ 
-      key: `department-${d}`, 
-      label: d, 
-      type: 'department', 
-      value: d 
-    })),
-    ...selectedPriorities.value.map(p => ({ 
-      key: `priority-${p}`, 
-      label: priorityFilterOptions.find(o => o.value === p)?.title || p, 
-      type: 'priority', 
-      value: p 
-    })),
-    ...selectedAssignees.value.map(a => ({ 
-      key: `assignee-${a}`, 
-      label: assigneeFilterOptions.find(o => o.value === a)?.title || a, 
-      type: 'assignee', 
-      value: a 
-    }))
+    ...selectedDepartments.value.map(d => ({ key: `department-${d}`, label: d, type: 'department', value: d })),
+    ...selectedPriorities.value.map(p => ({ key: `priority-${p}`, label: priorityFilterOptions.find(o => o.value === p)?.title || p, type: 'priority', value: p })),
+    ...selectedAssignees.value.map(a => ({ key: `assignee-${a}`, label: assigneeFilterOptions.find(o => o.value === a)?.title || a, type: 'assignee', value: a }))
   ]
 })
 
 const filteredTasksList = computed(() => {
-  let filtered = tasks.value
-
-  if (selectedPriorities.value.length > 0) {
-    filtered = filtered.filter(task => selectedPriorities.value.includes(task.priority))
-  }
-  if (selectedAssignees.value.length > 0) {
-    filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo))
-  }
-  if (selectedDepartments.value.length > 0) {
-    filtered = filtered.filter(task => selectedDepartments.value.includes(task.department))
-  }
-
-  return filtered
+  return filterTasks(tasks.value);
 })
 
-// Validate if date is in the past
 const validateDueDate = (dateString) => {
   if (!dateString) return true;
-  
   const selectedDate = new Date(dateString);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
   return selectedDate >= today;
 }
 
-// Add Task Function
 const handleCreateSave = async (taskData) => {
   try {
-    const response = await axios.post('http://localhost:3000/tasks', taskData);
+    const response = await axiosClient.post('/tasks', taskData);
     const newTaskId = response.data.id;
-
     const newTaskWithId = {
       ...taskData,
       id: newTaskId,
@@ -1058,88 +821,52 @@ const handleCreateSave = async (taskData) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-
-    // Remove any existing task with this ID first to prevent duplicates
     tasks.value = tasks.value.filter(t => t.id !== newTaskId);
-
-    // Add the new task
     tasks.value.push(newTaskWithId);
-
-    showSnackbar.value = true;
-    snackbarMessage.value = 'Task created successfully!';
-    snackbarColor.value = 'success';
+    showMessage('Task created successfully!', 'success');
   } catch (error) {
-    showSnackbar.value = true;
-    snackbarMessage.value = error.response?.data?.message || 'Failed to create task.';
-    snackbarColor.value = 'error';
+    showMessage(error.response?.data?.message || 'Failed to create task.', 'error');
   }
 };
 
-// Update Task Function
 const updateTask = async (taskId, updatedData) => {
   try {
     if (updatedData.dueDate && !validateDueDate(updatedData.dueDate)) {
       showMessage('Cannot set due date in the past', 'error');
       return false;
     }
-
     if (updatedData.attachments && updatedData.attachments.length > 0) {
       updatedData.attachments = await uploadFiles(updatedData.attachments);
     }
-
-    // Prepare the data for backend - ensure collaborators is properly formatted and serialize Vue proxies
-    const backendData = JSON.parse(JSON.stringify({
-      ...updatedData,
-      collaborators: updatedData.collaborators || []
-    }));
-
+    const backendData = JSON.parse(JSON.stringify({ ...updatedData, collaborators: updatedData.collaborators || [] }));
     await axiosClient.put(`/tasks/${taskId}`, backendData);
-
-    // Remove any existing task with this ID first to prevent duplicates
     tasks.value = tasks.value.filter(t => t.id !== taskId);
-
-    // Add the updated task
-    const updatedTask = {
-      ...updatedData,
-      id: taskId,
-      updatedAt: new Date().toISOString()
-    };
+    const updatedTask = { ...updatedData, id: taskId, updatedAt: new Date().toISOString() };
     tasks.value.push(updatedTask);
-
-    if (selectedTask.value?.id === taskId) {
-      selectedTask.value = updatedTask;
-    }
-    if (selectedListTask.value?.id === taskId) {
-      selectedListTask.value = updatedTask;
-    }
-
+    if (selectedTask.value?.id === taskId) selectedTask.value = updatedTask;
+    if (selectedListTask.value?.id === taskId) selectedListTask.value = updatedTask;
     showMessage('Task updated successfully!', 'success');
     return true;
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Failed to update task';
-    showMessage(errorMessage, 'error');
+    showMessage(error.response?.data?.message || 'Failed to update task', 'error');
     return false;
   }
 };
 
 const archiveTask = async (taskId) => {
-  await axios.put(`http://localhost:3000/tasks/${taskId}/archive`)
-    .then(() => {
-      tasks.value = tasks.value.filter(task => task.id !== taskId);
-      showMessage('Task archived successfully!', 'success');
-      showDetailsDialog.value = false;
-    })
-    .catch(error => {
-      const errorMessage = error.response?.data?.message || 'Failed to archive task';
-      showMessage(errorMessage, 'error');
-    });
+  try {
+    await axiosClient.put(`/tasks/${taskId}/archive`);
+    tasks.value = tasks.value.filter(task => task.id !== taskId);
+    showMessage('Task archived successfully!', 'success');
+    showDetailsDialog.value = false;
+  } catch (error) {
+    showMessage(error.response?.data?.message || 'Failed to archive task', 'error');
+  }
 }
 
-// Create Task Function
 const createTask = async () => {
   if (isEditing.value) {
     const mainAttachments = await uploadFiles(newTask.value.attachments);
-    
     const updatedData = {
       title: newTask.value.title,
       description: newTask.value.description,
@@ -1151,28 +878,19 @@ const createTask = async () => {
       attachments: mainAttachments.length > 0 ? mainAttachments : newTask.value.attachments,
       subtasks: subtasks.value
     };
-    
-    const success = await updateTask(newTask.value.id, updatedData);
-    
-    if (success) {
+    if (await updateTask(newTask.value.id, updatedData)) {
       showCreateDialog.value = false;
       resetForm();
     }
     return;
   }
-  
   try {
     if (newTask.value.dueDate && !validateDueDate(newTask.value.dueDate)) {
       showMessage('Cannot set due date in the past', 'error');
       return;
     }
-
     const mainAttachments = await uploadFiles(newTask.value.attachments);
-
-    const processedSubtasks = subtasks.value.map(subtask => ({
-        ...subtask,
-    }));
-
+    const processedSubtasks = subtasks.value.map(subtask => ({ ...subtask }));
     const taskData = {
       title: newTask.value.title,
       description: newTask.value.description || '',
@@ -1186,130 +904,80 @@ const createTask = async () => {
       projectId: newTask.value.projectId || null,
       recurrence: newTask.value.recurrence || { enabled: false, type: '', interval: 1, startDate: null, endDate: null }
     };
-
     const response = await axiosClient.post('/tasks', taskData); 
-    const newTaskId = response.data.id; 
-    
     const newTaskWithId = { 
         ...taskData, 
-        id: newTaskId,
-        statusHistory: [{ 
-            timestamp: new Date().toISOString(),
-            oldStatus: null, 
-            newStatus: taskData.status 
-        }],
+        id: response.data.id,
+        statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status }],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
-
     tasks.value.push(newTaskWithId);
     showMessage('Task created successfully!', 'success');
-
     showCreateDialog.value = false;
     resetForm();
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Failed to connect to server or save task.';
-    console.error('Error creating task:', errorMessage, error);
-    showMessage(errorMessage, 'error');
+    showMessage(error.response?.data?.message || 'Failed to connect to server or save task.', 'error');
   }
 }
 
-// In Tasks.vue (replace your existing changeTaskStatus function)
 const changeTaskStatus = async (payload) => {
-    // 1. Correctly unpack the properties from the single payload object
     const taskId = payload.taskId;
     const newStatus = payload.status; 
-    
-    // 2. Final comprehensive check for a valid, non-synthetic ID
     if (!taskId || typeof taskId !== 'string' || taskId.includes('subtask')) {
-        console.error('API Update Blocked: Task ID is invalid or missing.', { taskId: payload, newStatus });
         showMessage('Failed to update: Task ID is invalid or missing.', 'error');
         return;
     }
-
     const task = tasks.value.find(t => t.id === taskId);
-
     if (!task) {
         showMessage('Task not found in local data.', 'error');
         return;
     }
-    
     const oldStatus = task.status;
-    
-    if (oldStatus === newStatus) {
-      showMessage(`Task is already in "${newStatus}" status.`, 'info');
-      return;
-    }
-    
+    if (oldStatus === newStatus) return;
     if (task.isSubtask) {
         showMessage('Subtask status is managed through the parent task details.', 'info');
         return;
     }
-
-    // 3. API call uses the guaranteed-correct taskId
     try {
         await axiosClient.put(`/tasks/${taskId}/status`, { status: newStatus }); 
-        
-        // 4. Local state update
-        const taskIndex = tasks.value.findIndex(t => t.id === taskId)
+        const taskIndex = tasks.value.findIndex(t => t.id === taskId);
         if (taskIndex !== -1) {
-          const taskData = tasks.value[taskIndex]
-          const statusHistory = [...(taskData.statusHistory || [])]
-          
-          statusHistory.push({
-            timestamp: new Date().toISOString(),
-            oldStatus: oldStatus,
-            newStatus: newStatus
-          })
-          
-          tasks.value[taskIndex] = {
-            ...taskData,
-            status: newStatus,
-            statusHistory,
-            updatedAt: new Date().toISOString()
-          }
-          
-          selectedTask.value = tasks.value[taskIndex]
-          selectedListTask.value = tasks.value[taskIndex]
+          const taskData = tasks.value[taskIndex];
+          const statusHistory = [...(taskData.statusHistory || []), { timestamp: new Date().toISOString(), oldStatus: oldStatus, newStatus: newStatus }];
+          tasks.value[taskIndex] = { ...taskData, status: newStatus, statusHistory, updatedAt: new Date().toISOString() };
+          selectedTask.value = tasks.value[taskIndex];
+          selectedListTask.value = tasks.value[taskIndex];
         }
-        
-        showMessage('Task status updated!', 'success')
+        showMessage('Task status updated!', 'success');
     } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Failed to update task status on server.';
-        console.error('Error updating task status:', error.response?.data || error);
-        
-        if (error.response?.status === 404) {
-             showMessage('Update failed: Task ID not found on server.', 'error');
-        } else {
-             showMessage(errorMessage, 'error');
-        }
+        showMessage(error.response?.data?.message || 'Failed to update task status on server.', 'error');
     }
 };
+
 const toggleUpcomingSidebar = () => {
   upcomingSidebarOpen.value = !upcomingSidebarOpen.value
 }
 
 const formatTime = (dateString) => {
   if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+  return new Date(dateString).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
 }
 
 const formatShortDate = (dateString) => {
   if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString([], {month: 'short', day: 'numeric'})
+  return new Date(dateString).toLocaleDateString([], {month: 'short', day: 'numeric'})
 }
 
 const getCurrentPeriodTitle = () => {
   if (viewMode.value === 'week') {
-    const startOfWeek = weekDates.value[0]?.date
-    const endOfWeek = weekDates.value[6]?.date
+    const startOfWeek = weekDates.value[0]?.date;
+    const endOfWeek = weekDates.value[6]?.date;
     if (startOfWeek && endOfWeek) {
-      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
   }
-  return currentDate.value.toLocaleString('default', { month: 'long', year: 'numeric' })
+  return currentDate.value.toLocaleString('default', { month: 'long', year: 'numeric' });
 }
 
 const previousPeriod = () => {
@@ -1352,64 +1020,26 @@ const addTaskForDate = (dateKey) => {
 }
 
 const getTasksForDate = (dateKey) => {
-  let items = []
+  let items = [];
   tasks.value.forEach(task => {
+    const taskDate = task.dueDate?.split('T')[0];
     if (task.subtasks && task.subtasks.length > 0) {
-      // Check if any subtask matches the date
-      const hasMatchingSubtask = task.subtasks.some(subtask => {
-        const subtaskDate = subtask.dueDate?.split('T')[0]
-        return subtaskDate === dateKey
-      })
-
-      // If parent task has due date matching, or has subtasks on this date, show it
-      const taskDate = task.dueDate?.split('T')[0];
-      if (taskDate === dateKey || hasMatchingSubtask) {
-        items.push(task)
-      }
-
-      // Also add individual matching subtasks
+      const hasMatchingSubtask = task.subtasks.some(sub => sub.dueDate?.split('T')[0] === dateKey);
+      if (taskDate === dateKey || hasMatchingSubtask) items.push(task);
       task.subtasks.forEach((subtask, index) => {
-        const subtaskDate = subtask.dueDate?.split('T')[0]
-        if (subtaskDate === dateKey) {
-          items.push({
-            ...subtask,
-            id: `${task.id}-subtask-${index}`,
-            status: subtask.status,
-            isSubtask: true,
-            parentTask: task
-          })
+        if (subtask.dueDate?.split('T')[0] === dateKey) {
+          items.push({ ...subtask, id: `${task.id}-subtask-${index}`, isSubtask: true, parentTask: task });
         }
-      })
-    } else {
-      const taskDate = task.dueDate?.split('T')[0];
-      if (taskDate === dateKey) {
-        items.push(task)
-      }
+      });
+    } else if (taskDate === dateKey) {
+      items.push(task);
     }
-  })
-
-  if (selectedPriorities.value.length > 0) {
-    items = items.filter(task => selectedPriorities.value.includes(task.priority))
-  }
-
-  if (selectedAssignees.value.length > 0) {
-    items = items.filter(task => selectedAssignees.value.includes(task.assignedTo))
-  }
-
-  if (selectedDepartments.value.length > 0) {
-    items = items.filter(task => selectedDepartments.value.includes(task.department))
-  }
-
-  return items
+  });
+  return filterTasks(items);
 }
 
 const getTaskStatusClass = (status, dueDate) => {
-  // 🟢 CRITICAL CHECK: If the task is overdue, assign the overdue class.
-  if (isTaskOverdue(dueDate, status)) {
-    return 'task-overdue'; 
-  }
-  
-  // Regular status classes
+  if (isTaskOverdue(dueDate, status)) return 'task-overdue'; 
   return {
     'task-ongoing': status === 'Ongoing',
     'task-pending': status === 'Pending Review', 
@@ -1419,352 +1049,210 @@ const getTaskStatusClass = (status, dueDate) => {
 }
 
 const getStatusColor = (status) => {
-  const colors = {
-    'Ongoing': 'blue',
-    'Completed': 'green',
-    'Pending Review': 'orange',
-    'Unassigned': 'grey'
-  }
-  return colors[status] || 'grey'
+  return { 'Ongoing': 'blue', 'Completed': 'green', 'Pending Review': 'orange', 'Unassigned': 'grey' }[status] || 'grey';
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  return new Date(dateString).toLocaleDateString()
-}
-
-const formatDateTime = (dateString) => {
-  if (!dateString) return ''
-  return new Date(dateString).toLocaleString()
-}
+const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString() : '';
+const formatDateTime = (dateString) => dateString ? new Date(dateString).toLocaleString() : '';
 
 const viewTaskDetails = (task) => {
-  selectedTask.value = task
-  showDetailsDialog.value = true
-  showDateDetailsDialog.value = false
+  selectedTask.value = task;
+  showDetailsDialog.value = true;
+  showDateDetailsDialog.value = false;
 }
 
-const openAttachment = (url) => {
-  window.open(url, '_blank')
-}
+const openAttachment = (url) => window.open(url, '_blank');
 
 const editTask = (task) => {
-  newTask.value = { ...task }
-  newTask.value.collaborators = newTask.value.collaborators || []
-  newTask.value.attachments = newTask.value.attachments || []
-  newTask.value.status = newTask.value.status || 'Ongoing'
-  subtasks.value = task.subtasks ? [...task.subtasks] : []
-  if (!newTask.value.statusHistory) newTask.value.statusHistory = []
-  subtasks.value.forEach(subtask => {
-    if (!subtask.statusHistory) subtask.statusHistory = []
-    subtask.collaborators = subtask.collaborators || []
-    subtask.attachments = subtask.attachments || []
-  })
-  isEditing.value = true
-  showCreateDialog.value = true
-  showDetailsDialog.value = false
+  newTask.value = { ...task, collaborators: task.collaborators || [], attachments: task.attachments || [], status: task.status || 'Ongoing', statusHistory: task.statusHistory || [] };
+  subtasks.value = task.subtasks ? [...task.subtasks] : [];
+  subtasks.value.forEach(sub => {
+    sub.statusHistory = sub.statusHistory || [];
+    sub.collaborators = sub.collaborators || [];
+    sub.attachments = sub.attachments || [];
+  });
+  isEditing.value = true;
+  showCreateDialog.value = true;
+  showDetailsDialog.value = false;
 }
 
 const cancelCreate = () => {
-  showCreateDialog.value = false
-  isEditing.value = false
-  resetForm()
+  showCreateDialog.value = false;
+  isEditing.value = false;
+  resetForm();
 }
 
 const resetForm = () => {
-  newTask.value = {
-    title: '',
-    description: '',
-    dueDate: '',
-    assignedTo: '',
-    collaborators: [],
-    status: 'Ongoing',
-    attachments: [],
-  }
-  subtasks.value = []
-  isEditing.value = false
+  newTask.value = { title: '', description: '', dueDate: '', assignedTo: '', collaborators: [], status: 'Ongoing', attachments: [] };
+  subtasks.value = [];
+  isEditing.value = false;
 }
 
 const addSubtask = () => {
-  subtasks.value.push({
-    title: '',
-    description: '',
-    status: 'Unassigned',
-    priority: 1,
-    assignedTo: '',
-    collaborators: [],
-    dueDate: '',
-    attachments: []
-  })
+  subtasks.value.push({ title: '', description: '', status: 'Unassigned', priority: 1, assignedTo: '', collaborators: [], dueDate: '', attachments: [] });
 }
 
 const showMessage = (message, color = 'success') => {
-  snackbarMessage.value = message
-  snackbarColor.value = color
-  showSnackbar.value = true
+  snackbarMessage.value = message;
+  snackbarColor.value = color;
+  showSnackbar.value = true;
 }
 
-// Priority Menu Functions
+const setupFilterMenu = (menuState, btnRef, topRef, leftRef, clickOutsideHandler) => {
+    if (menuState.value) {
+        menuState.value = false;
+        document.removeEventListener('click', clickOutsideHandler);
+    } else {
+        closeAllFilterMenus();
+        nextTick(() => {
+            if (btnRef.value) {
+                const rect = btnRef.value.$el.getBoundingClientRect();
+                topRef.value = rect.bottom + 4;
+                leftRef.value = rect.left;
+            }
+            menuState.value = true;
+            nextTick(() => document.addEventListener('click', clickOutsideHandler));
+        });
+    }
+}
+
+const closeAllFilterMenus = () => {
+    priorityMenuOpen.value = false;
+    assigneeMenuOpen.value = false;
+    departmentMenuOpen.value = false;
+    document.removeEventListener('click', handlePriorityClickOutside);
+    document.removeEventListener('click', handleAssigneeClickOutside);
+    document.removeEventListener('click', handleDepartmentClickOutside);
+}
+
 const togglePriorityMenu = () => {
-  if (priorityMenuOpen.value) {
-    closePriorityMenu()
-  } else {
-    closeAssigneeMenu()
-    closeDepartmentMenu()
-    openPriorityMenu()
-  }
+    tempSelectedPriorities.value = [...selectedPriorities.value];
+    searchPriority.value = '';
+    setupFilterMenu(priorityMenuOpen, priorityBtnRef, priorityDropdownTop, priorityDropdownLeft, handlePriorityClickOutside);
 }
-
-const openPriorityMenu = () => {
-  tempSelectedPriorities.value = [...selectedPriorities.value]
-  searchPriority.value = ''
-
-  nextTick(() => {
-    if (priorityBtnRef.value) {
-      const rect = priorityBtnRef.value.$el.getBoundingClientRect()
-      priorityDropdownTop.value = rect.bottom + 4
-      priorityDropdownLeft.value = rect.left
-    }
-  })
-
-  priorityMenuOpen.value = true
-
-  nextTick(() => {
-    document.addEventListener('click', handlePriorityClickOutside)
-  })
-}
-
-const closePriorityMenu = () => {
-  priorityMenuOpen.value = false
-  document.removeEventListener('click', handlePriorityClickOutside)
-}
-
 const handlePriorityClickOutside = (event) => {
-  if (priorityDropdownRef.value && !priorityDropdownRef.value.contains(event.target)) {
-    closePriorityMenu()
-  }
+    if (priorityDropdownRef.value && !priorityDropdownRef.value.contains(event.target)) closeAllFilterMenus();
 }
-
 const applyPriorityFilter = () => {
-  selectedPriorities.value = [...tempSelectedPriorities.value]
-  closePriorityMenu()
+    selectedPriorities.value = [...tempSelectedPriorities.value];
+    closeAllFilterMenus();
 }
-
 const togglePriority = (value) => {
-  if (tempSelectedPriorities.value.includes(value)) {
-    tempSelectedPriorities.value = tempSelectedPriorities.value.filter(v => v !== value)
-  } else {
-    tempSelectedPriorities.value.push(value)
-  }
+    const index = tempSelectedPriorities.value.indexOf(value);
+    if (index > -1) tempSelectedPriorities.value.splice(index, 1);
+    else tempSelectedPriorities.value.push(value);
 }
 
-// Assignee Menu Functions
 const toggleAssigneeMenu = () => {
-  if (assigneeMenuOpen.value) {
-    closeAssigneeMenu()
-  } else {
-    closePriorityMenu()
-    closeDepartmentMenu()
-    openAssigneeMenu()
-  }
+    tempSelectedAssignees.value = [...selectedAssignees.value];
+    searchAssignee.value = '';
+    setupFilterMenu(assigneeMenuOpen, assigneeBtnRef, assigneeDropdownTop, assigneeDropdownLeft, handleAssigneeClickOutside);
 }
-
-const openAssigneeMenu = () => {
-  tempSelectedAssignees.value = [...selectedAssignees.value]
-  searchAssignee.value = ''
-
-  nextTick(() => {
-    if (assigneeBtnRef.value) {
-      const rect = assigneeBtnRef.value.$el.getBoundingClientRect()
-      assigneeDropdownTop.value = rect.bottom + 4
-      assigneeDropdownLeft.value = rect.left
-    }
-  })
-
-  assigneeMenuOpen.value = true
-
-  nextTick(() => {
-    document.addEventListener('click', handleAssigneeClickOutside)
-  })
-}
-
-const closeAssigneeMenu = () => {
-  assigneeMenuOpen.value = false
-  document.removeEventListener('click', handleAssigneeClickOutside)
-}
-
 const handleAssigneeClickOutside = (event) => {
-  if (assigneeDropdownRef.value && !assigneeDropdownRef.value.contains(event.target)) {
-    closeAssigneeMenu()
-  }
+    if (assigneeDropdownRef.value && !assigneeDropdownRef.value.contains(event.target)) closeAllFilterMenus();
 }
-
 const applyAssigneeFilter = () => {
-  selectedAssignees.value = [...tempSelectedAssignees.value]
-  closeAssigneeMenu()
+    selectedAssignees.value = [...tempSelectedAssignees.value];
+    closeAllFilterMenus();
 }
-
 const toggleAssignee = (value) => {
-  if (tempSelectedAssignees.value.includes(value)) {
-    tempSelectedAssignees.value = tempSelectedAssignees.value.filter(v => v !== value)
-  } else {
-    tempSelectedAssignees.value.push(value)
-  }
+    const index = tempSelectedAssignees.value.indexOf(value);
+    if (index > -1) tempSelectedAssignees.value.splice(index, 1);
+    else tempSelectedAssignees.value.push(value);
 }
 
-// Department Menu Functions
 const toggleDepartmentMenu = () => {
-  if (departmentMenuOpen.value) {
-    closeDepartmentMenu()
-  } else {
-    closePriorityMenu()
-    closeAssigneeMenu()
-    openDepartmentMenu()
-  }
+    tempSelectedDepartments.value = [...selectedDepartments.value];
+    searchDepartment.value = '';
+    setupFilterMenu(departmentMenuOpen, departmentBtnRef, departmentDropdownTop, departmentDropdownLeft, handleDepartmentClickOutside);
 }
-
-const openDepartmentMenu = () => {
-  tempSelectedDepartments.value = [...selectedDepartments.value]
-  searchDepartment.value = ''
-
-  nextTick(() => {
-    if (departmentBtnRef.value) {
-      const rect = departmentBtnRef.value.$el.getBoundingClientRect()
-      departmentDropdownTop.value = rect.bottom + 4
-      departmentDropdownLeft.value = rect.left
-    }
-  })
-
-  departmentMenuOpen.value = true
-
-  nextTick(() => {
-    document.addEventListener('click', handleDepartmentClickOutside)
-  })
-}
-
-const closeDepartmentMenu = () => {
-  departmentMenuOpen.value = false
-  document.removeEventListener('click', handleDepartmentClickOutside)
-}
-
 const handleDepartmentClickOutside = (event) => {
-  if (departmentDropdownRef.value && !departmentDropdownRef.value.contains(event.target)) {
-    closeDepartmentMenu()
-  }
+    if (departmentDropdownRef.value && !departmentDropdownRef.value.contains(event.target)) closeAllFilterMenus();
 }
-
 const applyDepartmentFilter = () => {
-  selectedDepartments.value = [...tempSelectedDepartments.value]
-  closeDepartmentMenu()
+    selectedDepartments.value = [...tempSelectedDepartments.value];
+    closeAllFilterMenus();
 }
-
 const toggleDepartment = (value) => {
-  if (tempSelectedDepartments.value.includes(value)) {
-    tempSelectedDepartments.value = tempSelectedDepartments.value.filter(v => v !== value)
-  } else {
-    tempSelectedDepartments.value.push(value)
-  }
+    const index = tempSelectedDepartments.value.indexOf(value);
+    if (index > -1) tempSelectedDepartments.value.splice(index, 1);
+    else tempSelectedDepartments.value.push(value);
 }
 
-// Filter Management
 const removeFilter = (filter) => {
-  if (filter.type === 'department') {
-    selectedDepartments.value = selectedDepartments.value.filter(d => d !== filter.value)
-  } else if (filter.type === 'priority') {
-    selectedPriorities.value = selectedPriorities.value.filter(p => p !== filter.value)
-  } else {
-    selectedAssignees.value = selectedAssignees.value.filter(a => a !== filter.value)
-  }
+    if (filter.type === 'department') selectedDepartments.value = selectedDepartments.value.filter(d => d !== filter.value);
+    else if (filter.type === 'priority') selectedPriorities.value = selectedPriorities.value.filter(p => p !== filter.value);
+    else selectedAssignees.value = selectedAssignees.value.filter(a => a !== filter.value);
 }
 
 const resetFilters = () => {
-  selectedPriorities.value = []
-  selectedAssignees.value = []
-  selectedDepartments.value = []
+    selectedPriorities.value = [];
+    selectedAssignees.value = [];
+    selectedDepartments.value = [];
 }
 
 const uploadFiles = async (files) => {
-  if (!files || files.length === 0) return []
-
-  const urls = []
-  for (const file of files) {
-    try {
-      const fileRef = storageRef(storage, `attachments/${Date.now()}_${file.name}`)
-      await uploadBytes(fileRef, file)
-      const url = await getDownloadURL(fileRef)
-      urls.push({ name: file.name, url })
-    } catch (error) {
-      console.error('Error uploading file:', error)
-      showMessage(`Failed to upload ${file.name}`, 'error')
+    if (!files || files.length === 0) return [];
+    const urls = [];
+    for (const file of files) {
+        try {
+            const fileRef = storageRef(storage, `attachments/${Date.now()}_${file.name}`);
+            await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(fileRef);
+            urls.push({ name: file.name, url });
+        } catch (error) {
+            showMessage(`Failed to upload ${file.name}`, 'error');
+        }
     }
-  }
-  return urls
+    return urls;
 }
 
-const truncateTaskTitle = (title) => {
-  if (title.length > 20) {
-    return title.substring(0, 20) + '...'
-  }
-  return title
-}
+const truncateTaskTitle = (title) => title.length > 20 ? title.substring(0, 20) + '...' : title;
 
-// List View Handlers
 const handleSelectTask = (task) => {
-  selectedListTask.value = task
-  selectedTaskId.value = task?.id || null 
+  selectedListTask.value = task;
+  selectedTaskId.value = task?.id || null;
 }
 
-// In Tasks.vue
 const handleListStatusChange = (payload) => {
-  const { taskId, status } = payload;
-  
-  // 🛑 DEFENSIVE CHECK: Ensure taskId is valid before calling changeTaskStatus
-  if (!taskId) {
-      showMessage('Update failed: Task ID is missing or invalid.', 'error');
+  if (!payload.taskId) {
+      showMessage('Update failed: Task ID is missing.', 'error');
       return;
   }
-  
-  changeTaskStatus(taskId, status); // Pass ID directly
+  changeTaskStatus({ taskId: payload.taskId, status: payload.status });
 }
 
 const handleBulkUpdateStatus = async (taskIds) => {
-  const newStatus = prompt('Enter new status (Ongoing, Completed, Pending Review, Unassigned):')  
+  const newStatus = prompt('Enter new status (Ongoing, Completed, Pending Review, Unassigned):');  
   if (newStatus && taskStatuses.includes(newStatus)) {
     try {
       for (const taskId of taskIds) {
-        const task = tasks.value.find(t => t.id === taskId)
-        if (task) {
-          await changeTaskStatus(task, newStatus)
-        }
+        await changeTaskStatus({ taskId, status: newStatus });
       }
-      showMessage(`Updated ${taskIds.length} task(s)`, 'success')
+      showMessage(`Updated ${taskIds.length} task(s)`, 'success');
     } catch (error) {
-      showMessage('Failed to update some tasks', 'error')
+      showMessage('Failed to update some tasks', 'error');
     }
   } else {
-    showMessage('Invalid status selected', 'error')
+    showMessage('Invalid status selected', 'error');
   }
 }
 
 const handleBulkDelete = async (taskIds) => {
   try {
     for (const taskId of taskIds) {
-      await axiosClient.delete(`/tasks/${taskId}`)
-      const index = tasks.value.findIndex(t => t.id === taskId)
-      if (index > -1) {
-        tasks.value.splice(index, 1)
-      }
+      await axiosClient.delete(`/tasks/${taskId}`);
+      const index = tasks.value.findIndex(t => t.id === taskId);
+      if (index > -1) tasks.value.splice(index, 1);
     }
-    showMessage(`Deleted ${taskIds.length} task(s)`, 'success')
-    selectedListTask.value = null
+    showMessage(`Deleted ${taskIds.length} task(s)`, 'success');
+    selectedListTask.value = null;
   } catch (error) {
-    showMessage('Failed to delete some tasks', 'error')
+    showMessage('Failed to delete some tasks', 'error');
   }
 }
 
-const handleMessage = ({ message, color }) => {
-  showMessage(message, color)
-}
+const handleMessage = ({ message, color }) => showMessage(message, color);
 
 </script>
 

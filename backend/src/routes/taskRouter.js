@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/taskController');
+// 1. Import the middleware
+const { verifyToken } = require('../middleware/auth.js');
 
 // Create a new task
 router.post('/', taskController.createTask);
@@ -26,8 +28,8 @@ router.put('/:id/archive', taskController.archiveTask);
 // Unarchive a task
 router.put('/:id/unarchive', taskController.unarchiveTask);
 
-// Add this line to your routes file
-router.put('/:id', taskController.updateTask);
+// 2. Add the middleware ONLY to the updateTask route
+router.put('/:id', verifyToken, taskController.updateTask);
 
 // Update recurrence rules for a recurring task
 router.put('/recurring/:id', taskController.updateRecurringTask);
