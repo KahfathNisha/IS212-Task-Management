@@ -1,0 +1,37 @@
+# frontend/.github/workflows/ci.yml
+
+name: Vue Frontend CI
+
+# This action will run on every push to the 'main' branch,
+# and on every pull request that targets the 'main' branch.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    # Use the latest version of Ubuntu as the operating system
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository's code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up the correct version of Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20' # Use the same Node.js version as your team
+
+      # Step 3: Install all project dependencies
+      - name: Install Dependencies
+        run: npm install
+
+      # Step 4: Run the unit tests
+      # The '-- --run' part tells Vitest to run once and exit,
+      # which is necessary for CI environments.
+      - name: Run Unit Tests
+        run: npm test -- --run

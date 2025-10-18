@@ -4,9 +4,9 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebas
 import { auth, firestoreHelpers } from "@/config/firebase";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { initializeListeners, cleanupListeners } from '@/services/notification-service';
-import axios from 'axios'; // Import axios
+import axios from 'axios';
 
-// Create a dedicated API client for your auth routes
+// This is the correct, centralized API client for all authentication requests.
 const authApiClient = axios.create({
   baseURL: "http://localhost:3000/api/auth",
 });
@@ -30,13 +30,10 @@ export const useAuthStore = defineStore("auth", () => {
       if (firebaseUser) {
         user.value = firebaseUser;
         try {
-          // It's good practice to re-fetch user data on auth state change
-          // to ensure it's fresh.
           const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email);
           if (userDoc) {
             userData.value = userDoc;
             initializeListeners(firebaseUser.email);
-            console.log("✅ Persistent notification listeners initialized.");
           }
         } catch (err) {
           console.error("Error fetching user data on auth state change:", err);
@@ -50,56 +47,36 @@ export const useAuthStore = defineStore("auth", () => {
     });
   };
 
-  // --- THIS IS THE UPDATED LOGIN FUNCTION ---
+  // This is the new, more secure login flow.
   const login = async (email, password) => {
     loading.value = true;
     error.value = null;
     try {
-      // 1. Check for account lockout (this part is correct)
       const checkResponse = await authApiClient.post('/check-lockout', { email });
-
-      const checkData = await checkResponse.data;
-      if (checkData.isLocked) {
-        throw new Error(checkData.message || 'Account is locked.');
+      if (checkResponse.data.isLocked) {
+        throw new Error(checkResponse.data.message || 'Account is locked.');
       }
 
-      // 2. Sign in with Firebase on the client
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // 3. --- THIS IS THE CRITICAL NEW STEP ---
-      // Get the ID token from the successful login
+      user.value = userCredential.user;
+
       const idToken = await userCredential.user.getIdToken();
-
-      // 4. --- AND SAVE IT TO LOCAL STORAGE ---
-      // The key MUST match the one in your axios interceptor ('firebaseIdToken')
-      localStorage.setItem('firebaseIdToken', idToken);
-      console.log("✅ Firebase ID Token saved to localStorage!");
-
-      // 5. Securely verify the token with your backend and get the user's profile
-      // This replaces the separate firestoreHelpers and 'login-success' calls
       const loginResponse = await authApiClient.post('/login', { idToken });
-
-      if (loginResponse.data.success) {
-        userData.value = loginResponse.data.user;
-      } else {
-        throw new Error(loginResponse.data.message || 'Backend verification failed.');
-      }
-
+      if (!loginResponse.data.success) throw new Error(loginResponse.data.message);
+      
+      userData.value = loginResponse.data.user;
       return { success: true, user: userCredential.user };
-
     } catch (err) {
       console.error("Login error:", err);
       let userFriendlyMessage = 'An unexpected error occurred.';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/too-many-requests') {
         try {
-            // This part for recording failed attempts is correct
-            const recordResponse = await authApiClient.post('/record-failed-attempt', { email });
-            const recordData = await recordResponse.data;
-            userFriendlyMessage = recordData.message || 'Incorrect email or password.';
+          const recordResponse = await authApiClient.post('/record-failed-attempt', { email });
+          userFriendlyMessage = recordResponse.data.message || 'Incorrect email or password.';
         } catch (apiErr) {
-            userFriendlyMessage = 'Could not verify login. Please try again later.';
+          userFriendlyMessage = 'Could not verify login. Please try again later.';
         }
-      } else if (err.message) {
+      } else {
         userFriendlyMessage = err.message;
       }
       error.value = userFriendlyMessage;
@@ -109,43 +86,87 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
-  // --- THIS IS THE UPDATED LOGOUT FUNCTION ---
   const logout = async (reason = null) => {
     const notificationStore = useNotificationStore();
     notificationStore.clearNotifications();
     cleanupListeners();
     try {
       await signOut(auth);
-      
-      // --- ADDED THIS LINE TO CLEAN UP ---
-      localStorage.removeItem('firebaseIdToken');
-      
       clearAuthData();
       return { redirect: reason === "session_expired" ? "/login?sessionExpired=true" : "/login" };
     } catch (err) {
       console.error("Auth Store: Logout error:", err);
-      
-      // Also clear the token on error, just in case
-      localStorage.removeItem('firebaseIdToken');
-
       clearAuthData();
       return { redirect: "/login" };
     }
   };
   
+  // --- Password Reset logic is now restored and uses the new API client ---
+  const requestPasswordReset = async (email) => {
+    const response = await authApiClient.post('/request-password-reset', { email });
+    return response.data;
+  };
+
+  const verifySecurityAnswer = async (resetCode, answer) => {
+    const response = await authApiClient.post('/verify-security-answer', { resetCode, answer });
+    return response.data;
+  };
+  
+  const resetPassword = async (resetCode, newPassword) => {
+    const response = await authApiClient.post('/reset-password', { resetCode, newPassword });
+    return response.data;
+  };
+
   const clearAuthData = () => {
     user.value = null; userData.value = null; error.value = null;
     if (sessionTimeout.value) clearTimeout(sessionTimeout.value);
   };
+  
+  // --- Session Management logic is now fully implemented ---
+  const startSessionTimer = () => {
+    if (sessionTimeout.value) clearTimeout(sessionTimeout.value);
+    const checkSession = () => {
+      const timeSinceActivity = Date.now() - lastActivity.value;
+      if (timeSinceActivity >= SESSION_DURATION) {
+        logout('session_expired');
+      } else {
+        const timeUntilTimeout = SESSION_DURATION - timeSinceActivity;
+        sessionTimeout.value = setTimeout(checkSession, Math.min(60000, timeUntilTimeout));
+      }
+    };
+    checkSession();
+  };
 
-  const startSessionTimer = () => { /* Session logic remains the same */ };
-  const updateLastActivity = () => { /* Session logic remains the same */ };
-  const extendSession = async () => { updateLastActivity(); return true; };
-  const setupActivityListeners = () => { /* Session logic remains the same */ };
+  const updateLastActivity = () => {
+    lastActivity.value = Date.now();
+    if (isAuthenticated.value) {
+      startSessionTimer();
+    }
+  };
 
+  const extendSession = async () => {
+    updateLastActivity();
+    return true;
+  };
+
+  const setupActivityListeners = () => {
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, updateLastActivity, { passive: true });
+    });
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateLastActivity);
+      });
+    };
+  };
+
+  // Ensure all functions are exported.
   return {
     user, userData, loading, error, isAuthenticated, userRole, userName, userEmail,
-    initializeAuth, login, logout, updateLastActivity, extendSession, setupActivityListeners
+    initializeAuth, login, logout,
+    requestPasswordReset, verifySecurityAnswer, resetPassword,
+    updateLastActivity, extendSession, setupActivityListeners
   };
 });
 

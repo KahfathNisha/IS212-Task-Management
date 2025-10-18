@@ -68,7 +68,11 @@ messaging.onBackgroundMessage((payload) => {
             changeOrigin: true,
           },
         }
-      }
+      },
+      test: {
+      globals: true,
+      environment: 'jsdom',
+    }
     };
 });
 
