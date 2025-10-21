@@ -42,10 +42,20 @@ const loading = ref(true);
 
 onMounted(async () => {
   const userEmail = authStore.userEmail;
+  console.log('NotificationHistory: onMounted called, userEmail:', userEmail);
   if (userEmail) {
-    history.value = await fetchNotificationHistory(userEmail);
+    try {
+      console.log('NotificationHistory: Fetching notification history for:', userEmail);
+      history.value = await fetchNotificationHistory(userEmail);
+      console.log('NotificationHistory: Fetched history:', history.value);
+    } catch (error) {
+      console.error('NotificationHistory: Error fetching notification history:', error);
+    }
+  } else {
+    console.warn('NotificationHistory: No userEmail available');
   }
   loading.value = false;
+  console.log('NotificationHistory: Loading set to false');
 });
 
 function formatTimeAgo(timestamp) {

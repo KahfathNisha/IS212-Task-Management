@@ -1,7 +1,7 @@
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useNotificationStore } from "@/stores/notificationStore";
-
+//TASK CHANGE NOTIFICATIONS, FIRESTORE LISTENERS HERE
 let unsubscribeTasks = null;
 let unsubscribeNotifications = null;
 
@@ -99,9 +99,19 @@ export function initializeListeners(userId) {
   initializeUnreadNotificationListener(userId);
 }
 export async function fetchNotificationHistory(userId) {
-  const notificationsQuery = query(collection(db, "users", userId, "notifications"), orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(notificationsQuery);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  console.log('fetchNotificationHistory: Called with userId:', userId);
+  try {
+    const notificationsQuery = query(collection(db, "users", userId, "notifications"), orderBy("createdAt", "desc"));
+    console.log('fetchNotificationHistory: Query created, executing getDocs...');
+    const snapshot = await getDocs(notificationsQuery);
+    console.log('fetchNotificationHistory: Query successful, docs count:', snapshot.docs.length);
+    const result = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log('fetchNotificationHistory: Mapped result:', result);
+    return result;
+  } catch (error) {
+    console.error('fetchNotificationHistory: Error during query:', error);
+    throw error; // Re-throw to propagate to caller
+  }
 }
 export function cleanupListeners() {
   if (unsubscribeTasks) unsubscribeTasks();

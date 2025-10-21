@@ -1,5 +1,78 @@
 const cron = require('node-cron');
 const { db, admin } = require('../config/firebase');
+const EmailService = require('../services/emailService');
+
+async function processEmailReminders(now) {
+    // Get all users with email notifications enabled
+    const usersSnapshot = await db.collection("users")
+        .where("notificationSettings.emailEnabled", "==", true)
+        .get();
+
+    for (const userDoc of usersSnapshot.docs) {
+        const userData = userDoc.data();
+        const userId = userDoc.id;
+        const settings = userData.notificationSettings;
+        
+        // Get tasks assigned to this user
+        const tasksSnapshot = await db.collection("tasks")
+            .where("assignedTo", "array-contains", userId)
+            .where("archived", "==", false)
+            .get();
+
+        for (const taskDoc of tasksSnapshot.docs) {
+            const taskData = taskDoc.data();
+            const dueDate = taskData.dueDate.toDate();
+            const timeDiff = dueDate - now;
+            const hoursUntilDue = timeDiff / (1000 * 60 * 60);
+            
+            // Check if we should send email based on settings
+            if (hoursUntilDue <= settings.emailLeadTime && hoursUntilDue > 0) {
+                // Check if we already sent a reminder recently
+                const lastReminderQuery = await db.collection("emailReminders")
+                    .where("userId", "==", userId)
+                    .where("taskId", "==", taskDoc.id)
+                    .orderBy("sentAt", "desc")
+                    .limit(1)
+                    .get();
+                
+                let shouldSend = true;
+                if (!lastReminderQuery.empty) {
+                    const lastReminder = lastReminderQuery.docs[0].data();
+                    const timeSinceLast = now - lastReminder.sentAt.toDate();
+                    const hoursSinceLast = timeSinceLast / (1000 * 60 * 60);
+                    shouldSend = hoursSinceLast >= settings.emailFrequency;
+                }
+                
+                if (shouldSend) {
+                    const hoursLeft = Math.floor(hoursUntilDue);
+                    const minutesLeft = Math.floor((hoursUntilDue - hoursLeft) * 60);
+                    
+                    try {
+                        await EmailService.sendDeadlineReminder(
+                            userData.email,
+                            { ...taskData, id: taskDoc.id },
+                            hoursLeft,
+                            minutesLeft,
+                            userData.timezone || 'UTC'
+                        );
+                        
+                        // Record the email reminder
+                        await db.collection("emailReminders").add({
+                            userId,
+                            taskId: taskDoc.id,
+                            sentAt: admin.firestore.Timestamp.now(),
+                            hoursLeft,
+                            minutesLeft
+                        });
+                        
+                    } catch (error) {
+                        console.error(`Failed to send email reminder for task ${taskDoc.id}:`, error);
+                    }
+                }
+            }
+        }
+    }
+}
 
 if (!global.reminderJobStarted) {
 
@@ -11,6 +84,9 @@ if (!global.reminderJobStarted) {
         try {
             const now = new Date();
             console.log(`[ReminderJob] Checking reminders at ${now.toISOString()}`);
+
+            // Check for email reminders
+            await processEmailReminders(now);
 
             const snapshot = await db
                 .collection("reminders")

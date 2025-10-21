@@ -1,7 +1,7 @@
 import { messaging, getToken, onMessage } from '../config/firebase';
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationStore } from '@/stores/notificationStore';
-
+//PUSH NOTIFICATIONS
 export async function initNotifications() {
     try {
         // Check browser support
@@ -26,7 +26,7 @@ export async function initNotifications() {
             console.warn('Notification permission not granted');
             return;
         }
-
+        // Service worker registration for FCM and FCM token retrieval
         const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
         const token = await getToken(messaging, {
             vapidKey: 'BOZVEiXTmivbb26FmxdVZNllDVnLHpwP7Nx2_vox2Yv7kaWyR1rh8lsZsG2Vs9uWEkh9Ki3YjeGQ6phnMBHkY78',

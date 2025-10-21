@@ -13,40 +13,88 @@
       </v-card-title>
       <v-card-text>
         <p class="mb-4">
-          Control which in-app notifications you receive.
+          Control which notifications you receive.
         </p>
-        <v-list v-if="!loading">
-          <v-list-item>
-            <v-switch
-              v-model="settings.TASK_UPDATE"
-              label="Task Updates"
-              details="Receive notifications for changes to priority, status, or description."
-              color="primary"
-              inset
-              hide-details
-            ></v-switch>
-          </v-list-item>
-          <v-list-item>
-            <v-switch
-              v-model="settings.TASK_REASSIGNMENT_ADD"
-              label="Task Assignments"
-              details="Receive a notification when you are assigned to a new task."
-              color="primary"
-              inset
-              hide-details
-            ></v-switch>
-          </v-list-item>
-          <v-list-item>
-            <v-switch
-              v-model="settings.TASK_REASSIGNMENT_REMOVE"
-              label="Task Removals"
-              details="Receive a notification when you are removed from a task."
-              color="primary"
-              inset
-              hide-details
-            ></v-switch>
-          </v-list-item>
-        </v-list>
+
+        <div v-if="!loading">
+          <!-- Email Notifications Section -->
+          <v-card variant="outlined" class="mb-4">
+            <v-card-title class="text-h6">Email Notifications</v-card-title>
+            <v-card-text>
+              <v-switch
+                v-model="settings.emailEnabled"
+                label="Enable Email Notifications"
+                color="primary"
+                inset
+                class="mb-4"
+              ></v-switch>
+
+              <v-text-field
+                v-model.number="settings.emailLeadTime"
+                label="Lead Time (hours before deadline)"
+                type="number"
+                :disabled="!settings.emailEnabled"
+                :rules="[v => v > 0 || 'Must be greater than 0']"
+                class="mb-4"
+              ></v-text-field>
+
+              <v-text-field
+                v-model.number="settings.emailFrequency"
+                label="Reminder Frequency (hours)"
+                type="number"
+                :disabled="!settings.emailEnabled"
+                :rules="[v => v > 0 || 'Must be greater than 0']"
+                class="mb-4"
+              ></v-text-field>
+
+              <v-select
+                v-model="settings.timezone"
+                :items="timezones"
+                label="Timezone"
+                :disabled="!settings.emailEnabled"
+              ></v-select>
+            </v-card-text>
+          </v-card>
+
+          <!-- Push Notifications Section -->
+          <v-card variant="outlined" class="mb-4">
+            <v-card-title class="text-h6">Push Notifications</v-card-title>
+            <v-card-text>
+              <v-list>
+                <v-list-item>
+                  <v-switch
+                    v-model="settings.TASK_UPDATE"
+                    label="Task Updates"
+                    details="Receive notifications for changes to priority, status, or description."
+                    color="primary"
+                    inset
+                    hide-details
+                  ></v-switch>
+                </v-list-item>
+                <v-list-item>
+                  <v-switch
+                    v-model="settings.TASK_REASSIGNMENT_ADD"
+                    label="Task Assignments"
+                    details="Receive a notification when you are assigned to a new task."
+                    color="primary"
+                    inset
+                    hide-details
+                  ></v-switch>
+                </v-list-item>
+                <v-list-item>
+                  <v-switch
+                    v-model="settings.TASK_REASSIGNMENT_REMOVE"
+                    label="Task Removals"
+                    details="Receive a notification when you are removed from a task."
+                    color="primary"
+                    inset
+                    hide-details
+                  ></v-switch>
+                </v-list-item>
+              </v-list>
+            </v-card-text>
+          </v-card>
+        </div>
         <div
           v-else
           class="text-center pa-4"
@@ -82,11 +130,23 @@ import { db } from "@/config/firebase";
 import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notificationStore";
 
+const timezones = ref([
+  { title: 'UTC', value: 'UTC' },
+  { title: 'Eastern Time', value: 'America/New_York' },
+  { title: 'Pacific Time', value: 'America/Los_Angeles' },
+  { title: 'Central European Time', value: 'Europe/Berlin' },
+  // Add more as needed
+]);
+
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
 const loading = ref(true); // For initial load
 const saving = ref(false); // For save button action
 const settings = ref({
+  emailEnabled: true,
+  emailLeadTime: 24,
+  emailFrequency: 6,
+  timezone: 'UTC',
   TASK_UPDATE: true,
   TASK_REASSIGNMENT_ADD: true,
   TASK_REASSIGNMENT_REMOVE: true,
@@ -102,8 +162,27 @@ async function loadUserSettings(email) {
   try {
     const userDocRef = doc(db, "users", email);
     const userDoc = await getDoc(userDocRef);
-    if (userDoc.exists() && userDoc.data().notificationSettings) {
-      Object.assign(settings.value, userDoc.data().notificationSettings);
+    if (userDoc.exists()) {
+      // Get user data
+      const userData = userDoc.data();
+
+      // Set defaults first, then override with existing settings
+      const defaultSettings = {
+        TASK_UPDATE: true,
+        TASK_REASSIGNMENT_ADD: true,
+        TASK_REASSIGNMENT_REMOVE: true,
+        emailEnabled: true,
+        emailLeadTime: 24,
+        emailFrequency: 6,
+        timezone: 'UTC',
+        pushEnabled: true
+      };
+
+      // Merge existing settings with defaults
+      settings.value = { ...defaultSettings, ...(userData.notificationSettings || {}) };
+      if (userData.timezone) {
+        settings.value.timezone = userData.timezone;
+      }
     }
   } catch (error) {
     console.error("Failed to load user settings:", error);

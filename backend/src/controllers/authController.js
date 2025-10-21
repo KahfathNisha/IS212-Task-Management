@@ -50,10 +50,67 @@ exports.login = async (req, res) => {
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
     });
 
+    // Migration: Add default notification settings for existing users
+    const userData = userDoc.data();
+
+    // Define default notification settings
+    const defaultNotificationSettings = {
+      TASK_UPDATE: true,
+      TASK_REASSIGNMENT_ADD: true,
+      TASK_REASSIGNMENT_REMOVE: true,
+      emailEnabled: true,
+      emailLeadTime: 24,
+      emailFrequency: 6,
+      pushEnabled: true
+    };
+
+    // Check what needs to be migrated
+    const updates = {};
+    let needsMigration = false;
+
+    if (!userData.notificationSettings) {
+      updates.notificationSettings = defaultNotificationSettings;
+      needsMigration = true;
+    } else {
+      // Check for missing individual fields
+      const existing = userData.notificationSettings;
+      if (existing.emailEnabled === undefined) {
+        updates['notificationSettings.emailEnabled'] = true;
+        needsMigration = true;
+      }
+      if (existing.emailLeadTime === undefined) {
+        updates['notificationSettings.emailLeadTime'] = 24;
+        needsMigration = true;
+      }
+      if (existing.emailFrequency === undefined) {
+        updates['notificationSettings.emailFrequency'] = 6;
+        needsMigration = true;
+      }
+      if (existing.pushEnabled === undefined) {
+        updates['notificationSettings.pushEnabled'] = true;
+        needsMigration = true;
+      }
+    }
+
+    if (!userData.timezone) {
+      updates.timezone = 'UTC';
+      needsMigration = true;
+    }
+
+    // Perform migration if needed
+    if (needsMigration) {
+      await userRef.update(updates);
+      console.log(`Migrated notification settings for user: ${email}`);
+    }
+
+    // Return updated user data including migrated fields
+    const updatedUserDoc = await userRef.get();
+    const updatedUserData = updatedUserDoc.data();
+
     res.status(200).json({
       success: true,
       message: 'Login successful!',
-      user: userDoc.data() // Send back the user's profile data
+      user: updatedUserData // Now includes migrated notificationSettings
     });
 
   } catch (error) {
@@ -197,7 +254,7 @@ exports.recordFailedAttempt = async (req, res) => {
     
     const userData = userDoc.data();
     const now = Date.now();
-    
+
     // Check if already locked
     if (userData.lockedUntil && userData.lockedUntil > now) {
         const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
