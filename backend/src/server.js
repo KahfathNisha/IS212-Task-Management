@@ -10,6 +10,7 @@ console.log('🔧 Loading routes...');
 const taskRouter = require('./routes/taskRouter');
 const authRouter = require('./routes/authRouter');
 const fcmRouter = require('./routes/fcmRouter');
+const reportsRouter = require('./routes/reportsRouter');
 
 console.log('✅ Routes loaded successfully');
 
@@ -64,6 +65,7 @@ app.use('/tasks', taskRouter);
 
 app.use('/api/auth', authRouter);
 app.use('/api/fcm', fcmRouter);
+app.use('/api/reports', reportsRouter);
 
 console.log('✅ Routes configured');
 
