@@ -208,218 +208,227 @@
 
       <!-- PROJECTS VIEW -->
       <div v-if="currentView === 'projects'" class="projects-list">
-        <div 
-          v-for="project in filteredProjects" 
-          :key="project.id" 
-          class="project-card"
-        >
-          <!-- Project Header -->
-          <div class="project-header" @click="toggleProject(project.id)">
-            <div class="project-header-left">
-              <button class="expand-btn">
-                <v-icon size="20">
-                  {{ expandedProjects.includes(project.id) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}
-                </v-icon>
-              </button>
-              <h3 class="project-name">{{ project.name }}</h3>
-              <v-chip 
-                :color="getStatusColor(project.status)" 
-                size="small"
-                class="status-chip"
-              >
-                {{ project.status }}
-              </v-chip>
-              <v-chip 
-                size="small"
-                class="department-chip"
-              >
-                {{ project.department }}
-              </v-chip>
-            </div>
-            <div class="project-header-right">
-              <v-btn 
-                icon="mdi-pencil" 
-                size="small" 
-                variant="text"
-                @click.stop="editProject(project)"
-              />
-              <v-btn 
-                icon="mdi-dots-vertical" 
-                size="small" 
-                variant="text"
-                @click.stop
-              />
-            </div>
-          </div>
+        <!-- Loading State -->
+        <div v-if="loadingProjects" class="loading-state">
+          <v-progress-circular indeterminate color="primary" size="64" />
+          <p>Loading projects...</p>
+        </div>
 
-          <!-- Project Summary -->
-          <div class="project-summary">
-            <p class="project-description">{{ project.description }}</p>
-            
-            <!-- Categories -->
-            <div class="project-categories" v-if="project.categories?.length">
-              <v-chip 
-                v-for="category in project.categories" 
-                :key="category"
-                size="small"
-                class="category-chip"
-                :color="getCategoryColor(category)"
-              >
-                <v-icon size="14" start>mdi-tag</v-icon>
-                {{ category }}
-              </v-chip>
-            </div>
-
-            <div class="project-meta">
-              <div class="meta-item">
-                <v-icon size="18" class="meta-icon">mdi-account-multiple</v-icon>
-                <span>{{ project.members.length }} members</span>
-              </div>
-              <div class="meta-item">
-                <v-icon size="18" class="meta-icon">mdi-checkbox-marked-circle-outline</v-icon>
-                <span>{{ project.completedTasks }}/{{ project.totalTasks }} tasks</span>
-              </div>
-              <div class="meta-item">
-                <v-icon size="18" class="meta-icon">mdi-calendar</v-icon>
-                <span>{{ formatDate(project.dueDate) }}</span>
-              </div>
-              <div class="progress-container">
-                <div class="progress-bar">
-                  <div 
-                    class="progress-fill" 
-                    :style="{ width: project.progress + '%' }"
-                  ></div>
-                </div>
-                <span class="progress-text">{{ project.progress }}%</span>
-              </div>
-            </div>
-            <div class="avatars">
-              <v-tooltip
-                v-for="(member, idx) in project.members.slice(0, 5)" 
-                :key="idx"
-                :text="member.name"
-              >
-                <template v-slot:activator="{ props }">
-                  <div 
-                    v-bind="props"
-                    class="avatar"
-                    :style="{ background: getAvatarColor(idx) }"
-                  >
-                    {{ member.initials }}
-                  </div>
-                </template>
-              </v-tooltip>
-              <div v-if="project.members.length > 5" class="avatar avatar-more">
-                +{{ project.members.length - 5 }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Expanded Details -->
-          <div v-if="expandedProjects.includes(project.id)" class="project-details">
-            <!-- Tasks by Category -->
-            <div class="details-section">
-              <div class="section-header">
-                <h4>Tasks by Category</h4>
-                <v-btn 
-                  size="small" 
-                  variant="text" 
-                  prepend-icon="mdi-tag-plus"
-                  @click="manageCategoriesForProject(project)"
+        <!-- Projects List -->
+        <template v-else>
+          <div 
+            v-for="project in filteredProjects" 
+            :key="project.id" 
+            class="project-card"
+          >
+            <!-- Project Header -->
+            <div class="project-header" @click="toggleProject(project.id)">
+              <div class="project-header-left">
+                <button class="expand-btn">
+                  <v-icon size="20">
+                    {{ expandedProjects.includes(project.id) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}
+                  </v-icon>
+                </button>
+                <h3 class="project-name">{{ project.name }}</h3>
+                <v-chip 
+                  :color="getStatusColor(project.status)" 
+                  size="small"
+                  class="status-chip"
                 >
-                  Manage Categories
-                </v-btn>
+                  {{ project.status }}
+                </v-chip>
+                <v-chip 
+                  size="small"
+                  class="department-chip"
+                >
+                  {{ project.department }}
+                </v-chip>
               </div>
+              <div class="project-header-right">
+                <v-btn 
+                  icon="mdi-pencil" 
+                  size="small" 
+                  variant="text"
+                  @click.stop="editProject(project)"
+                />
+                <v-btn 
+                  icon="mdi-dots-vertical" 
+                  size="small" 
+                  variant="text"
+                  @click.stop
+                />
+              </div>
+            </div>
 
-              <div v-if="project.categories?.length" class="categories-section">
-                <div 
+            <!-- Project Summary -->
+            <div class="project-summary">
+              <p class="project-description">{{ project.description }}</p>
+              
+              <!-- Categories -->
+              <div class="project-categories" v-if="project.categories?.length">
+                <v-chip 
                   v-for="category in project.categories" 
                   :key="category"
-                  class="category-group"
+                  size="small"
+                  class="category-chip"
+                  :color="getCategoryColor(category)"
                 >
-                  <div class="category-header">
-                    <v-chip 
-                      size="small"
-                      :color="getCategoryColor(category)"
-                    >
-                      <v-icon size="14" start>mdi-tag</v-icon>
-                      {{ category }}
-                    </v-chip>
-                    <span class="task-count">{{ getTasksByCategory(project, category).length }} tasks</span>
-                  </div>
+                  <v-icon size="14" start>mdi-tag</v-icon>
+                  {{ category }}
+                </v-chip>
+              </div>
 
-                  <div class="category-tasks">
+              <div class="project-meta">
+                <div class="meta-item">
+                  <v-icon size="18" class="meta-icon">mdi-account-multiple</v-icon>
+                  <span>{{ project.members?.length || 0 }} members</span>
+                </div>
+                <div class="meta-item">
+                  <v-icon size="18" class="meta-icon">mdi-checkbox-marked-circle-outline</v-icon>
+                  <span>{{ project.completedTasks || 0 }}/{{ project.totalTasks || 0 }} tasks</span>
+                </div>
+                <div class="meta-item">
+                  <v-icon size="18" class="meta-icon">mdi-calendar</v-icon>
+                  <span>{{ formatDate(project.dueDate) }}</span>
+                </div>
+                <div class="progress-container">
+                  <div class="progress-bar">
                     <div 
-                      v-for="task in getTasksByCategory(project, category)" 
-                      :key="task.id"
-                      class="task-item"
+                      class="progress-fill" 
+                      :style="{ width: (project.progress || 0) + '%' }"
+                    ></div>
+                  </div>
+                  <span class="progress-text">{{ project.progress || 0 }}%</span>
+                </div>
+              </div>
+              <div class="avatars" v-if="project.members?.length">
+                <v-tooltip
+                  v-for="(member, idx) in project.members.slice(0, 5)" 
+                  :key="idx"
+                  :text="member.name || member"
+                >
+                  <template v-slot:activator="{ props }">
+                    <div 
+                      v-bind="props"
+                      class="avatar"
+                      :style="{ background: getAvatarColor(idx) }"
                     >
-                      <v-icon size="20" class="task-icon">mdi-checkbox-blank-circle-outline</v-icon>
-                      <div class="task-content">
-                        <div class="task-title">{{ task.title }}</div>
-                        <div class="task-meta">
-                          <span>{{ task.assignedTo }}</span>
-                          <span>•</span>
-                          <span>Due: {{ formatDate(task.dueDate) }}</span>
-                        </div>
-                      </div>
+                      {{ getInitials(member) }}
+                    </div>
+                  </template>
+                </v-tooltip>
+                <div v-if="project.members.length > 5" class="avatar avatar-more">
+                  +{{ project.members.length - 5 }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Expanded Details -->
+            <div v-if="expandedProjects.includes(project.id)" class="project-details">
+              <!-- Tasks by Category -->
+              <div class="details-section">
+                <div class="section-header">
+                  <h4>Tasks by Category</h4>
+                  <v-btn 
+                    size="small" 
+                    variant="text" 
+                    prepend-icon="mdi-tag-plus"
+                    @click="manageCategoriesForProject(project)"
+                  >
+                    Manage Categories
+                  </v-btn>
+                </div>
+
+                <div v-if="project.categories?.length" class="categories-section">
+                  <div 
+                    v-for="category in project.categories" 
+                    :key="category"
+                    class="category-group"
+                  >
+                    <div class="category-header">
                       <v-chip 
-                        :color="getStatusColor(task.status)" 
                         size="small"
+                        :color="getCategoryColor(category)"
                       >
-                        {{ task.status }}
+                        <v-icon size="14" start>mdi-tag</v-icon>
+                        {{ category }}
                       </v-chip>
+                      <span class="task-count">{{ getTasksByCategory(project, category).length }} tasks</span>
+                    </div>
+
+                    <div class="category-tasks">
+                      <div 
+                        v-for="task in getTasksByCategory(project, category)" 
+                        :key="task.id"
+                        class="task-item"
+                      >
+                        <v-icon size="20" class="task-icon">mdi-checkbox-blank-circle-outline</v-icon>
+                        <div class="task-content">
+                          <div class="task-title">{{ task.title }}</div>
+                          <div class="task-meta">
+                            <span>{{ task.assignedTo }}</span>
+                            <span>•</span>
+                            <span>Due: {{ formatDate(task.dueDate) }}</span>
+                          </div>
+                        </div>
+                        <v-chip 
+                          :color="getStatusColor(task.status)" 
+                          size="small"
+                        >
+                          {{ task.status }}
+                        </v-chip>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="no-categories">
+                  <v-icon size="48" color="grey-lighten-1">mdi-tag-outline</v-icon>
+                  <p>No categories assigned</p>
+                  <v-btn 
+                    size="small" 
+                    variant="text" 
+                    prepend-icon="mdi-tag-plus"
+                    @click="manageCategoriesForProject(project)"
+                  >
+                    Add Categories
+                  </v-btn>
+                </div>
+              </div>
+
+              <!-- Team Members Section -->
+              <div class="details-section" v-if="project.members?.length">
+                <h4>Team Members</h4>
+                <div class="team-members">
+                  <div 
+                    v-for="(member, idx) in project.members" 
+                    :key="idx" 
+                    class="team-member"
+                  >
+                    <div 
+                      class="avatar avatar-large"
+                      :style="{ background: getAvatarColor(idx) }"
+                    >
+                      {{ getInitials(member) }}
+                    </div>
+                    <div class="member-info">
+                      <div class="member-name">{{ typeof member === 'string' ? member : member.name }}</div>
+                      <div class="member-role" v-if="member.role">{{ member.role }}</div>
+                      <div class="member-tasks">{{ getMemberTaskCount(project, typeof member === 'string' ? member : member.name) }} tasks</div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <div v-else class="no-categories">
-                <v-icon size="48" color="grey-lighten-1">mdi-tag-outline</v-icon>
-                <p>No categories assigned</p>
-                <v-btn 
-                  size="small" 
-                  variant="text" 
-                  prepend-icon="mdi-tag-plus"
-                  @click="manageCategoriesForProject(project)"
-                >
-                  Add Categories
-                </v-btn>
-              </div>
-            </div>
-
-            <!-- Team Members Section -->
-            <div class="details-section">
-              <h4>Team Members</h4>
-              <div class="team-members">
-                <div 
-                  v-for="(member, idx) in project.members" 
-                  :key="idx" 
-                  class="team-member"
-                >
-                  <div 
-                    class="avatar avatar-large"
-                    :style="{ background: getAvatarColor(idx) }"
-                  >
-                    {{ member.initials }}
-                  </div>
-                  <div class="member-info">
-                    <div class="member-name">{{ member.name }}</div>
-                    <div class="member-role">{{ member.role }}</div>
-                    <div class="member-tasks">{{ getMemberTaskCount(project, member.name) }} tasks</div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Empty State -->
-        <div v-if="filteredProjects.length === 0" class="empty-state">
-          <v-icon size="64" color="grey-lighten-1">mdi-folder-outline</v-icon>
-          <h3>No projects found</h3>
-          <p>Adjust your filters or create a new project</p>
-        </div>
+          <!-- Empty State -->
+          <div v-if="filteredProjects.length === 0" class="empty-state">
+            <v-icon size="64" color="grey-lighten-1">mdi-folder-outline</v-icon>
+            <h3>No projects found</h3>
+            <p>Adjust your filters or create a new project</p>
+          </div>
+        </template>
       </div>
 
       <!-- CATEGORY VIEW -->
@@ -645,6 +654,8 @@
       </v-card>
     </v-dialog>
 
+    
+
     <!-- Manage Categories Dialog -->
     <v-dialog v-model="showManageCategoriesDialog" max-width="600px">
       <v-card>
@@ -744,7 +755,12 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { projectService } from '@/services/projectService'
+
+// Auth store
+const authStore = useAuthStore()
 
 // State
 const expandedProjects = ref([])
@@ -823,582 +839,34 @@ const newProject = ref({
   totalTasks: 0
 })
 
-// Mock data
-const projects = ref([
-  {
-    id: 1,
-    name: 'Website Redesign',
-    status: 'Ongoing',
-    department: 'Engineering',
-    description: 'Complete overhaul of company website with modern design and improved UX',
-    completedTasks: 2,
-    totalTasks: 6,
-    dueDate: '2025-11-30',
-    progress: 65,
-    categories: ['Feature', 'UI/UX', 'Performance'],
-    members: [
-      { initials: 'SC', name: 'Sarah Chen', role: 'Lead Developer' },
-      { initials: 'MJ', name: 'Mike Johnson', role: 'Designer' },
-      { initials: 'DK', name: 'David Kim', role: 'Backend Dev' }
-    ],
-    tasks: [
-      {
-        id: 't1',
-        title: 'Implement user authentication',
-        description: 'Add OAuth 2.0 login functionality',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-10-20',
-        status: 'Ongoing',
-        priority: 1,
-        categories: ['Feature']
-      },
-      {
-        id: 't2',
-        title: 'Design new homepage layout',
-        description: 'Create modern responsive layout',
-        assignedTo: 'Mike Johnson',
-        dueDate: '2025-10-25',
-        status: 'Completed',
-        priority: 2,
-        categories: ['UI/UX']
-      },
-      {
-        id: 't3',
-        title: 'Optimize database queries',
-        description: 'Improve query performance',
-        assignedTo: 'David Kim',
-        dueDate: '2025-10-28',
-        status: 'Ongoing',
-        priority: 3,
-        categories: ['Performance']
-      },
-      {
-        id: 't4',
-        title: 'Add dark mode support',
-        description: 'Implement theme switching',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-11-05',
-        status: 'Pending Review',
-        priority: 4,
-        categories: ['Feature', 'UI/UX']
-      },
-      {
-        id: 't5',
-        title: 'Setup CDN for assets',
-        description: 'Configure CloudFront distribution',
-        assignedTo: 'David Kim',
-        dueDate: '2025-11-10',
-        status: 'Unassigned',
-        priority: 5,
-        categories: ['Performance']
-      },
-      {
-        id: 't6',
-        title: 'Mobile responsive testing',
-        description: 'Test on various devices',
-        assignedTo: 'Mike Johnson',
-        dueDate: '2025-11-15',
-        status: 'Completed',
-        priority: 2,
-        categories: ['UI/UX']
-      }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Mobile App',
-    status: 'Ongoing',
-    department: 'Engineering',
-    description: 'Native mobile application for iOS and Android',
-    completedTasks: 3,
-    totalTasks: 7,
-    dueDate: '2025-12-31',
-    progress: 45,
-    categories: ['Feature', 'Bug', 'Testing'],
-    members: [
-      { initials: 'SC', name: 'Sarah Chen', role: 'Lead Developer' },
-      { initials: 'DK', name: 'David Kim', role: 'Backend Dev' },
-      { initials: 'LP', name: 'Lisa Park', role: 'iOS Developer' }
-    ],
-    tasks: [
-      {
-        id: 't7',
-        title: 'Set up navigation system',
-        description: 'Implement React Navigation',
-        assignedTo: 'Lisa Park',
-        dueDate: '2025-10-25',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Feature']
-      },
-      {
-        id: 't8',
-        title: 'Fix login crash',
-        description: 'Debug authentication flow',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-10-22',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Bug']
-      },
-      {
-        id: 't9',
-        title: 'Write unit tests',
-        description: 'Add test coverage for core modules',
-        assignedTo: 'David Kim',
-        dueDate: '2025-11-01',
-        status: 'Pending Review',
-        priority: 3,
-        categories: ['Testing']
-      },
-      {
-        id: 't10',
-        title: 'Implement push notifications',
-        description: 'Setup Firebase messaging',
-        assignedTo: 'Lisa Park',
-        dueDate: '2025-11-08',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Feature']
-      },
-      {
-        id: 't11',
-        title: 'Fix memory leak',
-        description: 'Resolve memory issues in chat view',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-11-12',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Bug']
-      },
-      {
-        id: 't12',
-        title: 'Integration testing',
-        description: 'E2E tests for critical flows',
-        assignedTo: 'David Kim',
-        dueDate: '2025-11-20',
-        status: 'Unassigned',
-        priority: 4,
-        categories: ['Testing']
-      },
-      {
-        id: 't13',
-        title: 'Biometric authentication',
-        description: 'Add Face ID and fingerprint support',
-        assignedTo: 'Lisa Park',
-        dueDate: '2025-12-01',
-        status: 'Completed',
-        priority: 2,
-        categories: ['Feature']
-      }
-    ]
-  },
-  {
-    id: 3,
-    name: 'Q4 Campaign',
-    status: 'Pending Review',
-    department: 'Marketing',
-    description: 'Multi-channel marketing campaign for Q4 product launch',
-    completedTasks: 4,
-    totalTasks: 8,
-    dueDate: '2025-12-31',
-    progress: 50,
-    categories: ['Content', 'Social Media', 'Analytics'],
-    members: [
-      { initials: 'LP', name: 'Lisa Park', role: 'Marketing Lead' },
-      { initials: 'MJ', name: 'Mike Johnson', role: 'Content Creator' },
-      { initials: 'ED', name: 'Emma Davis', role: 'Social Media Manager' }
-    ],
-    tasks: [
-      {
-        id: 't14',
-        title: 'Create campaign assets',
-        description: 'Design social media graphics and videos',
-        assignedTo: 'Mike Johnson',
-        dueDate: '2025-11-15',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Content']
-      },
-      {
-        id: 't15',
-        title: 'Schedule social posts',
-        description: 'Plan and schedule content calendar',
-        assignedTo: 'Emma Davis',
-        dueDate: '2025-11-18',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Social Media']
-      },
-      {
-        id: 't16',
-        title: 'Setup tracking pixels',
-        description: 'Configure analytics and conversion tracking',
-        assignedTo: 'Lisa Park',
-        dueDate: '2025-11-20',
-        status: 'Completed',
-        priority: 3,
-        categories: ['Analytics']
-      },
-      {
-        id: 't17',
-        title: 'Write blog posts',
-        description: 'Create SEO-optimized content',
-        assignedTo: 'Mike Johnson',
-        dueDate: '2025-11-25',
-        status: 'Pending Review',
-        priority: 2,
-        categories: ['Content']
-      },
-      {
-        id: 't18',
-        title: 'Launch Instagram campaign',
-        description: 'Deploy paid ads and organic posts',
-        assignedTo: 'Emma Davis',
-        dueDate: '2025-12-01',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Social Media']
-      },
-      {
-        id: 't19',
-        title: 'A/B test landing pages',
-        description: 'Test variations and analyze results',
-        assignedTo: 'Lisa Park',
-        dueDate: '2025-12-05',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Analytics']
-      },
-      {
-        id: 't20',
-        title: 'Email newsletter design',
-        description: 'Create responsive email templates',
-        assignedTo: 'Mike Johnson',
-        dueDate: '2025-12-10',
-        status: 'Completed',
-        priority: 3,
-        categories: ['Content']
-      },
-      {
-        id: 't21',
-        title: 'Influencer outreach',
-        description: 'Contact and coordinate with influencers',
-        assignedTo: 'Emma Davis',
-        dueDate: '2025-12-15',
-        status: 'Unassigned',
-        priority: 4,
-        categories: ['Social Media']
-      }
-    ]
-  },
-  {
-    id: 4,
-    name: 'Customer Portal',
-    status: 'Ongoing',
-    department: 'Engineering',
-    description: 'Self-service customer portal with account management',
-    completedTasks: 5,
-    totalTasks: 12,
-    dueDate: '2025-11-15',
-    progress: 42,
-    categories: ['Feature', 'Bug', 'Security'],
-    members: [
-      { initials: 'DK', name: 'David Kim', role: 'Backend Lead' },
-      { initials: 'SC', name: 'Sarah Chen', role: 'Frontend Dev' },
-      { initials: 'JW', name: 'John Wang', role: 'QA Engineer' },
-      { initials: 'AM', name: 'Alex Martinez', role: 'DevOps' }
-    ],
-    tasks: [
-      {
-        id: 't22',
-        title: 'User dashboard',
-        description: 'Create main dashboard view',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-10-28',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Feature']
-      },
-      {
-        id: 't23',
-        title: 'Payment integration',
-        description: 'Integrate Stripe payment processing',
-        assignedTo: 'David Kim',
-        dueDate: '2025-11-02',
-        status: 'Ongoing',
-        priority: 1,
-        categories: ['Feature']
-      },
-      {
-        id: 't24',
-        title: 'Fix session timeout',
-        description: 'Resolve premature logout issue',
-        assignedTo: 'David Kim',
-        dueDate: '2025-10-30',
-        status: 'Completed',
-        priority: 2,
-        categories: ['Bug']
-      },
-      {
-        id: 't25',
-        title: 'Implement 2FA',
-        description: 'Add two-factor authentication',
-        assignedTo: 'Alex Martinez',
-        dueDate: '2025-11-05',
-        status: 'Pending Review',
-        priority: 1,
-        categories: ['Security']
-      },
-      {
-        id: 't26',
-        title: 'Support ticket system',
-        description: 'Build ticket submission and tracking',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-11-08',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Feature']
-      },
-      {
-        id: 't27',
-        title: 'Load testing',
-        description: 'Perform stress tests on API',
-        assignedTo: 'John Wang',
-        dueDate: '2025-11-10',
-        status: 'Completed',
-        priority: 3,
-        categories: ['Feature']
-      },
-      {
-        id: 't28',
-        title: 'Fix file upload bug',
-        description: 'Resolve large file upload failures',
-        assignedTo: 'David Kim',
-        dueDate: '2025-11-12',
-        status: 'Completed',
-        priority: 2,
-        categories: ['Bug']
-      },
-      {
-        id: 't29',
-        title: 'SSL certificate renewal',
-        description: 'Update SSL certs before expiry',
-        assignedTo: 'Alex Martinez',
-        dueDate: '2025-11-14',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Security']
-      },
-      {
-        id: 't30',
-        title: 'Notification preferences',
-        description: 'Add user notification settings',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-11-18',
-        status: 'Unassigned',
-        priority: 3,
-        categories: ['Feature']
-      },
-      {
-        id: 't31',
-        title: 'Security audit',
-        description: 'Conduct comprehensive security review',
-        assignedTo: 'John Wang',
-        dueDate: '2025-11-20',
-        status: 'Ongoing',
-        priority: 1,
-        categories: ['Security']
-      },
-      {
-        id: 't32',
-        title: 'Fix mobile layout',
-        description: 'Resolve responsive design issues',
-        assignedTo: 'Sarah Chen',
-        dueDate: '2025-11-22',
-        status: 'Pending Review',
-        priority: 2,
-        categories: ['Bug']
-      },
-      {
-        id: 't33',
-        title: 'Activity logs',
-        description: 'Implement user activity tracking',
-        assignedTo: 'David Kim',
-        dueDate: '2025-11-25',
-        status: 'Unassigned',
-        priority: 4,
-        categories: ['Feature']
-      }
-    ]
-  },
-  {
-    id: 5,
-    name: 'Sales Training Program',
-    status: 'Ongoing',
-    department: 'Sales',
-    description: 'Comprehensive training program for new sales representatives',
-    completedTasks: 2,
-    totalTasks: 5,
-    dueDate: '2025-11-30',
-    progress: 40,
-    categories: ['Training', 'Documentation'],
-    members: [
-      { initials: 'RJ', name: 'Robert Johnson', role: 'Sales Director' },
-      { initials: 'KL', name: 'Karen Lee', role: 'Training Coordinator' }
-    ],
-    tasks: [
-      {
-        id: 't34',
-        title: 'Create training materials',
-        description: 'Develop comprehensive training documentation',
-        assignedTo: 'Karen Lee',
-        dueDate: '2025-11-08',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Documentation']
-      },
-      {
-        id: 't35',
-        title: 'Schedule training sessions',
-        description: 'Coordinate with new hires',
-        assignedTo: 'Robert Johnson',
-        dueDate: '2025-11-12',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Training']
-      },
-      {
-        id: 't36',
-        title: 'Setup CRM training',
-        description: 'Teach Salesforce best practices',
-        assignedTo: 'Karen Lee',
-        dueDate: '2025-11-18',
-        status: 'Pending Review',
-        priority: 1,
-        categories: ['Training']
-      },
-      {
-        id: 't37',
-        title: 'Create knowledge base',
-        description: 'Build internal wiki for sales team',
-        assignedTo: 'Karen Lee',
-        dueDate: '2025-11-22',
-        status: 'Completed',
-        priority: 3,
-        categories: ['Documentation']
-      },
-      {
-        id: 't38',
-        title: 'Conduct mock calls',
-        description: 'Role-play customer interactions',
-        assignedTo: 'Robert Johnson',
-        dueDate: '2025-11-28',
-        status: 'Unassigned',
-        priority: 2,
-        categories: ['Training']
-      }
-    ]
-  },
-  {
-    id: 6,
-    name: 'HR System Upgrade',
-    status: 'Pending Review',
-    department: 'HR',
-    description: 'Upgrade HRIS system and migrate employee data',
-    completedTasks: 6,
-    totalTasks: 8,
-    dueDate: '2025-10-31',
-    progress: 75,
-    categories: ['Migration', 'Testing', 'Training'],
-    members: [
-      { initials: 'JD', name: 'Jennifer Davis', role: 'HR Manager' },
-      { initials: 'TS', name: 'Tom Smith', role: 'IT Specialist' }
-    ],
-    tasks: [
-      {
-        id: 't39',
-        title: 'Data migration plan',
-        description: 'Plan employee data migration strategy',
-        assignedTo: 'Tom Smith',
-        dueDate: '2025-10-20',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Migration']
-      },
-      {
-        id: 't40',
-        title: 'Test new system',
-        description: 'Conduct UAT with HR team',
-        assignedTo: 'Jennifer Davis',
-        dueDate: '2025-10-25',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Testing']
-      },
-      {
-        id: 't41',
-        title: 'Employee training',
-        description: 'Train staff on new HRIS',
-        assignedTo: 'Jennifer Davis',
-        dueDate: '2025-10-28',
-        status: 'Ongoing',
-        priority: 2,
-        categories: ['Training']
-      },
-      {
-        id: 't42',
-        title: 'Data validation',
-        description: 'Verify migrated data accuracy',
-        assignedTo: 'Tom Smith',
-        dueDate: '2025-10-29',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Migration']
-      },
-      {
-        id: 't43',
-        title: 'System configuration',
-        description: 'Configure workflows and permissions',
-        assignedTo: 'Tom Smith',
-        dueDate: '2025-10-30',
-        status: 'Completed',
-        priority: 2,
-        categories: ['Migration']
-      },
-      {
-        id: 't44',
-        title: 'Integration testing',
-        description: 'Test integrations with payroll',
-        assignedTo: 'Tom Smith',
-        dueDate: '2025-10-31',
-        status: 'Completed',
-        priority: 1,
-        categories: ['Testing']
-      },
-      {
-        id: 't45',
-        title: 'Create user guides',
-        description: 'Document system procedures',
-        assignedTo: 'Jennifer Davis',
-        dueDate: '2025-10-31',
-        status: 'Completed',
-        priority: 3,
-        categories: ['Training']
-      },
-      {
-        id: 't46',
-        title: 'Go-live preparation',
-        description: 'Final checks before launch',
-        assignedTo: 'Tom Smith',
-        dueDate: '2025-10-31',
-        status: 'Pending Review',
-        priority: 1,
-        categories: ['Migration']
-      }
-    ]
+// Real Firebase data
+const projects = ref([])
+const loadingProjects = ref(true)
+
+// Load projects from Firebase
+const loadProjects = async () => {
+  loadingProjects.value = true
+  try {
+    const fetchedProjects = await projectService.getAllProjects(
+      authStore.userEmail,
+      authStore.userRole,
+      authStore.userData?.department
+    )
+    projects.value = fetchedProjects
+    console.log('📦 Loaded projects:', fetchedProjects)
+  } catch (error) {
+    console.error('Error loading projects:', error)
+    showMessage('Failed to load projects: ' + error.message, 'error')
+  } finally {
+    loadingProjects.value = false
   }
-])
+}
+
+// Load projects when component mounts
+onMounted(() => {
+  loadProjects()
+})
+
 
 // Computed
 const allCategories = computed(() => {
@@ -1527,6 +995,35 @@ const getAvatarColor = (index) => {
     'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
   ]
   return colors[index % colors.length]
+}
+const getInitials = (member) => {
+  if (!member) return '?'
+  
+  // If member is just an email string
+  if (typeof member === 'string') {
+    const name = member.split('@')[0] // Get part before @
+    const parts = name.split('.')
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase()
+    }
+    return name.substring(0, 2).toUpperCase()
+  }
+  
+  // If member has initials property
+  if (member.initials) {
+    return member.initials
+  }
+  
+  // If member has name property
+  if (member.name) {
+    const nameParts = member.name.split(' ')
+    if (nameParts.length >= 2) {
+      return (nameParts[0][0] + nameParts[1][0]).toUpperCase()
+    }
+    return member.name.substring(0, 2).toUpperCase()
+  }
+  
+  return '?'
 }
 
 const formatDate = (dateString) => {
@@ -1693,34 +1190,41 @@ const createGlobalCategory = () => {
   newGlobalCategory.value = ''
 }
 
-const saveProject = () => {
+const saveProject = async () => {
   if (!newProject.value.name) {
     showMessage('Please enter a project name', 'error')
     return
   }
 
-  if (isEditing.value) {
-    const index = projects.value.findIndex(p => p.id === newProject.value.id)
-    if (index !== -1) {
-      projects.value[index] = { ...newProject.value }
+  try {
+    if (isEditing.value) {
+      // Update existing project
+      await projectService.updateProject(
+        newProject.value.id, 
+        newProject.value,
+        authStore.userRole,
+        authStore.userEmail
+      )
       showMessage('Project updated successfully', 'success')
+    } else {
+      // Create new project
+      await projectService.createProject(
+        newProject.value,
+        authStore.userEmail,
+        authStore.userRole,
+        authStore.userData?.department
+      )
+      showMessage('Project created successfully', 'success')
     }
-  } else {
-    const newId = Math.max(...projects.value.map(p => p.id), 0) + 1
-    projects.value.push({
-      ...newProject.value,
-      id: newId,
-      members: [],
-      tasks: [],
-      progress: 0,
-      completedTasks: 0,
-      totalTasks: 0
-    })
-    showMessage('Project created successfully', 'success')
-  }
 
-  showCreateDialog.value = false
-  resetForm()
+    // Reload projects from Firebase
+    await loadProjects()
+    showCreateDialog.value = false
+    resetForm()
+  } catch (error) {
+    console.error('Error saving project:', error)
+    showMessage('Failed to save project: ' + error.message, 'error')
+  }
 }
 
 const cancelCreate = () => {
@@ -1930,6 +1434,7 @@ const resetFilters = () => {
   selectedDepartments.value = []
   selectedCategories.value = []
 }
+
 </script>
 
 <style scoped>
@@ -3053,5 +2558,20 @@ const resetFilters = () => {
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+}
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.loading-state p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
 }
 </style>
