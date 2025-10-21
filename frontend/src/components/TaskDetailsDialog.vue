@@ -72,6 +72,27 @@
             </div>
           </v-col>
         </v-row>
+        
+        <v-row>
+        <v-col cols="6">
+          <div class="detail-section">
+            <div class="detail-section-icon-row">
+              <v-icon size="small" class="detail-icon">mdi-folder-outline</v-icon>
+              <h4>Project</h4>
+            </div>
+            <p>{{ task.projectName || 'No project' }}</p>
+          </div>
+        </v-col>
+        <v-col cols="6">
+          <div class="detail-section">
+            <div class="detail-section-icon-row">
+              <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
+              <h4>Priority</h4>
+            </div>
+            <p>{{ task.priority || 'Not set' }}</p>
+          </div>
+        </v-col>
+      </v-row>
 
         <v-row>
           <v-col cols="6">

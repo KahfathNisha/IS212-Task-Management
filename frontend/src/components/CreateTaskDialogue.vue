@@ -56,7 +56,7 @@
               class="flex-1"
             />
             <v-select
-              v-model="localTask.project"
+              v-model="localTask.projectId"
               label="Project"
               :items="projects"
               placeholder="Select project"

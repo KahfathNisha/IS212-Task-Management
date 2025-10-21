@@ -493,6 +493,7 @@
       :isEditing="isEditing"
       :taskStatuses="taskStatuses"
       :priorities="priorities"
+      :projects="projects"
       :teamMembers="teamMembers"
       :todayDate="todayDate"
       :currentUser="currentUser"  
@@ -524,6 +525,7 @@ import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
 import ArchivedTasks from '../components/ArchivedTasks.vue'
 import { useAuthStore } from '@/stores/auth'; // Import your auth store
+import { projectService } from '@/services/projectService'  // ADD THIS LINE
 
 // Axios client configuration (this is correct)
 const axiosClient = axios.create({
@@ -550,6 +552,8 @@ const authStore = useAuthStore();
 const currentUser = computed(() => authStore.userData);
 
 const tasks = ref([]) // This will hold ALL tasks from the backend
+const projects = ref([]) // Will hold projects from Firebase
+const loadingProjects = ref(false)
 
 // --- 1. THIS IS THE NEW CENTRAL FILTER ---
 // This computed property returns only the tasks that the current user should see.
@@ -708,7 +712,8 @@ const newTask = ref({
   status: 'Ongoing',
   attachments: [],
   startTime: '',
-  endTime: ''
+  endTime: '',
+  projectId: null
 })
 
 const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
@@ -736,19 +741,66 @@ const assigneeFilterOptions = [
 const subtasks = ref([])
 
 onMounted(async () => {
+  // Load projects first
+  await loadProjects()
+  
+  // Try to load tasks from backend
   try {
+    console.log('📤 Fetching tasks from backend...')
     const response = await axiosClient.get('/tasks');
+    console.log('✅ Backend response:', response.data)
+    
     const uniqueTasks = response.data.filter((task, index, self) =>
       index === self.findIndex(t => t.id === task.id)
     );
+    
     tasks.value = uniqueTasks.map(task => ({
       ...task,
       recurrence: task.recurrence || { enabled: false }
     }));
+    
+    console.log('✅ Loaded tasks:', tasks.value.length)
+    showMessage(`Loaded ${tasks.value.length} tasks`, 'success');
+    
   } catch (error) {
-    showMessage('Failed to load tasks. You may need to log in.', 'error');
+    console.error('❌ Error loading tasks:', error)
+    console.error('❌ Error details:', error.response?.data)
+    
+    // Show user-friendly error
+    if (error.response?.status === 400) {
+      showMessage('Backend filtering error. Check console for details.', 'error');
+    } else if (error.response?.status === 403) {
+      showMessage('Permission denied. You may not have access to tasks.', 'error');
+    } else {
+      showMessage('Failed to load tasks. You may need to log in.', 'error');
+    }
   }
 });
+
+// Load projects from Firebase
+const loadProjects = async () => {
+  loadingProjects.value = true
+  try {
+    const fetchedProjects = await projectService.getAllProjects(
+      authStore.userEmail,
+      authStore.userRole,
+      authStore.userData?.department
+    )
+    
+    // Format projects for dropdown (id and name)
+    projects.value = fetchedProjects.map(p => ({
+      title: p.name,  // Display name
+      value: p.id     // Store ID
+    }))
+    
+    console.log('📦 Loaded projects for tasks:', projects.value)
+  } catch (error) {
+    console.error('Error loading projects:', error)
+    showMessage('Failed to load projects: ' + error.message, 'error')
+  } finally {
+    loadingProjects.value = false
+  }
+}
 
 const todayDate = computed(() => {
   return new Date().toISOString().split('T')[0]
