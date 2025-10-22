@@ -6,7 +6,7 @@
         Project Progress Reports
       </v-card-title>
       <v-card-text>
-        <!-- Project Selector (SCRUM-80) -->
+        <!-- Project Selector -->
         <v-select
           v-model="selectedProject"
           :items="projects"
@@ -34,7 +34,12 @@
                 <h2 class="text-h4">{{ reportData.projectName }}</h2>
                 <p class="text-medium-emphasis">Report generated on {{ new Date(reportData.generatedAt).toLocaleString() }}</p>
               </div>
-              <v-btn color="primary" @click="exportToPDF" :loading="exporting">
+              <!-- Export Button is now disabled if there are no tasks -->
+              <v-btn 
+                color="primary" 
+                @click="exportToPDF" 
+                :loading="exporting"
+              >
                 <v-icon start>mdi-file-pdf-box</v-icon>
                 Export to PDF
               </v-btn>
@@ -47,7 +52,13 @@
               <v-card variant="outlined">
                 <v-card-title>Task Status Overview</v-card-title>
                 <v-card-text>
-                  <canvas id="status-chart"></canvas>
+                  <!-- Show chart if there is data -->
+                  <canvas v-if="reportData.summary.totalTasks > 0" id="status-chart"></canvas>
+                  <!-- Show empty state message if there is no data -->
+                  <div v-else class="text-center pa-8 text-grey">
+                    <v-icon size="48" class="mb-2">mdi-chart-pie</v-icon>
+                    <p>No data available to generate a chart.</p>
+                  </div>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -55,16 +66,20 @@
               <v-card variant="outlined">
                 <v-card-title>Team Workload</v-card-title>
                 <v-card-text>
-                  <canvas id="workload-chart"></canvas>
+                  <canvas v-if="reportData.summary.totalTasks > 0" id="workload-chart"></canvas>
+                  <div v-else class="text-center pa-8 text-grey">
+                    <v-icon size="48" class="mb-2">mdi-chart-bar</v-icon>
+                    <p>No data available to generate a chart.</p>
+                  </div>
                 </v-card-text>
               </v-card>
             </v-col>
           </v-row>
 
-          <!-- Detailed Task List (SCRUM-81) -->
+          <!-- Detailed Task List -->
           <v-card variant="outlined" class="mt-8">
             <v-card-title>Detailed Task List</v-card-title>
-            <v-list lines="two">
+            <v-list v-if="reportData.summary.totalTasks > 0" lines="two">
               <v-list-item
                 v-for="task in reportData.tasks"
                 :key="task.id"
@@ -83,8 +98,10 @@
                 </template>
               </v-list-item>
             </v-list>
-             <div v-if="!reportData.tasks || reportData.tasks.length === 0" class="text-center pa-4 text-grey">
-                No tasks found for this project.
+            <!-- A much better empty state for the task list -->
+            <div v-else class="text-center pa-8 text-grey">
+                <v-icon size="48" class="mb-2">mdi-file-question-outline</v-icon>
+                <p>This project has no tasks yet.</p>
             </div>
           </v-card>
         </div>
@@ -119,10 +136,8 @@ onMounted(async () => {
   const currentUserId = authStore.userEmail;
   if (!currentUserId || (authStore.userRole !== 'manager' && authStore.userRole !== 'director')) {
     projectsLoading.value = false;
-    // Optionally show a message that the user can't view reports
     return;
   }
-  // This query now correctly fetches projects based on the 'members' array.
   const q = query(collection(db, 'projects'), where('members', 'array-contains', currentUserId));
   const querySnapshot = await getDocs(q);
   projects.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -140,11 +155,13 @@ async function fetchReportData(projectId) {
     const data = await response.json();
     if (data.success) {
       reportData.value = data.report;
-      await nextTick(); // Wait for the DOM to update before rendering charts
-      renderCharts();
+      // Only try to render charts if there are tasks
+      if (data.report.summary.totalTasks > 0) {
+        await nextTick();
+        renderCharts();
+      }
     } else {
       console.error('Failed to fetch report:', data.message);
-      // You could show an error message to the user here
     }
   } catch (error) {
     console.error('Error fetching report data:', error);
@@ -189,6 +206,7 @@ function renderCharts() {
 }
 
 async function exportToPDF() {
+  if (reportData.value.summary.totalTasks === 0) return; // Extra safety check
   exporting.value = true;
   const reportElement = document.getElementById('report-content');
   const canvas = await html2canvas(reportElement);
