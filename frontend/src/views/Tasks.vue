@@ -564,7 +564,15 @@ const userVisibleTasks = computed(() => {
   }
   
   const userName = currentUser.value.name;
+  // Access the user's role from the auth store
+  const userRole = authStore.userRole; 
 
+  // RBAC: HR role can see all tasks (Override logic)
+  if (userRole === 'hr' || userRole === 'director') {
+    return tasks.value; 
+  }
+
+  // Standard visibility logic for Staff, Manager, Director, etc.
   return tasks.value.filter(task => {
     // Check if the user is the task owner
     const isOwner = task.taskOwner === userName;
