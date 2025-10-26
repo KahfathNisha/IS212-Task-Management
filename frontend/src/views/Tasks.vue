@@ -703,7 +703,15 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const teamMembers = ['John Doe', 'Jane Smith', 'Alice Johnson']
+const teamMembers = [
+    // Ensure all departments are capitalized or consistently formatted (e.g., 'HR' not 'hr')
+    { text: 'John Doe', value: 'John Doe', department: 'Engineering' },
+    { text: 'Michael Brown', value: 'Michael Brown', department: 'Engineering' },
+    { text: 'Sally Loh', value: 'Sally Loh', department: 'HR' },
+    { text: 'Alice Johnson', value: 'Alice Johnson', department: 'Marketing' },
+    { text: 'Jack Sim', value: 'Jack Sim', department: 'Management' },
+    { text: 'Jane Smith', value: 'Jane Smith', department: 'Engineering' }
+];
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
 const departmentFilterOptions = departments.map(dept => ({ title: dept, value: dept }))

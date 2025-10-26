@@ -35,19 +35,19 @@
           <v-col cols="6">
             <div class="detail-section">
               <div class="detail-section-icon-row">
-                <v-icon size="small" class="detail-icon">mdi-text</v-icon>
-                <h4>Description</h4>
+                <v-icon size="small" class="detail-icon">mdi-account-star</v-icon>
+                <h4>Task Owner</h4>
               </div>
-              <p>{{ task.description || "No description" }}</p>
+              <p>{{ task.taskOwner || 'Not set' }}</p>
             </div>
           </v-col>
           <v-col cols="6">
             <div class="detail-section">
               <div class="detail-section-icon-row">
-                <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
-                <h4>Due Date</h4>
+                <v-icon size="small" class="detail-icon">mdi-domain</v-icon>
+                <h4>Department</h4>
               </div>
-              <p>{{ task.dueDate ? formatDate(task.dueDate) : 'No due date' }}</p>
+              <p>{{ task.taskOwnerDepartment || 'Not set' }}</p>
             </div>
           </v-col>
         </v-row>
@@ -56,10 +56,10 @@
           <v-col cols="6">
             <div class="detail-section">
               <div class="detail-section-icon-row">
-                <v-icon size="small" class="detail-icon">mdi-account-star</v-icon>
-                <h4>Task Owner</h4>
+                <v-icon size="small" class="detail-icon">mdi-calendar-outline</v-icon>
+                <h4>Due Date</h4>
               </div>
-              <p>{{ task.taskOwner || 'Not set' }}</p>
+              <p>{{ task.dueDate ? formatDate(task.dueDate) : 'No due date' }}</p>
             </div>
           </v-col>
           <v-col cols="6">
@@ -72,29 +72,29 @@
             </div>
           </v-col>
         </v-row>
-        
-        <v-row>
-        <v-col cols="6">
-          <div class="detail-section">
-            <div class="detail-section-icon-row">
-              <v-icon size="small" class="detail-icon">mdi-folder-outline</v-icon>
-              <h4>Project</h4>
-            </div>
-            <p>{{ task.projectName || 'No project' }}</p>
-          </div>
-        </v-col>
-        <v-col cols="6">
-          <div class="detail-section">
-            <div class="detail-section-icon-row">
-              <v-icon size="small" class="detail-icon">mdi-priority-high</v-icon>
-              <h4>Priority</h4>
-            </div>
-            <p>{{ task.priority || 'Not set' }}</p>
-          </div>
-        </v-col>
-      </v-row>
 
         <v-row>
+          <v-col cols="12">
+            <div class="detail-section">
+              <div class="detail-section-icon-row">
+                <v-icon size="small" class="detail-icon">mdi-text</v-icon>
+                <h4>Description</h4>
+              </div>
+              <p>{{ task.description || "No description" }}</p>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row>
+          <v-col cols="6">
+            <div class="detail-section">
+              <div class="detail-section-icon-row">
+                <v-icon size="small" class="detail-icon">mdi-folder-outline</v-icon>
+                <h4>Project</h4>
+              </div>
+              <p>{{ task.projectName || 'No project' }}</p>
+            </div>
+          </v-col>
           <v-col cols="6">
             <div class="detail-section">
               <div class="detail-section-icon-row">
@@ -104,8 +104,8 @@
               <p>{{ task.priority || 'Not set' }}</p>
             </div>
           </v-col>
-          <v-col cols="6"></v-col>
         </v-row>
+        
         <v-row>
           <v-col cols="12">
             <div class="detail-section">

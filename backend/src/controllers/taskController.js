@@ -13,7 +13,8 @@ const formatTimestampToISO = (timestamp) => {
 // Create Task
 exports.createTask = async (req, res) => {
     try {
-        const { dueDate, assigneeId, title, priority, subtasks, taskOwner } = req.body;
+        // ADDED: taskOwnerDepartment destructuring
+        const { dueDate, assigneeId, title, priority, subtasks, taskOwner, taskOwnerDepartment } = req.body;
 
         if (!title || title.trim() === '') {
             return res.status(400).json({ message: "Title is required" });
@@ -21,6 +22,11 @@ exports.createTask = async (req, res) => {
         
         if (!taskOwner) {
             return res.status(400).json({ message: "Task Owner is required" });
+        }
+        
+        // ADDED: Validation for taskOwnerDepartment
+        if (!taskOwnerDepartment) {
+            return res.status(400).json({ message: "Task Owner Department is required" });
         }
 
         if (!dueDate) {
@@ -61,13 +67,17 @@ exports.createTask = async (req, res) => {
             status: req.body.status || 'Unassigned',
             projectId: req.body.projectId || null,
             archived: false
+            // taskOwnerDepartment is included via the spread of req.body
         };
 
         if (task.recurrence && task.recurrence.enabled) {
             const recurrence = task.recurrence;
+            
+            // ADDED: taskOwnerDepartment to the recurring task master document
             const recurringTaskRef = await db.collection('recurringTasks').add({
                 userId: assigneeId,
                 taskOwner: task.taskOwner,
+                taskOwnerDepartment: taskOwnerDepartment, // ADDED
                 recurrence: recurrence,
                 title: task.title,
                 description: task.description,
@@ -106,6 +116,7 @@ exports.createTask = async (req, res) => {
                         createdAt: admin.firestore.Timestamp.now(),
                         updatedAt: admin.firestore.Timestamp.now(),
                         recurringTaskId: recurringTaskRef.id
+                        // taskOwnerDepartment is already included in 'task' via req.body spread
                     };
                     await db.collection('tasks').add(recurringTaskInstance);
                     const next = new Date(current);
@@ -126,6 +137,7 @@ exports.createTask = async (req, res) => {
 
 // Get Task
 exports.getTask = async (req, res) => {
+// No changes needed here, it returns all stored data.
     try {
         const doc = await db.collection('tasks').doc(req.params.id).get();
         if (!doc.exists) return res.status(404).json({ message: 'Task not found' });
@@ -140,6 +152,7 @@ exports.getTask = async (req, res) => {
 
 // Get All Tasks
 exports.getAllTasks = async (req, res) => {
+// No changes needed here, it returns all stored data.
     try {
         const snapshot = await db.collection('tasks').get();
         const tasks = snapshot.docs.map(doc => {
@@ -167,7 +180,8 @@ exports.updateTask = async (req, res) => {
             return res.status(401).json({ message: "Authentication required or user name is missing." });
         }
 
-        const { dueDate, priority, subtasks, title, collaborators, taskOwner, ...otherFields } = req.body;
+        // ADDED: taskOwnerDepartment destructuring
+        const { dueDate, priority, subtasks, title, collaborators, taskOwner, taskOwnerDepartment, ...otherFields } = req.body;
 
         // Fetch the original task from the database FIRST
         const docRef = db.collection('tasks').doc(req.params.id);
@@ -201,6 +215,8 @@ exports.updateTask = async (req, res) => {
         if (collaborators !== undefined) updateData.collaborators = collaborators;
         if (title !== undefined && (!title || title.trim() === '')) return res.status(400).json({ message: "title is required" });
         if (taskOwner !== undefined && !taskOwner) return res.status(400).json({ message: "Task Owner is required" });
+        // ADDED: Validation for taskOwnerDepartment
+        if (taskOwnerDepartment !== undefined && !taskOwnerDepartment) return res.status(400).json({ message: "Task Owner Department is required" });
         if (priority !== undefined && !priority) return res.status(400).json({ message: "priority is required" });
         if (subtasks) updateData.subtasks = subtasks;
 
@@ -216,6 +232,8 @@ exports.updateTask = async (req, res) => {
         if (title !== undefined) updateData.title = title;
         if (priority !== undefined) updateData.priority = priority;
         if (taskOwner !== undefined) updateData.taskOwner = taskOwner;
+        // ADDED: Include taskOwnerDepartment in updateData
+        if (taskOwnerDepartment !== undefined) updateData.taskOwnerDepartment = taskOwnerDepartment;
 
         const { id, createdAt, ...finalUpdateData } = updateData;
 
@@ -230,6 +248,7 @@ exports.updateTask = async (req, res) => {
 
 // Update task status
 exports.updateTaskStatus = async (req, res) => {
+// No changes needed here.
     try {
         const { status } = req.body;
         await db.collection('tasks').doc(req.params.id).update({
@@ -244,6 +263,7 @@ exports.updateTaskStatus = async (req, res) => {
 
 // Assign task
 exports.assignTask = async (req, res) => {
+// No changes needed here.
     try {
         const { assigneeId } = req.body;
         await db.collection('tasks').doc(req.params.id).update({
@@ -258,6 +278,7 @@ exports.assignTask = async (req, res) => {
 
 // Soft-delete / archive task
 exports.archiveTask = async (req, res) => {
+// No changes needed here.
     try {
         await db.collection('tasks').doc(req.params.id).update({
             archived: true,
@@ -271,6 +292,7 @@ exports.archiveTask = async (req, res) => {
 
 // Unarchive task
 exports.unarchiveTask = async (req, res) => {
+// No changes needed here.
     try {
         await db.collection('tasks').doc(req.params.id).update({
             archived: false,
@@ -284,6 +306,7 @@ exports.unarchiveTask = async (req, res) => {
 
 // Get All Recurring Tasks
 exports.getAllRecurringTasks = async (req, res) => {
+// No changes needed here.
     try {
         const snapshot = await db.collection('recurringTasks').get();
         const recurringTasks = snapshot.docs.map(doc => ({
@@ -302,13 +325,17 @@ exports.getAllRecurringTasks = async (req, res) => {
 exports.updateRecurringTask = async (req, res) => {
     try {
         const recurringTaskId = req.params.id;
-        const { userId, recurrence, taskOwner } = req.body;
+        // ADDED: taskOwnerDepartment destructuring
+        const { userId, recurrence, taskOwner, taskOwnerDepartment } = req.body;
 
         const recurringUpdateData = {
             recurrence,
             updatedAt: admin.firestore.Timestamp.now()
         };
         if (taskOwner) recurringUpdateData.taskOwner = taskOwner;
+        // ADDED: Update taskOwnerDepartment in the recurring task master document
+        if (taskOwnerDepartment) recurringUpdateData.taskOwnerDepartment = taskOwnerDepartment; 
+
         await db.collection('recurringTasks').doc(recurringTaskId).update(recurringUpdateData);
 
         const now = new Date();
@@ -319,6 +346,8 @@ exports.updateRecurringTask = async (req, res) => {
             updatedAt: admin.firestore.Timestamp.now()
         };
         if (taskOwner) futureInstanceUpdate.taskOwner = taskOwner;
+        // ADDED: Update taskOwnerDepartment in future instances
+        if (taskOwnerDepartment) futureInstanceUpdate.taskOwnerDepartment = taskOwnerDepartment; 
 
         const batch = db.batch();
         tasksSnapshot.forEach(doc => {

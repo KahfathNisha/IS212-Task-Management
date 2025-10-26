@@ -70,11 +70,20 @@
               v-model="localTask.taskOwner"
               label="Task Owner *"
               :items="teamMembers"
-              :rules="[v => !!v || 'Task Owner is required']"
+              item-title="text"  :rules="[v => !!v || 'Task Owner is required']"
               required
               placeholder="Search and select task owner"
               variant="outlined"
             />
+            <v-alert
+                v-if="taskOwnerDepartment"
+                type="info"
+                variant="tonal"
+                class="mt-2"
+                density="compact"
+            >
+                Department: **{{ taskOwnerDepartment }}**
+            </v-alert>
           </div>
           
           <div class="d-flex ga-4 mb-4">
@@ -82,7 +91,7 @@
               v-model="localTask.assignedTo"
               label="Assignee"
               :items="teamMembers.filter(member => !localTask.collaborators.includes(member))"
-              placeholder="Search and select assignee"
+              item-title="text"  placeholder="Search and select assignee"
               variant="outlined"
               class="flex-1"
             />
@@ -90,7 +99,7 @@
               v-model="localTask.collaborators"
               label="Collaborators"
               :items="teamMembers.filter(member => member !== localTask.assignedTo)"
-              placeholder="Search and select collaborators"
+              item-title="text"  placeholder="Search and select collaborators"
               variant="outlined"
               multiple
               chips
@@ -212,7 +221,7 @@
                 v-model="subtask.assignedTo"
                 label="Assignee"
                 :items="teamMembers.filter(member => !subtask.collaborators.includes(member))"
-                placeholder="Search and select assignee"
+                item-title="text"  placeholder="Search and select assignee"
                 variant="outlined"
                 class="flex-1"
               />
@@ -220,7 +229,7 @@
                 v-model="subtask.collaborators"
                 label="Collaborators"
                 :items="teamMembers.filter(member => member !== subtask.assignedTo)"
-                placeholder="Search and select collaborators"
+                item-title="text"  placeholder="Search and select collaborators"
                 variant="outlined"
                 multiple
                 chips
@@ -327,7 +336,8 @@ const props = defineProps({
   taskStatuses: { type: Array, default: () => [] },
   priorities: { type: Array, default: () => [] },
   projects: { type: Array, default: () => [] },
-  teamMembers: { type: Array, default: () => [] },
+  // NOTE: teamMembers must be an array of objects: { text, value, department }
+  teamMembers: { type: Array, default: () => [] }, 
   todayDate: { type: String, default: () => new Date().toISOString().split('T')[0] }
 })
 
@@ -358,7 +368,22 @@ const collaboratorPermissions = ref(normalizeCollaborators(localTask.value.colla
 const formValid = ref(false)
 const taskForm = ref(null)
 
-// ===== THIS IS THE UPDATED BLOCK =====
+// 1. ADDED: Computed property to perform the department lookup
+const taskOwnerDepartment = computed(() => {
+    const ownerName = localTask.value.taskOwner;
+    
+    if (ownerName) {
+        // Look up the user object by matching the selected value against the 'value' field
+        const member = props.teamMembers.find(member => member.value === ownerName);
+        
+        // Return the department string
+        return member ? member.department : null; 
+    }
+    return null;
+});
+// --------------------------------------------------------------------------
+
+// ===== EXISTING WATCH BLOCK =====
 watch(() => props.model, (v) => {
   // Use a fresh copy of the incoming data
   const taskData = { ...v };
@@ -466,6 +491,13 @@ const onSave = () => {
     return
   }
 
+  // ADDED: Validation check for department lookup (if Task Owner is set)
+  if (localTask.value.taskOwner && !taskOwnerDepartment.value) {
+    showMessage('Could not determine the Task Owner\'s department. Please re-select the Task Owner.', 'error')
+    return
+  }
+  // ------------------------------------------------------------------
+
   for (let i = 0; i < subtasks.value.length; i++) {
     const subtask = subtasks.value[i]
     if (!subtask.title || subtask.title.trim() === '') {
@@ -500,6 +532,8 @@ const onSave = () => {
   )
   const payload = {
     ...localTask.value,
+    // 2. ADDED: Include the auto-populated department in the payload
+    taskOwnerDepartment: taskOwnerDepartment.value, 
     collaborators: dedupedCollaborators,
     subtasks: subtasks.value.map(s => ({
       ...s,
