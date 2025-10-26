@@ -1,35 +1,28 @@
 <template>
-  <div class="recurring-task-item" :class="{ editing: isEditing }">
-    <div class="task-title-row">
-      <v-icon color="primary" size="18" class="mr-1">mdi-repeat</v-icon>
-      <span class="task-title">{{ task.title }}</span>
+  <div class="recurring-task-item">
+    <div class="task-header">
+      <h4 class="task-title">{{ task?.title || '' }}</h4>
       <v-btn
-        icon="mdi-pencil"
-        size="x-small"
+        icon
+        size="small"
         variant="text"
-        class="edit-btn"
-        @click.stop="startEdit"
         :disabled="isEditing"
-        title="Edit Recurrence"
-      />
+        @click="emit('edit', task)"
+        class="edit-btn"
+      >
+        <v-icon>mdi-pencil</v-icon>
+      </v-btn>
     </div>
-    <div class="task-meta">
-      <span class="recurrence-type">{{ formatRecurrence(task.recurrence) }}</span>
-      <span class="recurrence-range">
-        {{ formatDate(task.recurrence?.startDate) }} - {{ formatDate(task.recurrence?.endDate) }}
-      </span>
-    </div>
-    <div class="task-desc" v-if="task.description">
-      {{ task.description }}
-    </div>
-    <div v-if="isEditing" class="edit-panel">
-      <slot name="edit" :task="task" :close="closeEdit"></slot>
+    <p class="task-desc">{{ task?.description || '' }}</p>
+    <div class="recurrence-info">
+      <span class="recurrence-type">{{ formatRecurrenceType }}</span>
+      <span class="recurrence-range">{{ formatDateRange }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { toRefs } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps({
   task: { type: Object, required: true },
@@ -38,81 +31,82 @@ const props = defineProps({
 
 const emit = defineEmits(['edit', 'close-edit'])
 
-const startEdit = () => {
-  if (!props.isEditing) emit('edit', props.task)
-}
-
-const closeEdit = () => {
-  emit('close-edit')
-}
-
-const formatRecurrence = (recurrence) => {
-  if (!recurrence) return ''
-  if (recurrence.type === 'custom') {
-    return `Every ${recurrence.interval} days`
+const formatRecurrenceType = computed(() => {
+  if (!props.task?.recurrence) return ''
+  
+  const { type, interval } = props.task.recurrence
+  
+  if (type === 'custom') {
+    return `Every ${interval} days`
   }
-  if (recurrence.type) {
-    return `Every ${recurrence.type.charAt(0).toUpperCase() + recurrence.type.slice(1)}`
-  }
-  return ''
-}
+  
+  return `Every ${type.charAt(0).toUpperCase() + type.slice(1)}`
+})
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString()
-}
+const formatDateRange = computed(() => {
+  if (!props.task?.recurrence?.startDate || !props.task?.recurrence?.endDate) return ''
+  
+  const startDate = new Date(props.task.recurrence.startDate)
+  const endDate = new Date(props.task.recurrence.endDate)
+  
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+  
+  return `${formatDate(startDate)} - ${formatDate(endDate)}`
+})
 </script>
 
 <style scoped>
 .recurring-task-item {
-  padding: 14px 12px 10px 12px;
-  border-radius: 8px;
-  background: #fff;
-  margin-bottom: 14px;
-  cursor: pointer;
+  padding: 16px;
   border: 1px solid #e0e0e0;
-  transition: background 0.2s;
-  box-shadow: 0 1px 2px rgba(60,60,60,0.03);
-  position: relative;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: white;
 }
-.recurring-task-item.editing {
-  background: #f3f7fa;
-  border-color: #1976d2;
-}
-.task-title-row {
+
+.task-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  font-weight: 600;
-  font-size: 16px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
+
 .task-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #333;
 }
-.edit-btn {
-  margin-left: auto;
+
+.task-desc {
+  color: #666;
+  margin: 8px 0;
+  font-size: 14px;
 }
-.task-meta {
-  font-size: 12px;
-  color: #757575;
+
+.recurrence-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-bottom: 4px;
+  gap: 4px;
+  font-size: 12px;
+  color: #888;
 }
-.task-desc {
-  font-size: 13px;
-  color: #616161;
-  margin-top: 2px;
-  word-break: break-word;
+
+.recurrence-type {
+  font-weight: 500;
 }
-.edit-panel {
-  margin-top: 10px;
-  padding: 10px;
-  background: #e3f2fd;
-  border-radius: 6px;
+
+.recurrence-range {
+  font-style: italic;
+}
+
+.edit-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
 }
 </style>

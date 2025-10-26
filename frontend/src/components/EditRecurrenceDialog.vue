@@ -1,6 +1,6 @@
 <template>
-  <v-dialog v-model="show" max-width="500px" persistent>
-    <v-card class="edit-recurrence-card">
+  <v-dialog v-model="dialog" max-width="500px" persistent>
+    <v-card>
       <v-card-title>Edit Recurrence</v-card-title>
       <v-card-text>
         <div class="d-flex ga-4 mb-4">
@@ -49,8 +49,6 @@
             min="0"
             variant="outlined"
             class="flex-1"
-            hint="How many units after recurrence date is each task due?"
-            persistent-hint
           />
           <v-select
             v-model="localRecurrence.dueOffsetUnit"
@@ -72,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, watch, reactive } from 'vue'
+import { ref, watch, reactive, computed } from 'vue'
 
 const props = defineProps({
   show: Boolean,
@@ -80,39 +78,41 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'save'])
 
-const show = ref(props.show)
-watch(() => props.show, v => show.value = v)
+const dialog = computed({
+  get: () => props.show,
+  set: v => { if (!v) emit('close') }
+})
 
-// Ensure localRecurrence always reflects the latest props.recurrence
-const localRecurrence = reactive({ ...props.recurrence })
+const localRecurrence = reactive({
+  type: 'weekly',
+  interval: 1,
+  startDate: '',
+  endDate: '',
+  dueOffset: 0,
+  dueOffsetUnit: 'days',
+  ...props.recurrence
+})
+
 watch(
   () => props.recurrence,
   (newVal) => {
-    Object.assign(localRecurrence, newVal || {})
+    if (newVal) {
+      Object.assign(localRecurrence, newVal)
+    }
   },
   { immediate: true, deep: true }
 )
 
 const save = () => {
   emit('save', { ...localRecurrence })
-  show.value = false
 }
+
 const close = () => {
   emit('close')
-  show.value = false
 }
 </script>
 
 <style scoped>
-.edit-recurrence-card {
-  background: #fff !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 1.5px 4px rgba(60,60,60,0.08);
-  border-radius: 12px;
-  padding: 8px 0 0 0;
-}
-.v-overlay__scrim {
-  background: rgba(30, 30, 30, 0.7) !important;
-}
 .ga-4 { gap: 16px !important; }
 .mb-4 { margin-bottom: 16px !important; }
 .mb-2 { margin-bottom: 8px !important; }

@@ -1,141 +1,126 @@
 <template>
   <div class="recurrence-section">
-    <v-select
-      v-model="recurrence.type"
-      :items="recurrenceTypes"
-      label="Recurrence"
-      variant="outlined"
-      class="mb-3"
-    />
-    <v-text-field
-      v-if="recurrence.type === 'custom'"
-      v-model.number="recurrence.interval"
-      label="Custom Interval (days)"
-      type="number"
-      min="1"
-      variant="outlined"
-      class="mb-3"
-    />
-    <v-text-field
-      v-model="recurrence.startDate"
-      label="Recurrence Start Date *"
-      type="date"
-      :min="minDate"
-      :error="startDateError"
-      :error-messages="startDateError ? 'Start date is required' : ''"
-      variant="outlined"
-      class="mb-3"
-      required
-    />
-    <v-text-field
-      v-model="recurrence.endDate"
-      label="Recurrence End Date *"
-      type="date"
-      :min="recurrence.startDate || minDate"
-      :error="endDateError"
-      :error-messages="endDateErrorMsg"
-      variant="outlined"
-      class="mb-3"
-      required
-    />
-    <v-text-field
-      v-model.number="modelValue.dueOffset"
-      label="Due Offset"
-      type="number"
-      min="0"
-      placeholder="e.g. 1"
-      variant="outlined"
-      class="mb-3"
-      hint="How many days/ week after start date is the task due?"
-      persistent-hint
-    />
-    <v-select
-      v-model="modelValue.dueOffsetUnit"
-      :items="['days', 'weeks']"
-      label="Due Offset Unit"
-      variant="outlined"
-      class="mb-3"
-      placeholder="Select unit"
-    />
-    <v-btn
-      variant="text"
-      color="error"
-      @click="$emit('stop')"
-      rounded="lg"
-      size="small"
-    >
-      Stop Recurrence
-    </v-btn>
+    <label class="recurrence-label">Recurrence Settings</label>
+    <div class="recurrence-form">
+      <div class="d-flex ga-4 mb-4">
+        <v-select
+          :model-value="modelValue.type"
+          @update:model-value="updateValue('type', $event)"
+          :items="['daily', 'weekly', 'monthly', 'custom']"
+          label="Recurrence Type"
+          variant="outlined"
+          class="flex-1"
+          required
+        />
+        <v-text-field
+          v-if="modelValue.type === 'custom'"
+          :model-value="modelValue.interval"
+          @update:model-value="updateValue('interval', parseInt($event))"
+          label="Custom Interval (days)"
+          type="number"
+          min="1"
+          variant="outlined"
+          class="flex-1"
+          required
+        />
+      </div>
+      <div class="d-flex ga-4 mb-4">
+        <v-text-field
+          :model-value="modelValue.startDate"
+          @update:model-value="updateValue('startDate', $event)"
+          label="Start Date"
+          type="date"
+          :min="minDate"
+          variant="outlined"
+          class="flex-1"
+          required
+        />
+        <v-text-field
+          :model-value="modelValue.endDate"
+          @update:model-value="updateValue('endDate', $event)"
+          label="End Date"
+          type="date"
+          :min="modelValue.startDate || minDate"
+          variant="outlined"
+          class="flex-1"
+          required
+        />
+      </div>
+      <div class="d-flex ga-4 mb-2">
+        <v-text-field
+          :model-value="modelValue.dueOffset"
+          @update:model-value="updateValue('dueOffset', parseInt($event))"
+          label="Due Offset"
+          type="number"
+          min="0"
+          variant="outlined"
+          class="flex-1"
+        />
+        <v-select
+          :model-value="modelValue.dueOffsetUnit"
+          @update:model-value="updateValue('dueOffsetUnit', $event)"
+          :items="['days', 'weeks']"
+          label="Due Offset Unit"
+          variant="outlined"
+          class="flex-1"
+          required
+        />
+      </div>
+      <div class="actions">
+        <v-btn color="error" @click="emit('stop')" variant="outlined">
+          Stop Recurrence
+        </v-btn>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, watch, ref } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
   minDate: { type: String, default: () => new Date().toISOString().split('T')[0] }
 })
-const emit = defineEmits(['update:modelValue', 'stop', 'save', 'update:show'])
 
-const recurrence = computed({
-  get: () => props.modelValue,
-  set: v => emit('update:modelValue', v)
-})
+const emit = defineEmits(['update:modelValue', 'stop'])
 
-const recurrenceTypes = [
-  { title: 'Daily', value: 'daily' },
-  { title: 'Weekly', value: 'weekly' },
-  { title: 'Monthly', value: 'monthly' },
-  { title: 'Custom Interval', value: 'custom' }
-]
-
-// Error handling for start and end date
-const startDateError = computed(() => !recurrence.value.startDate)
-const endDateError = computed(() => {
-  if (!recurrence.value.endDate) return true
-  if (!recurrence.value.startDate) return false
-  return recurrence.value.endDate < recurrence.value.startDate
-})
-const endDateErrorMsg = computed(() => {
-  if (!recurrence.value.endDate) return 'End date is required'
-  if (recurrence.value.endDate < recurrence.value.startDate) return 'End date must be after start date'
-  return ''
-})
-
-// Ensure interval is at least 1 for custom
-watch(() => recurrence.value.type, (val) => {
-  if (val === 'custom' && (!recurrence.value.interval || recurrence.value.interval < 1)) {
-    recurrence.value.interval = 1
-  }
-})
-
-const onSave = () => {
-  if (
-    !recurrence.value.startDate ||
-    !recurrence.value.endDate ||
-    recurrence.value.endDate < recurrence.value.startDate
-  ) {
-    // Prevent save if invalid
-    return
-  }
-  if (localTask.value.recurrence && localTask.value.recurrence.type) {
-    localTask.value.recurrence.enabled = true
-  } else {
-    localTask.value.recurrence = { enabled: false, type: '', interval: 1, startDate: '', endDate: '' }
-  }
-  const payload = { ...localTask.value, subtasks: subtasks.value }
-  emit('save', payload)
-  emit('update:show', false)
+const updateValue = (key, value) => {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [key]: value
+  })
 }
 </script>
 
 <style scoped>
 .recurrence-section {
-  background: #f5f7fa;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 16px;
-  border: 1px solid #e0e0e0;
-  margin-bottom: 16px;
+  margin: 16px 0;
 }
+
+.recurrence-label {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.recurrence-form {
+  margin-top: 12px;
+}
+
+.actions {
+  margin-top: 16px;
+  text-align: right;
+}
+
+.ga-4 { gap: 16px !important; }
+.mb-4 { margin-bottom: 16px !important; }
+.mb-2 { margin-bottom: 8px !important; }
+.d-flex { display: flex !important; }
+.flex-1 { flex: 1 1 0% !important; }
 </style>
