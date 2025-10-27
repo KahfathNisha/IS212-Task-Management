@@ -24,29 +24,36 @@ async function processEmailReminders(now) {
             const dueDate = taskData.dueDate.toDate();
             const timeDiff = dueDate - now;
             const hoursUntilDue = timeDiff / (1000 * 60 * 60);
-            
-            // Check if we should send email based on settings
-            if (hoursUntilDue <= settings.emailLeadTime && hoursUntilDue > 0) {
-                // Check if we already sent a reminder recently
+            const daysUntilDue = hoursUntilDue / 24;
+
+            // Get reminder intervals based on user settings
+            let reminderIntervals = [];
+            if (settings.emailReminderType === 'custom' && settings.emailCustomReminders && settings.emailCustomReminders.length > 0) {
+                // Custom reminders are in hours
+                reminderIntervals = settings.emailCustomReminders.map(hours => hours / 24); // Convert to days
+            } else {
+                // Default preset: 1, 3, 7 days
+                reminderIntervals = settings.emailPresetReminders || [1, 3, 7];
+            }
+
+            // Check if we should send email at any of the configured intervals
+            const shouldSendReminder = reminderIntervals.some(interval => Math.abs(daysUntilDue - interval) < 0.1); // Allow small tolerance for timing
+
+            if (shouldSendReminder && hoursUntilDue > 0) {
+                // Check if we already sent a reminder for this specific interval
                 const lastReminderQuery = await db.collection("emailReminders")
                     .where("userId", "==", userId)
                     .where("taskId", "==", taskDoc.id)
+                    .where("daysLeft", "==", Math.round(daysUntilDue))
                     .orderBy("sentAt", "desc")
                     .limit(1)
                     .get();
-                
-                let shouldSend = true;
-                if (!lastReminderQuery.empty) {
-                    const lastReminder = lastReminderQuery.docs[0].data();
-                    const timeSinceLast = now - lastReminder.sentAt.toDate();
-                    const hoursSinceLast = timeSinceLast / (1000 * 60 * 60);
-                    shouldSend = hoursSinceLast >= settings.emailFrequency;
-                }
-                
-                if (shouldSend) {
+
+                if (lastReminderQuery.empty) {
                     const hoursLeft = Math.floor(hoursUntilDue);
                     const minutesLeft = Math.floor((hoursUntilDue - hoursLeft) * 60);
-                    
+                    const daysLeft = Math.round(daysUntilDue);
+
                     try {
                         await EmailService.sendDeadlineReminder(
                             userData.email,
@@ -55,16 +62,17 @@ async function processEmailReminders(now) {
                             minutesLeft,
                             userData.timezone || 'UTC'
                         );
-                        
-                        // Record the email reminder
+
+                        // Record the email reminder with days left
                         await db.collection("emailReminders").add({
                             userId,
                             taskId: taskDoc.id,
                             sentAt: admin.firestore.Timestamp.now(),
                             hoursLeft,
-                            minutesLeft
+                            minutesLeft,
+                            daysLeft
                         });
-                        
+
                     } catch (error) {
                         console.error(`Failed to send email reminder for task ${taskDoc.id}:`, error);
                     }
