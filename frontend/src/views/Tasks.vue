@@ -116,7 +116,7 @@
         <div class="view-header">
           <div class="header-left">
             <h1>Good Morning, {{ currentUser?.name || 'User' }}!</h1>
-            <p class="date-subtitle">It's Friday, 17 October 2025</p>
+            <p class="date-subtitle">It's {{ currentFormattedDate }}</p>
           </div>
           
           <div class="header-right">
@@ -723,9 +723,9 @@ const teamMembers = [
     { text: 'John Doe', value: 'John Doe', department: 'Engineering' },
     { text: 'Michael Brown', value: 'Michael Brown', department: 'Engineering' },
     { text: 'Sally Loh', value: 'Sally Loh', department: 'HR' },
-    { text: 'Alice Johnson', value: 'Alice Johnson', department: 'Marketing' },
+    { text: 'Alice Johnson', value: 'Alice Johnson', department: 'Engineering' },
     { text: 'Jack Sim', value: 'Jack Sim', department: 'Management' },
-    { text: 'Jane Smith', value: 'Jane Smith', department: 'Engineering' }
+    { text: 'Jane Smith', value: 'Jane Smith', department: 'Marketing' }
 ];
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
