@@ -58,28 +58,29 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
-    // First, verify the token's identity with Firebase Auth
+    // Verify the token with Firebase Auth
     const decodedToken = await admin.auth().verifyIdToken(token);
     
-    // --- THIS IS THE UPDATED SECTION ---
-    // 2. Look up the user's profile in the 'users' collection in Firestore
-    //    using the email from the verified token.
+    // Look up the user's profile in Firestore
     const userDoc = await db.collection('users').doc(decodedToken.email).get();
 
     if (!userDoc.exists) {
-      return res.status(404).json({ success: false, message: 'User profile not found in database.' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User profile not found in database.' 
+      });
     }
 
     const userProfile = userDoc.data();
     
-    // 3. Attach the correct user info to the request object
+    // ✅ FIXED: Include ALL necessary fields
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email,
-      // Use the 'name' field from your Firestore document, not from Firebase Auth
-      name: userProfile.name 
+      name: userProfile.name,
+      role: userProfile.role,           // ✅ Added
+      department: userProfile.department // ✅ Added
     };
-    // --- END OF UPDATE ---
 
     next();
   } catch (error) {
