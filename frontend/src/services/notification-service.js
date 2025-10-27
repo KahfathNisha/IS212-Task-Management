@@ -1,23 +1,23 @@
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useNotificationStore } from "@/stores/notificationStore";
-//TASK CHANGE NOTIFICATIONS, FIRESTORE LISTENERS HERE
+
 let unsubscribeTasks = null;
 let unsubscribeNotifications = null;
 
-// This function has been completely rewritten with a more robust, manual-comparison logic
-// to definitively fix the bug of incorrect notification types.
+// This version uses the correct query for a SINGLE STRING assignee field.
 function initializeTaskChangeListeners(userId) {
-  // This map will store the state of the user's tasks from the last snapshot.
+  // --- THIS IS THE FIX ---
+  // Query for tasks where the 'assignedTo' STRING field equals the userId.
+  const tasksQuery = query(collection(db, "tasks"), where("assignedTo", "==", userId));
+  // --- End of Fix ---
+
   let knownTasks = new Map();
   let isFirstSnapshot = true;
-
-  const tasksQuery = query(collection(db, "tasks"), where("assignedTo", "array-contains", userId));
 
   unsubscribeTasks = onSnapshot(tasksQuery, async (snapshot) => {
     const currentTasks = new Map(snapshot.docs.map(doc => [doc.id, doc.data()]));
 
-    // On the very first run, we just populate the initial state without sending notifications.
     if (isFirstSnapshot) {
       knownTasks = currentTasks;
       isFirstSnapshot = false;
@@ -29,7 +29,7 @@ function initializeTaskChangeListeners(userId) {
     // Check for NEWLY ASSIGNED or MODIFIED tasks
     for (const [taskId, taskData] of currentTasks.entries()) {
       const knownTask = knownTasks.get(taskId);
-      // Case 1: Task is in the new snapshot, but wasn't known before. It's a new assignment.
+      // Case 1: Task is new to the query results (new assignment).
       if (!knownTask) {
         const dueDateText = taskData.dueDate?.toDate ? `Due: ${taskData.dueDate.toDate().toLocaleDateString()}` : 'No due date set.';
         notificationsToCreate.push({
@@ -38,8 +38,7 @@ function initializeTaskChangeListeners(userId) {
           taskId: taskId,
         });
       } 
-      // Case 2: Task was known before. Check if it has been meaningfully updated.
-      // We compare the 'updatedAt' timestamp for simplicity and reliability.
+      // Case 2: Task was already known. Check if it was updated.
       else if (knownTask.updatedAt?.toMillis() !== taskData.updatedAt?.toMillis()) {
          notificationsToCreate.push({
           title: `Task Updated: ${taskData.title}`,
@@ -49,9 +48,9 @@ function initializeTaskChangeListeners(userId) {
       }
     }
 
-    // Check for REMOVED or DELETED tasks
+    // Check for REMOVED tasks (user unassigned or task deleted)
     for (const [taskId, taskData] of knownTasks.entries()) {
-      // Case 3: A task was known before, but is no longer in the current snapshot. It was removed/deleted.
+      // Case 3: Task was known before, but is no longer in the query results.
       if (!currentTasks.has(taskId)) {
         notificationsToCreate.push({
           title: `Removed from Task: ${taskData.title}`,
@@ -61,7 +60,7 @@ function initializeTaskChangeListeners(userId) {
       }
     }
 
-    // Write all detected notifications to the database.
+    // Write notifications to the database.
     if (notificationsToCreate.length > 0) {
       const userNotificationsRef = collection(db, "users", userId, "notifications");
       for (const notif of notificationsToCreate) {
@@ -72,12 +71,11 @@ function initializeTaskChangeListeners(userId) {
         });
       }
     }
-
-    // Finally, update our known state to the current state for the next comparison.
-    knownTasks = currentTasks;
+    knownTasks = currentTasks; // Update known state
   });
 }
 
+// This function listens for new unread notifications (remains the same)
 function initializeUnreadNotificationListener(userId) {
   const notificationStore = useNotificationStore();
   const notificationsQuery = query(
@@ -93,25 +91,15 @@ function initializeUnreadNotificationListener(userId) {
   });
 }
 
-// This file now correctly exports all necessary functions for your app.
+// Exported functions remain the same
 export function initializeListeners(userId) {
   initializeTaskChangeListeners(userId);
   initializeUnreadNotificationListener(userId);
 }
 export async function fetchNotificationHistory(userId) {
-  console.log('fetchNotificationHistory: Called with userId:', userId);
-  try {
-    const notificationsQuery = query(collection(db, "users", userId, "notifications"), orderBy("createdAt", "desc"));
-    console.log('fetchNotificationHistory: Query created, executing getDocs...');
-    const snapshot = await getDocs(notificationsQuery);
-    console.log('fetchNotificationHistory: Query successful, docs count:', snapshot.docs.length);
-    const result = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('fetchNotificationHistory: Mapped result:', result);
-    return result;
-  } catch (error) {
-    console.error('fetchNotificationHistory: Error during query:', error);
-    throw error; // Re-throw to propagate to caller
-  }
+  const notificationsQuery = query(collection(db, "users", userId, "notifications"), orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(notificationsQuery);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 export function cleanupListeners() {
   if (unsubscribeTasks) unsubscribeTasks();
