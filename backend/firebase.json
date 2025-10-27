@@ -16,12 +16,13 @@
         "firebase-debug.*.log",
         "*.local"
       ],
+      // Keep predeploy commented out if linting fails locally
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"
       ]
     }
   ],
-    "hosting": {
+  "hosting": {
     "public": "../frontend/dist",
     "ignore": [
       "firebase.json",
@@ -56,3 +57,4 @@
     "singleProjectMode": true
   }
 }
+

@@ -5,10 +5,12 @@
         <v-icon start icon="mdi-bell-ring"></v-icon>
         Notification History
       </v-card-title>
+      
       <v-card-text v-if="loading" class="text-center pa-8">
         <v-progress-circular indeterminate color="primary"></v-progress-circular>
         <p class="mt-2">Loading notifications...</p>
       </v-card-text>
+      
       <v-card-text v-else>
         <v-list v-if="history.length > 0" lines="two">
           <v-list-item
@@ -22,6 +24,7 @@
             </template>
           </v-list-item>
         </v-list>
+        
         <div v-else class="text-center pa-8 text-grey">
           <v-icon size="48" class="mb-2">mdi-bell-off-outline</v-icon>
           <p>You have no notifications.</p>
@@ -32,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { fetchNotificationHistory } from "@/services/notification-service";
 
@@ -40,34 +43,55 @@ const authStore = useAuthStore();
 const history = ref([]);
 const loading = ref(true);
 
-onMounted(async () => {
+async function loadHistory() {
   const userEmail = authStore.userEmail;
-  console.log('NotificationHistory: onMounted called, userEmail:', userEmail);
   if (userEmail) {
+    loading.value = true;
     try {
-      console.log('NotificationHistory: Fetching notification history for:', userEmail);
       history.value = await fetchNotificationHistory(userEmail);
-      console.log('NotificationHistory: Fetched history:', history.value);
     } catch (error) {
-      console.error('NotificationHistory: Error fetching notification history:', error);
+      console.error('Error fetching notification history:', error);
+      history.value = [];
+    } finally {
+      loading.value = false;
     }
   } else {
-    console.warn('NotificationHistory: No userEmail available');
+    loading.value = false;
+    history.value = [];
   }
-  loading.value = false;
-  console.log('NotificationHistory: Loading set to false');
-});
+}
+
+// Watch for the auth store to finish loading and user to be available
+watch(() => [authStore.loading, authStore.userEmail], ([isLoading, userEmail]) => {
+  if (!isLoading && userEmail) {
+    loadHistory();
+  } else if (!isLoading && !userEmail) {
+    loading.value = false;
+    history.value = [];
+  }
+}, { immediate: true }); // immediate: true runs the check once on component mount
 
 function formatTimeAgo(timestamp) {
-  if (!timestamp) return "";
-  const date = timestamp.toDate();
-  const now = new Date();
-  const seconds = Math.floor((now - date) / 1000);
-  // (Your existing time formatting logic)
-  let interval = seconds / 60;
-  if (interval < 60) return Math.floor(interval) + " minutes ago";
-  // ... etc.
-  return "Just now";
+  if (!timestamp || typeof timestamp.toDate !== 'function') return "Invalid date";
+  try {
+    const date = timestamp.toDate();
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    let interval = Math.floor(seconds / 31536000);
+    if (interval >= 1) return interval + (interval === 1 ? " year" : " years") + " ago";
+    interval = Math.floor(seconds / 2592000);
+    if (interval >= 1) return interval + (interval === 1 ? " month" : " months") + " ago";
+    interval = Math.floor(seconds / 86400);
+    if (interval >= 1) return interval + (interval === 1 ? " day" : " days") + " ago";
+    interval = Math.floor(seconds / 3600);
+    if (interval >= 1) return interval + (interval === 1 ? " hour" : " hours") + " ago";
+    interval = Math.floor(seconds / 60);
+    if (interval >= 1) return interval + (interval === 1 ? " minute" : " minutes") + " ago";
+    return "Just now";
+  } catch (e) {
+    console.error("Error formatting time:", e);
+    return "Invalid date";
+  }
 }
 </script>
-
