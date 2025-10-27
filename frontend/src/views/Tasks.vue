@@ -548,14 +548,24 @@ axiosClient.interceptors.request.use(config => {
 
 // Get an instance of the auth store (this is correct)
 const authStore = useAuthStore();
-// Create a computed property to get the logged-in user's data (this is correct)
+
+// Create computed properties for user data
 const currentUser = computed(() => authStore.userData);
+const userDepartment = computed(() => authStore.userData?.department); 
+
+// 🌟 ADDED: Computed property for the current date format (for the header)
+const currentFormattedDate = computed(() => {
+  const date = new Date();
+  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const datePart = date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+  return `${dayOfWeek}, ${datePart}`; 
+});
 
 const tasks = ref([]) // This will hold ALL tasks from the backend
 const projects = ref([]) // Will hold projects from Firebase
 const loadingProjects = ref(false)
 
-// --- 1. THIS IS THE NEW CENTRAL FILTER ---
+// --- 1. THIS IS THE NEW CENTRAL FILTER (FIXED) ---
 // This computed property returns only the tasks that the current user should see.
 const userVisibleTasks = computed(() => {
   if (!currentUser.value || !currentUser.value.name) {
@@ -566,6 +576,9 @@ const userVisibleTasks = computed(() => {
   const userName = currentUser.value.name;
   // Access the user's role from the auth store
   const userRole = authStore.userRole; 
+  
+  // 💥 FIX: Define the local alias 'currentDept' here by accessing the global computed ref's value
+  const currentDept = userDepartment.value; 
 
   // RBAC: HR role can see all tasks (Override logic)
   if (userRole === 'hr' || userRole === 'director') {
@@ -584,8 +597,11 @@ const userVisibleTasks = computed(() => {
     const isCollaborator = Array.isArray(task.collaborators) && 
                            task.collaborators.some(c => c.name === userName);
 
+    // 🌟 UPDATED CHECK: Task is visible if its owner's department matches the user's department
+    const isDepartmentTask = currentDept && task.taskOwnerDepartment === currentDept;
+
     // The task is visible if ANY of these conditions are true
-    return isOwner || isAssignee || isCollaborator;
+    return isOwner || isAssignee || isCollaborator || isDepartmentTask;
   });
 });
 
