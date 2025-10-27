@@ -5,34 +5,34 @@ const taskController = require('../controllers/taskController');
 const { verifyToken } = require('../middleware/auth.js');
 
 // Create a new task
-router.post('/', taskController.createTask);
+router.post('/', verifyToken, taskController.createTask);
 
 // Get all tasks
-router.get('/', taskController.getAllTasks);
+router.get('/', verifyToken, taskController.getAllTasks);
 
 // Get all recurring tasks
-router.get('/recurring', taskController.getAllRecurringTasks);
+router.get('/recurring', verifyToken, taskController.getAllRecurringTasks);
 
 // Get a specific task by ID
-router.get('/:id', taskController.getTask);
+router.get('/:id', verifyToken, taskController.getTask);
 
 // Update task status
-router.put('/:id/status', taskController.updateTaskStatus);
+router.put('/:id/status', verifyToken, taskController.updateTaskStatus);
 
 // Assign a task
-router.put('/:id/assign', taskController.assignTask);
+router.put('/:id/assign', verifyToken, taskController.assignTask);
 
 // Archive (soft-delete) a task
-router.put('/:id/archive', taskController.archiveTask);
+router.put('/:id/archive', verifyToken, taskController.archiveTask);
 
 // Unarchive a task
-router.put('/:id/unarchive', taskController.unarchiveTask);
+router.put('/:id/unarchive', verifyToken, taskController.unarchiveTask);
 
 // 2. Add the middleware ONLY to the updateTask route
 router.put('/:id', verifyToken, taskController.updateTask);
 
 // Update recurrence rules for a recurring task
-router.put('/recurring/:id', taskController.updateRecurringTask);
+router.put('/recurring/:id', verifyToken, taskController.updateRecurringTask);
 
 module.exports = router;
 
