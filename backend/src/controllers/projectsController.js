@@ -102,3 +102,84 @@ exports.getProject = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Add category to project
+exports.addCategory = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { category } = req.body;
+    
+    if (!category || !category.trim()) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
+    
+    const projectRef = db.collection('projects').doc(projectId);
+    const projectDoc = await projectRef.get();
+    
+    if (!projectDoc.exists) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    
+    const projectData = projectDoc.data();
+    const categories = projectData.categories || [];
+    
+    // Check if category already exists
+    if (categories.includes(category)) {
+      return res.status(400).json({ message: 'Category already exists in this project' });
+    }
+    
+    // Add category
+    categories.push(category);
+    
+    await projectRef.update({
+      categories: categories,
+      updatedAt: new Date()
+    });
+    
+    console.log(`✅ Added category "${category}" to project ${projectId}`);
+    res.status(200).json({ 
+      message: 'Category added successfully',
+      categories: categories 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error adding category:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Remove category from project
+exports.removeCategory = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const category = decodeURIComponent(req.params.category);
+    
+    const projectRef = db.collection('projects').doc(projectId);
+    const projectDoc = await projectRef.get();
+    
+    if (!projectDoc.exists) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    
+    const projectData = projectDoc.data();
+    const categories = projectData.categories || [];
+    
+    // Remove category
+    const updatedCategories = categories.filter(cat => cat !== category);
+    
+    await projectRef.update({
+      categories: updatedCategories,
+      updatedAt: new Date()
+    });
+    
+    console.log(`✅ Removed category "${category}" from project ${projectId}`);
+    res.status(200).json({ 
+      message: 'Category removed successfully',
+      categories: updatedCategories 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error removing category:', error);
+    res.status(500).json({ error: error.message });
+  }
+};

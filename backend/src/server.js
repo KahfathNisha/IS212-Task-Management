@@ -11,6 +11,7 @@ const taskRouter = require('./routes/taskRouter');
 const authRouter = require('./routes/authRouter');
 const fcmRouter = require('./routes/fcmRouter');
 const reportsRouter = require('./routes/reportsRouter');
+const projectsRouter = require('./routes/projectsRouter');
 
 console.log('✅ Routes loaded successfully');
 
@@ -62,6 +63,7 @@ app.get('/health', (req, res) => {
 
 // Use individual routers for API routes
 app.use('/tasks', taskRouter);
+app.use('/projects', projectsRouter);
 
 app.use('/api/auth', authRouter);
 app.use('/api/fcm', fcmRouter);

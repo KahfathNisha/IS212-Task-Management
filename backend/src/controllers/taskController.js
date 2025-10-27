@@ -10,6 +10,44 @@ const formatTimestampToISO = (timestamp) => {
     return timestamp;
 };
 
+// --- Helper function to update project statistics ---
+const updateProjectStats = async (projectId) => {
+    if (!projectId) return;
+    
+    try {
+        const projectRef = db.collection('projects').doc(projectId);
+        const projectDoc = await projectRef.get();
+        
+        if (!projectDoc.exists) {
+            console.warn(`⚠️ Project ${projectId} not found`);
+            return;
+        }
+        
+        // Get all non-archived tasks for this project
+        const tasksSnapshot = await db.collection('tasks')
+            .where('projectId', '==', projectId)
+            .where('archived', '==', false)
+            .get();
+        
+        const tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+        const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+        
+        await projectRef.update({
+            totalTasks,
+            completedTasks,
+            progress,
+            updatedAt: admin.firestore.Timestamp.now()
+        });
+        
+        console.log(`✅ Updated project ${projectId}: ${completedTasks}/${totalTasks} tasks (${progress}%)`);
+        
+    } catch (error) {
+        console.error(`❌ Error updating project stats for ${projectId}:`, error);
+    }
+};
+
 // Create Task
 exports.createTask = async (req, res) => {
     try {
@@ -66,6 +104,7 @@ exports.createTask = async (req, res) => {
             updatedAt: admin.firestore.Timestamp.now(),
             status: req.body.status || 'Unassigned',
             projectId: req.body.projectId || null,
+            categories: req.body.categories || [],
             archived: false
             // taskOwnerDepartment is included via the spread of req.body
         };
@@ -128,6 +167,12 @@ exports.createTask = async (req, res) => {
         }
 
         const docRef = await db.collection('tasks').add(task);
+        
+        // Update project stats if task belongs to a project
+        if (req.body.projectId) {
+            await updateProjectStats(req.body.projectId);
+        }
+        
         res.status(201).json({ id: docRef.id, message: 'Task created successfully' });
     } catch (err) {
         console.error('Create task error:', err);
@@ -239,6 +284,18 @@ exports.updateTask = async (req, res) => {
 
         await docRef.update(finalUpdateData);
 
+        // Update project stats if projectId changed
+        if (otherFields.projectId !== undefined) {
+            // Update old project if task was moved from another project
+            if (originalTask.projectId && originalTask.projectId !== otherFields.projectId) {
+                await updateProjectStats(originalTask.projectId);
+            }
+            // Update new project
+            if (otherFields.projectId) {
+                await updateProjectStats(otherFields.projectId);
+            }
+        }
+
         res.status(200).json({ message: 'Task updated successfully' });
     } catch (err) {
         console.error("Update Task Error:", err);
@@ -251,10 +308,19 @@ exports.updateTaskStatus = async (req, res) => {
 // No changes needed here.
     try {
         const { status } = req.body;
+        const taskDoc = await db.collection('tasks').doc(req.params.id).get();
+        const task = taskDoc.data();
+        
         await db.collection('tasks').doc(req.params.id).update({
             status,
             updatedAt: admin.firestore.Timestamp.now()
         });
+        
+        // Update project progress if status changed to/from Completed
+        if (task.projectId && (status === 'Completed' || task.status === 'Completed')) {
+            await updateProjectStats(task.projectId);
+        }
+        
         res.status(200).json({ message: 'Task status updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -280,10 +346,19 @@ exports.assignTask = async (req, res) => {
 exports.archiveTask = async (req, res) => {
 // No changes needed here.
     try {
+        const taskDoc = await db.collection('tasks').doc(req.params.id).get();
+        const task = taskDoc.data();
+        
         await db.collection('tasks').doc(req.params.id).update({
             archived: true,
             updatedAt: admin.firestore.Timestamp.now()
         });
+        
+        // Update project stats when task is archived
+        if (task.projectId) {
+            await updateProjectStats(task.projectId);
+        }
+        
         res.status(200).json({ message: 'Task archived' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -294,10 +369,19 @@ exports.archiveTask = async (req, res) => {
 exports.unarchiveTask = async (req, res) => {
 // No changes needed here.
     try {
+        const taskDoc = await db.collection('tasks').doc(req.params.id).get();
+        const task = taskDoc.data();
+        
         await db.collection('tasks').doc(req.params.id).update({
             archived: false,
             updatedAt: admin.firestore.Timestamp.now()
         });
+        
+        // Update project stats when task is unarchived
+        if (task.projectId) {
+            await updateProjectStats(task.projectId);
+        }
+        
         res.status(200).json({ message: 'Task unarchived' });
     } catch (err) {
         res.status(500).json({ error: err.message });

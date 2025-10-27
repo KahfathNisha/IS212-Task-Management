@@ -59,11 +59,28 @@
               v-model="localTask.projectId"
               label="Project"
               :items="projects"
+              item-title="title"
+              item-value="value"
               placeholder="Select project"
               variant="outlined"
+              clearable
               class="flex-1"
+              @update:model-value="onProjectChange"
             />
           </div>
+
+          <v-select
+            v-if="localTask.projectId"
+            v-model="localTask.categories"
+            label="Categories"
+            :items="availableCategories"
+            placeholder="Select categories"
+            variant="outlined"
+            multiple
+            chips
+            clearable
+            class="mb-4"
+          />
           
           <div class="mb-4">
             <v-autocomplete
@@ -545,6 +562,22 @@ const onSave = () => {
 
   emit('save', payload)
   emit('update:show', false)
+}
+
+const availableCategories = ref([])
+
+const onProjectChange = async (projectId) => {
+  if (projectId) {
+    try {
+      const response = await axiosClient.get(`/projects/${projectId}`)
+      availableCategories.value = response.data.categories || []
+    } catch (error) {
+      console.error('Error fetching project categories:', error)
+    }
+  } else {
+    availableCategories.value = []
+    localTask.value.categories = []
+  }
 }
 </script>
 

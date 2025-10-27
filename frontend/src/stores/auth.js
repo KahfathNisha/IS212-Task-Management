@@ -47,6 +47,8 @@ export const useAuthStore = defineStore("auth", () => {
     });
   };
 
+
+
   // This is the new, more secure login flow.
   const login = async (email, password) => {
     loading.value = true;
@@ -61,6 +63,7 @@ export const useAuthStore = defineStore("auth", () => {
       user.value = userCredential.user;
 
       const idToken = await userCredential.user.getIdToken();
+      localStorage.setItem('firebaseIdToken', idToken);
       const loginResponse = await authApiClient.post('/login', { idToken });
       if (!loginResponse.data.success) throw new Error(loginResponse.data.message);
       

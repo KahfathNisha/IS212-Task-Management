@@ -432,74 +432,13 @@
       </div>
 
       <!-- CATEGORY VIEW -->
-      <div v-else-if="currentView === 'categories'" class="categories-view">
-        <div class="category-cards">
-          <div 
-            v-for="category in allCategories" 
-            :key="category"
-            class="category-card"
-          >
-            <div class="category-card-header">
-              <v-chip 
-                :color="getCategoryColor(category)"
-                size="large"
-              >
-                <v-icon size="20" start>mdi-tag</v-icon>
-                {{ category }}
-              </v-chip>
-              <v-btn 
-                icon="mdi-filter" 
-                size="small" 
-                variant="text"
-                @click="filterByCategory(category)"
-              />
-            </div>
-
-            <div class="category-stats">
-              <div class="stat-item">
-                <span class="stat-value">{{ getProjectsByCategory(category).length }}</span>
-                <span class="stat-label">Projects</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value">{{ getTasksCountByCategory(category) }}</span>
-                <span class="stat-label">Tasks</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value">{{ getCompletionRateByCategory(category) }}%</span>
-                <span class="stat-label">Completion</span>
-              </div>
-            </div>
-
-            <div class="category-projects">
-              <h5>Projects</h5>
-              <div class="project-tags">
-                <v-chip 
-                  v-for="project in getProjectsByCategory(category).slice(0, 5)" 
-                  :key="project.id"
-                  size="small"
-                  @click="scrollToProject(project.id)"
-                  class="project-tag"
-                >
-                  {{ project.name }}
-                </v-chip>
-                <v-chip 
-                  v-if="getProjectsByCategory(category).length > 5"
-                  size="small"
-                  class="project-tag-more"
-                >
-                  +{{ getProjectsByCategory(category).length - 5 }} more
-                </v-chip>
-              </div>
-            </div>
-          </div>
-
-          <!-- Add Category Card -->
-          <div class="category-card add-category-card" @click="showAddCategoryDialog = true">
-            <v-icon size="48" color="grey-lighten-1">mdi-plus-circle-outline</v-icon>
-            <p>Add New Category</p>
-          </div>
-        </div>
-      </div>
+      <CategoriesDetail 
+        v-if="currentView === 'categories'"
+        :projects="filteredProjects"
+        :all-categories="allCategories"
+        @add-global-category="addGlobalCategory"
+        @delete-category="deleteGlobalCategory"
+      />
 
       <!-- WORKLOAD VIEW -->
       <div v-else-if="currentView === 'workload'" class="workload-view">
@@ -654,64 +593,6 @@
       </v-card>
     </v-dialog>
 
-    
-
-    <!-- Manage Categories Dialog -->
-    <v-dialog v-model="showManageCategoriesDialog" max-width="600px">
-      <v-card>
-        <v-card-title class="dialog-header">
-          <span class="dialog-title">Manage Project Categories</span>
-          <v-btn icon="mdi-close" variant="text" @click="showManageCategoriesDialog = false" />
-        </v-card-title>
-
-        <v-card-text class="dialog-content">
-          <p class="mb-4">Project: <strong>{{ selectedProjectForCategories?.name }}</strong></p>
-          
-          <div class="categories-input">
-            <label class="input-label">Current Categories</label>
-            <div class="selected-categories">
-              <v-chip 
-                v-for="category in selectedProjectForCategories?.categories" 
-                :key="category"
-                closable
-                @click:close="removeCategoryFromProject(category)"
-                :color="getCategoryColor(category)"
-              >
-                <v-icon size="14" start>mdi-tag</v-icon>
-                {{ category }}
-              </v-chip>
-              <span v-if="!selectedProjectForCategories?.categories?.length" class="empty-text">
-                No categories assigned
-              </span>
-            </div>
-            
-            <div class="category-input-row">
-              <v-combobox
-                v-model="newCategoryInput"
-                :items="allCategories"
-                label="Add Category"
-                variant="outlined"
-                density="compact"
-                hide-details
-                @keyup.enter="addCategoryToProject"
-              />
-              <v-btn 
-                color="primary" 
-                @click="addCategoryToProject"
-                :disabled="!newCategoryInput"
-              >
-                Add
-              </v-btn>
-            </div>
-          </div>
-        </v-card-text>
-
-        <v-card-actions class="dialog-actions">
-          <v-spacer />
-          <v-btn color="primary" @click="showManageCategoriesDialog = false">Done</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
     <!-- Add Category Dialog -->
     <v-dialog v-model="showAddCategoryDialog" max-width="400px">
@@ -758,6 +639,27 @@
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { projectService } from '@/services/projectService'
+import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
+import axios from 'axios'
+
+// Axios client configuration
+const axiosClient = axios.create({
+  baseURL: 'http://localhost:3000',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Axios interceptor to send the token
+axiosClient.interceptors.request.use(config => {
+  const token = localStorage.getItem('firebaseIdToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+}, error => {
+  return Promise.reject(error)
+})
 
 // Auth store
 const authStore = useAuthStore()
@@ -766,16 +668,16 @@ const authStore = useAuthStore()
 const expandedProjects = ref([])
 const currentView = ref('projects')
 const showCreateDialog = ref(false)
-const showManageCategoriesDialog = ref(false)
-const showAddCategoryDialog = ref(false)
+// const showManageCategoriesDialog = ref(false)
+// const showAddCategoryDialog = ref(false)
 const showWorkloadDialog = ref(false)
 const isEditing = ref(false)
 const showSnackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
-const selectedProjectForCategories = ref(null)
+// const selectedProjectForCategories = ref(null)
 const newCategoryInput = ref('')
-const newGlobalCategory = ref('')
+// const newGlobalCategory = ref('')
 
 // View tabs
 const viewTabs = [
@@ -847,13 +749,21 @@ const loadingProjects = ref(true)
 const loadProjects = async () => {
   loadingProjects.value = true
   try {
-    const fetchedProjects = await projectService.getAllProjects(
-      authStore.userEmail,
-      authStore.userRole,
-      authStore.userData?.department
-    )
-    projects.value = fetchedProjects
-    console.log('📦 Loaded projects:', fetchedProjects)
+    // Load projects from backend API
+    const projectsResponse = await axiosClient.get('/projects')
+    const fetchedProjects = projectsResponse.data
+    
+    // Load tasks for all projects
+    const tasksResponse = await axiosClient.get('/tasks')
+    const allTasks = tasksResponse.data
+    
+    // Attach tasks to each project
+    projects.value = fetchedProjects.map(project => ({
+      ...project,
+      tasks: allTasks.filter(task => task.projectId === project.id && !task.archived)
+    }))
+    
+    console.log('📦 Loaded projects:', projects.value)
   } catch (error) {
     console.error('Error loading projects:', error)
     showMessage('Failed to load projects: ' + error.message, 'error')
@@ -1129,54 +1039,54 @@ const editProject = (project) => {
   showCreateDialog.value = true
 }
 
-const manageCategoriesForProject = (project) => {
-  selectedProjectForCategories.value = project
-  showManageCategoriesDialog.value = true
-}
+// const manageCategoriesForProject = (project) => {
+//   selectedProjectForCategories.value = project
+//   showManageCategoriesDialog.value = true
+// }
 
-const addCategory = () => {
-  if (!newCategoryInput.value) return
+// const addCategory = () => {
+//   if (!newCategoryInput.value) return
   
-  const category = newCategoryInput.value.trim()
-  if (category && !newProject.value.categories.includes(category)) {
-    newProject.value.categories.push(category)
-  }
-  newCategoryInput.value = ''
-}
+//   const category = newCategoryInput.value.trim()
+//   if (category && !newProject.value.categories.includes(category)) {
+//     newProject.value.categories.push(category)
+//   }
+//   newCategoryInput.value = ''
+// }
 
-const removeCategory = (category) => {
-  newProject.value.categories = newProject.value.categories.filter(c => c !== category)
-}
+// const removeCategory = (category) => {
+//   newProject.value.categories = newProject.value.categories.filter(c => c !== category)
+// }
 
-const addCategoryToProject = () => {
-  if (!newCategoryInput.value || !selectedProjectForCategories.value) return
+// const addCategoryToProject = () => {
+//   if (!newCategoryInput.value || !selectedProjectForCategories.value) return
   
-  const category = newCategoryInput.value.trim()
-  if (category && !selectedProjectForCategories.value.categories.includes(category)) {
-    selectedProjectForCategories.value.categories.push(category)
+//   const category = newCategoryInput.value.trim()
+//   if (category && !selectedProjectForCategories.value.categories.includes(category)) {
+//     selectedProjectForCategories.value.categories.push(category)
     
-    // Update in main projects array
-    const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
-    if (index !== -1) {
-      projects.value[index].categories.push(category)
-    }
-  }
-  newCategoryInput.value = ''
-}
+//     // Update in main projects array
+//     const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
+//     if (index !== -1) {
+//       projects.value[index].categories.push(category)
+//     }
+//   }
+//   newCategoryInput.value = ''
+// }
 
-const removeCategoryFromProject = (category) => {
-  if (!selectedProjectForCategories.value) return
+// const removeCategoryFromProject = (category) => {
+//   if (!selectedProjectForCategories.value) return
   
-  selectedProjectForCategories.value.categories = 
-    selectedProjectForCategories.value.categories.filter(c => c !== category)
+//   selectedProjectForCategories.value.categories = 
+//     selectedProjectForCategories.value.categories.filter(c => c !== category)
   
-  // Update in main projects array
-  const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
-  if (index !== -1) {
-    projects.value[index].categories = 
-      projects.value[index].categories.filter(c => c !== category)
-  }
-}
+//   // Update in main projects array
+//   const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
+//   if (index !== -1) {
+//     projects.value[index].categories = 
+//       projects.value[index].categories.filter(c => c !== category)
+//   }
+// }
 
 const createGlobalCategory = () => {
   if (!newGlobalCategory.value) return
@@ -1435,7 +1345,107 @@ const resetFilters = () => {
   selectedCategories.value = []
 }
 
+const refreshProject = async (projectId) => {
+  try {
+    const response = await axiosClient.get(`/projects/${projectId}`);
+    const updatedProject = response.data;
+    
+    // Find and update the project in the list
+    const index = projects.value.findIndex(p => p.id === projectId);
+    if (index !== -1) {
+      projects.value[index] = {
+        ...projects.value[index],
+        totalTasks: updatedProject.totalTasks,
+        completedTasks: updatedProject.completedTasks,
+        progress: updatedProject.progress
+      };
+    }
+    
+    // If this is the selected project, update it too
+    if (selectedProject.value && selectedProject.value.id === projectId) {
+      selectedProject.value = {
+        ...selectedProject.value,
+        totalTasks: updatedProject.totalTasks,
+        completedTasks: updatedProject.completedTasks,
+        progress: updatedProject.progress
+      };
+    }
+  } catch (error) {
+    console.error('Error refreshing project:', error);
+  }
+};
+
+// OPTION 1: Set up an interval to auto-refresh every 5 seconds
+onMounted(() => {
+  // ... your existing onMounted code ...
+  
+  // Auto-refresh project data every 5 seconds
+  const refreshInterval = setInterval(() => {
+    if (selectedProject.value) {
+      refreshProject(selectedProject.value.id);
+    }
+  }, 5000);
+  
+  // Clean up interval when component unmounts
+  onUnmounted(() => {
+    clearInterval(refreshInterval);
+  });
+});
+
+const projectTasks = ref([])
+const projectCategories = computed(() => selectedProject.value?.categories || [])
+
+const loadProjectTasks = async (projectId) => {
+  try {
+    const response = await axiosClient.get('/tasks')
+    projectTasks.value = response.data.filter(t => 
+      t.projectId === projectId && !t.archived
+    )
+  } catch (error) {
+    console.error('Error loading project tasks:', error)
+  }
+}
+
+const addGlobalCategory = async (categoryName) => {
+  try {
+    // Add category to all selected projects or create a global list
+    // For now, we'll just show a success message
+    // You can enhance this to add to a global categories collection
+    showMessage(`Category "${categoryName}" created successfully`, 'success')
+    
+    // Reload projects to reflect changes
+    await loadProjects()
+  } catch (error) {
+    console.error('Error adding global category:', error)
+    showMessage('Failed to add category', 'error')
+  }
+}
+
+const deleteGlobalCategory = async (categoryName) => {
+  try {
+    // Remove category from all projects that have it
+    const projectsWithCategory = projects.value.filter(p => 
+      p.categories && p.categories.includes(categoryName)
+    )
+    
+    for (const project of projectsWithCategory) {
+      await axiosClient.delete(`/projects/${project.id}/categories/${encodeURIComponent(categoryName)}`)
+    }
+    
+    showMessage(`Category "${categoryName}" deleted from all projects`, 'success')
+    
+    // Reload projects
+    await loadProjects()
+  } catch (error) {
+    console.error('Error deleting category:', error)
+    showMessage('Failed to delete category', 'error')
+  }
+}
+
+
+
 </script>
+
 
 <style scoped>
 /* ===========================
