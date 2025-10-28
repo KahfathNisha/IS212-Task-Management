@@ -61,11 +61,12 @@ service cloud.firestore {
       allow create: if request.auth.token.email == userId;
       
       // Users can update their own profile (but not change their role/dept)
-      allow update: if isSignedIn() && 
-                      request.auth.token.email == userId &&
-                      request.resource.data.role == resource.data.role &&
-                      request.resource.data.department == resource.data.department;
-      
+      allow update: if isSignedIn() &&
+                request.auth.token.email == userId &&
+                request.resource.data.keys().hasAll(['role', 'department']) &&
+                resource.data.keys().hasAll(['role', 'department']) &&
+                request.resource.data.role == resource.data.role &&
+                request.resource.data.department == resource.data.department;
       // Only directors can delete users
       allow delete: if isDirector();
 
