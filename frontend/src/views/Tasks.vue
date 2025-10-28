@@ -545,11 +545,15 @@ const axiosClient = axios.create({
     },
 });
 
-// Axios interceptor to send the token (this is correct)
-axiosClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('firebaseIdToken');
-  if (token) {
+// Axios interceptor to send the token (FIXED: use fresh token from auth store)
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const { useAuthStore } = await import('/src/stores/auth.js');
+    const authStore = useAuthStore();
+    const token = await authStore.getToken();
     config.headers.Authorization = `Bearer ${token}`;
+  } catch (error) {
+    console.error('Failed to get auth token:', error);
   }
   return config;
 }, error => {
@@ -770,12 +774,13 @@ const snackbarColor = ref('success')
 
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const teamMembers = [
-    { text: 'John Doe', value: 'John Doe', department: 'Engineering' },
-    { text: 'Michael Brown', value: 'Michael Brown', department: 'Engineering' },
-    { text: 'Sally Loh', value: 'Sally Loh', department: 'HR' },
-    { text: 'Alice Johnson', value: 'Alice Johnson', department: 'Engineering' },
-    { text: 'Jack Sim', value: 'Jack Sim', department: 'Management' },
-    { text: 'Jane Smith', value: 'Jane Smith', department: 'Marketing' }
+    // Ensure all departments are capitalized or consistently formatted (e.g., 'HR' not 'hr')
+    { text: 'John Doe', value: 'john.doe@company.com', department: 'Engineering' },
+    { text: 'Michael Brown', value: 'michael.brown@company.com', department: 'Engineering' },
+    { text: 'Sally Loh', value: 'sally.loh@company.com', department: 'HR' },
+    { text: 'Alice Johnson', value: 'alice.johnson@company.com', department: 'Engineering' },
+    { text: 'Jack Sim', value: 'jack.sim@company.com', department: 'Management' },
+    { text: 'Jane Smith', value: 'jane.smith@company.com', department: 'Marketing' }
 ];
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
@@ -811,6 +816,12 @@ const priorityFilterOptions = [
   { title: 'Priority 8', value: 8 },
   { title: 'Priority 9', value: 9 },
   { title: 'Priority 10', value: 10 }
+]
+
+const assigneeFilterOptions = [
+  { title: 'John Doe', value: 'john.doe@company.com' },
+  { title: 'Jane Smith', value: 'jane.smith@company.com' },
+  { title: 'Alice Johnson', value: 'alice.johnson@company.com' }
 ]
 
 const subtasks = ref([])
@@ -1000,12 +1011,31 @@ const validateDueDate = (dateString) => {
 
 const handleCreateSave = async (taskData) => {
   try {
-    const response = await axiosClient.post('/tasks', taskData);
+    // Map UI payload to backend shape
+    const payload = {
+      ...taskData,
+      assigneeId: taskData.assignedTo || null,
+      // Preserve explicit taskOwner/taskOwnerDepartment if provided by dialog
+      taskOwner: taskData.taskOwner || currentUser?.email || authStore.userEmail,
+      taskOwnerDepartment: taskData.taskOwnerDepartment || undefined,
+    };
+
+    console.log('📤 [Tasks.vue] Creating task with payload:', {
+      title: payload.title,
+      assigneeId: payload.assigneeId,
+      dueDate: payload.dueDate,
+      taskOwner: payload.taskOwner,
+      taskOwnerDepartment: payload.taskOwnerDepartment
+    });
+
+    const response = await axiosClient.post('/tasks', payload);
+    console.log('✅ [Tasks.vue] Create task response:', response.status, response.data);
+
     const newTaskId = response.data.id;
     const newTaskWithId = {
-      ...taskData,
+      ...payload,
       id: newTaskId,
-      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: taskData.status || 'Ongoing' }],
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: payload.status || 'Ongoing' }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1013,6 +1043,7 @@ const handleCreateSave = async (taskData) => {
     tasks.value.push(newTaskWithId);
     showMessage('Task created successfully!', 'success');
   } catch (error) {
+    console.error('❌ [Tasks.vue] Failed to create task:', error?.response?.status, error?.response?.data || error);
     showMessage(error.response?.data?.message || 'Failed to create task.', 'error');
   }
 };

@@ -9,13 +9,23 @@ export const useNotificationStore = defineStore("notification", () => {
   const currentNotification = computed(() => notificationQueue.value[0]);
 
   function addNotification(notification) {
-    // Add a unique ID for Vue's key-binding and to prevent duplicates
-    const newNotification = { ...notification, id: Date.now() + Math.random() };
+    // Use the provided ID (from database) or generate a unique one for Vue's key-binding
+    const newNotification = { 
+      ...notification, 
+      id: notification.id || (Date.now() + Math.random()) 
+    };
     notificationQueue.value.push(newNotification);
   }
 
-  // This is called by the UI component when a popup is dismissed.
+  // This is called when user clicks "Mark as Read" - removes from queue (API call handled by component)
   function dismissCurrentNotification() {
+    if (notificationQueue.value.length > 0) {
+      notificationQueue.value.shift(); // Removes the first item from the queue
+    }
+  }
+
+  // This is called when user clicks "Dismiss" - temporarily hides popup but keeps in queue
+  function dismissNotification() {
     if (notificationQueue.value.length > 0) {
       notificationQueue.value.shift(); // Removes the first item from the queue
     }
@@ -31,6 +41,7 @@ export const useNotificationStore = defineStore("notification", () => {
     currentNotification,
     addNotification,
     dismissCurrentNotification,
+    dismissNotification,
     clearNotifications,
   };
 });

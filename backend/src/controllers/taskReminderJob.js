@@ -1,9 +1,9 @@
 const cron = require('node-cron');
 const { db, admin } = require('../config/firebase');
-const EmailService = require('../services/emailService');
+const NotificationService = require('../services/notificationService');
 
-async function processEmailReminders(now) {
-    // Get all users with email notifications enabled
+async function processDeadlineReminders(now) {
+    // Get all users with notifications enabled
     const usersSnapshot = await db.collection("users")
         .where("notificationSettings.emailEnabled", "==", true)
         .get();
@@ -15,7 +15,7 @@ async function processEmailReminders(now) {
         
         // Get tasks assigned to this user
         const tasksSnapshot = await db.collection("tasks")
-            .where("assignedTo", "array-contains", userId)
+            .where("assigneeId", "==", userId)
             .where("archived", "==", false)
             .get();
 
@@ -36,7 +36,7 @@ async function processEmailReminders(now) {
                 reminderIntervals = settings.emailPresetReminders || [1, 3, 7];
             }
 
-            // Check if we should send email at any of the configured intervals
+            // Check if we should send reminder at any of the configured intervals
             const shouldSendReminder = reminderIntervals.some(interval => Math.abs(daysUntilDue - interval) < 0.1); // Allow small tolerance for timing
 
             if (shouldSendReminder && hoursUntilDue > 0) {
@@ -55,15 +55,24 @@ async function processEmailReminders(now) {
                     const daysLeft = Math.round(daysUntilDue);
 
                     try {
-                        await EmailService.sendDeadlineReminder(
-                            userData.email,
-                            { ...taskData, id: taskDoc.id },
+                        // Create unified notification (database + push + email)
+                        const notificationData = {
+                            title: `Task Deadline Reminder`,
+                            body: `Your task "${taskData.title}" is due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}!`,
+                            taskId: taskDoc.id,
+                            type: 'warning'
+                        };
+
+                        await NotificationService.sendNotification(userId, notificationData, {
+                            sendPush: settings.pushEnabled !== false, // Default to true
+                            sendEmail: true,
+                            taskData: { ...taskData, id: taskDoc.id },
                             hoursLeft,
                             minutesLeft,
-                            userData.timezone || 'UTC'
-                        );
+                            userTimezone: userData.timezone || 'UTC'
+                        });
 
-                        // Record the email reminder with days left
+                        // Record the reminder for duplicate prevention
                         await db.collection("emailReminders").add({
                             userId,
                             taskId: taskDoc.id,
@@ -74,7 +83,7 @@ async function processEmailReminders(now) {
                         });
 
                     } catch (error) {
-                        console.error(`Failed to send email reminder for task ${taskDoc.id}:`, error);
+                        console.error(`Failed to send deadline reminder for task ${taskDoc.id}:`, error);
                     }
                 }
             }
@@ -93,8 +102,8 @@ if (!global.reminderJobStarted) {
             const now = new Date();
             console.log(`[ReminderJob] Checking reminders at ${now.toISOString()}`);
 
-            // Check for email reminders
-            await processEmailReminders(now);
+            // Check for deadline reminders
+            await processDeadlineReminders(now);
 
             const snapshot = await db
                 .collection("reminders")

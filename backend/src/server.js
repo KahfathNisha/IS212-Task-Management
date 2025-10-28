@@ -14,6 +14,8 @@ const fcmRouter = require('./routes/fcmRouter');
 const reportsRouter = require('./routes/reportsRouter');
 const projectsRouter = require('./routes/projectsRouter');
 const categoriesRouter = require('./routes/categoriesRouter');
+const notificationRouter = require('./routes/notificationRouter'); 
+
 console.log('✅ Routes loaded successfully');
 
 const app = express();
@@ -69,6 +71,7 @@ app.use('/api/categories', categoriesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/fcm', fcmRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/notifications', notificationRouter);
 
 // Firebase test endpoint (optional)
 app.get('/firebase-test', async (req, res) => {

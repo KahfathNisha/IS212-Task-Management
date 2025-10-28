@@ -42,7 +42,6 @@
       The old, conflicting v-snackbar has been removed.
       We now use our new, stable Notifications component which will handle all popups.
     -->
-    <NotificationPopup />
     <Notifications />
   </v-app>
 </template>

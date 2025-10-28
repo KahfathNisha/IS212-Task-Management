@@ -1,5 +1,6 @@
 const { db, admin } = require('../config/firebase');
 const taskModel = require('../models/taskModel');
+const NotificationService = require('../services/notificationService');
 
 // --- Helper function for Timestamp conversion ---
 const formatTimestampToISO = (timestamp) => {
@@ -51,6 +52,15 @@ const updateProjectStats = async (projectId) => {
 // Create Task
 exports.createTask = async (req, res) => {
     try {
+        // Entry log for debugging task creation calls
+        console.log('📥 [TaskController] createTask called by:', req.user?.email || 'unknown');
+        console.log('   Incoming payload:', {
+            title: req.body?.title,
+            assigneeId: req.body?.assigneeId,
+            assignedTo: req.body?.assignedTo,
+            dueDate: req.body?.dueDate,
+            projectId: req.body?.projectId
+        });
         // ADDED: taskOwnerDepartment destructuring
         const { dueDate, assigneeId, title, priority, subtasks, taskOwner, taskOwnerDepartment } = req.body;
 
@@ -171,6 +181,33 @@ exports.createTask = async (req, res) => {
         // Update project stats if task belongs to a project
         if (req.body.projectId) {
             await updateProjectStats(req.body.projectId);
+        }
+
+        // Send notification to assignee if task is assigned
+        if (assigneeId) {
+            try {
+                console.log(`📢 [TaskController] Sending "New Task Assigned" notification:`);
+                console.log(`   Task: "${title}"`);
+                console.log(`   Assignee: ${assigneeId}`);
+                console.log(`   TaskId: ${docRef.id}`);
+                
+                const notificationData = {
+                    title: `New Task Assigned`,
+                    body: `You have been assigned a new task: "${title}"`,
+                    taskId: docRef.id,
+                    type: 'info'
+                };
+
+                await NotificationService.sendNotification(assigneeId, notificationData, {
+                    sendPush: false,
+                    sendEmail: false
+                });
+                
+                console.log(`✅ [TaskController] "New Task Assigned" notification sent successfully`);
+            } catch (error) {
+                console.error('❌ [TaskController] Failed to send task assignment notification:', error);
+                // Don't fail the task creation if notification fails
+            }
         }
         
         res.status(201).json({ id: docRef.id, message: 'Task created successfully' });
@@ -296,6 +333,97 @@ exports.updateTask = async (req, res) => {
             }
         }
 
+        // Send notifications about task update
+        if (originalTask.assigneeId) {
+            try {
+                // Check if assignee changed
+                const assigneeChanged = req.body.assigneeId && req.body.assigneeId !== originalTask.assigneeId;
+                const statusChanged = req.body.status && req.body.status !== originalTask.status;
+                
+                if (assigneeChanged) {
+                    console.log(`📢 [TaskController] Sending "Removed from Task" notification:`);
+                    console.log(`   Task: "${originalTask.title}"`);
+                    console.log(`   Old Assignee: ${originalTask.assigneeId}`);
+                    console.log(`   TaskId: ${req.params.id}`);
+                    
+                    // Notify old assignee they were unassigned
+                    const unassignNotificationData = {
+                        title: `Removed from Task`,
+                        body: `You are no longer assigned to task "${originalTask.title}"`,
+                        taskId: req.params.id,
+                        type: 'info'
+                    };
+
+                    await NotificationService.sendNotification(originalTask.assigneeId, unassignNotificationData, {
+                        sendPush: false,
+                        sendEmail: false
+                    });
+                    
+                    console.log(`✅ [TaskController] "Removed from Task" notification sent successfully`);
+
+                    // Notify new assignee they were assigned
+                    if (req.body.assigneeId) {
+                        console.log(`📢 [TaskController] Sending "Task Assigned" notification:`);
+                        console.log(`   Task: "${originalTask.title}"`);
+                        console.log(`   New Assignee: ${req.body.assigneeId}`);
+                        console.log(`   TaskId: ${req.params.id}`);
+                        
+                        const assignNotificationData = {
+                            title: `Task Assigned`,
+                            body: `You have been assigned to task "${originalTask.title}"`,
+                            taskId: req.params.id,
+                            type: 'info'
+                        };
+
+                        await NotificationService.sendNotification(req.body.assigneeId, assignNotificationData, {
+                            sendPush: false,
+                            sendEmail: false
+                        });
+                        
+                        console.log(`✅ [TaskController] "Task Assigned" notification sent successfully`);
+                    }
+                } else if (statusChanged) {
+                    console.log(`📢 [TaskController] Sending "Task Status Updated" notification:`);
+                    console.log(`   Task: "${originalTask.title}"`);
+                    console.log(`   Old Status: ${originalTask.status}`);
+                    console.log(`   New Status: ${req.body.status}`);
+                    console.log(`   Assignee: ${originalTask.assigneeId}`);
+                    console.log(`   TaskId: ${req.params.id}`);
+                    
+                    // Notify about status change
+                    const statusNotificationData = {
+                        title: `Task Status Updated`,
+                        body: `Task "${originalTask.title}" status changed to "${req.body.status}"`,
+                        taskId: req.params.id,
+                        type: req.body.status === 'Completed' ? 'success' : 'info'
+                    };
+
+                    await NotificationService.sendNotification(originalTask.assigneeId, statusNotificationData, {
+                        sendPush: false,
+                        sendEmail: false
+                    });
+                    
+                    console.log(`✅ [TaskController] "Task Status Updated" notification sent successfully`);
+                } else {
+                    // General task update notification
+                    const notificationData = {
+                        title: `Task Updated`,
+                        body: `Task "${originalTask.title}" has been updated`,
+                        taskId: req.params.id,
+                        type: 'info'
+                    };
+
+                    await NotificationService.sendNotification(originalTask.assigneeId, notificationData, {
+                        sendPush: false,
+                        sendEmail: false
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to send task update notification:', error);
+                // Don't fail the task update if notification fails
+            }
+        }
+
         res.status(200).json({ message: 'Task updated successfully' });
     } catch (err) {
         console.error("Update Task Error:", err);
@@ -305,7 +433,6 @@ exports.updateTask = async (req, res) => {
 
 // Update task status
 exports.updateTaskStatus = async (req, res) => {
-// No changes needed here.
     try {
         const { status } = req.body;
         const taskDoc = await db.collection('tasks').doc(req.params.id).get();
@@ -321,6 +448,26 @@ exports.updateTaskStatus = async (req, res) => {
             await updateProjectStats(task.projectId);
         }
         
+        // Send notification about status change
+        if (task.assigneeId && status !== task.status) {
+            try {
+                const statusNotificationData = {
+                    title: `Task Status Updated`,
+                    body: `Task "${task.title}" status changed to "${status}"`,
+                    taskId: req.params.id,
+                    type: status === 'Completed' ? 'success' : 'info'
+                };
+
+                await NotificationService.sendNotification(task.assigneeId, statusNotificationData, {
+                    sendPush: false,
+                    sendEmail: false
+                });
+            } catch (error) {
+                console.error('Failed to send status change notification:', error);
+                // Don't fail the status update if notification fails
+            }
+        }
+        
         res.status(200).json({ message: 'Task status updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -329,13 +476,56 @@ exports.updateTaskStatus = async (req, res) => {
 
 // Assign task
 exports.assignTask = async (req, res) => {
-// No changes needed here.
     try {
         const { assigneeId } = req.body;
+        
+        // Get the task details for notifications
+        const taskDoc = await db.collection('tasks').doc(req.params.id).get();
+        const task = taskDoc.data();
+        
+        // Notify old assignee if they were unassigned
+        if (task.assigneeId && task.assigneeId !== assigneeId) {
+            try {
+                const unassignNotificationData = {
+                    title: `Removed from Task`,
+                    body: `You are no longer assigned to task "${task.title}"`,
+                    taskId: req.params.id,
+                    type: 'info'
+                };
+
+                await NotificationService.sendNotification(task.assigneeId, unassignNotificationData, {
+                    sendPush: false,
+                    sendEmail: false
+                });
+            } catch (error) {
+                console.error('Failed to send unassignment notification:', error);
+            }
+        }
+        
         await db.collection('tasks').doc(req.params.id).update({
             assigneeId,
             updatedAt: admin.firestore.Timestamp.now()
         });
+        
+        // Notify new assignee
+        if (assigneeId) {
+            try {
+                const assignNotificationData = {
+                    title: `Task Assigned`,
+                    body: `You have been assigned to task "${task.title}"`,
+                    taskId: req.params.id,
+                    type: 'info'
+                };
+
+                await NotificationService.sendNotification(assigneeId, assignNotificationData, {
+                    sendPush: false,
+                    sendEmail: false
+                });
+            } catch (error) {
+                console.error('Failed to send assignment notification:', error);
+            }
+        }
+        
         res.status(200).json({ message: 'Task assigned successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -344,7 +534,6 @@ exports.assignTask = async (req, res) => {
 
 // Soft-delete / archive task
 exports.archiveTask = async (req, res) => {
-// No changes needed here.
     try {
         const taskDoc = await db.collection('tasks').doc(req.params.id).get();
         const task = taskDoc.data();
@@ -359,6 +548,26 @@ exports.archiveTask = async (req, res) => {
             await updateProjectStats(task.projectId);
         }
         
+        // Send notification about task archiving
+        if (task.assigneeId) {
+            try {
+                const archiveNotificationData = {
+                    title: `Task Archived`,
+                    body: `Task "${task.title}" has been archived`,
+                    taskId: req.params.id,
+                    type: 'warning'
+                };
+
+                await NotificationService.sendNotification(task.assigneeId, archiveNotificationData, {
+                    sendPush: false,
+                    sendEmail: false
+                });
+            } catch (error) {
+                console.error('Failed to send archive notification:', error);
+                // Don't fail the archive if notification fails
+            }
+        }
+        
         res.status(200).json({ message: 'Task archived' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -367,7 +576,6 @@ exports.archiveTask = async (req, res) => {
 
 // Unarchive task
 exports.unarchiveTask = async (req, res) => {
-// No changes needed here.
     try {
         const taskDoc = await db.collection('tasks').doc(req.params.id).get();
         const task = taskDoc.data();
@@ -380,6 +588,26 @@ exports.unarchiveTask = async (req, res) => {
         // Update project stats when task is unarchived
         if (task.projectId) {
             await updateProjectStats(task.projectId);
+        }
+        
+        // Send notification about task unarchiving
+        if (task.assigneeId) {
+            try {
+                const unarchiveNotificationData = {
+                    title: `Task Restored`,
+                    body: `Task "${task.title}" has been restored from archive`,
+                    taskId: req.params.id,
+                    type: 'info'
+                };
+
+                await NotificationService.sendNotification(task.assigneeId, unarchiveNotificationData, {
+                    sendPush: false,
+                    sendEmail: false
+                });
+            } catch (error) {
+                console.error('Failed to send unarchive notification:', error);
+                // Don't fail the unarchive if notification fails
+            }
         }
         
         res.status(200).json({ message: 'Task unarchived' });

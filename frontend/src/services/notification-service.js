@@ -1,81 +1,11 @@
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useAuthStore } from "@/stores/auth";
 
-let unsubscribeTasks = null;
 let unsubscribeNotifications = null;
 
-// This version uses the correct query for a SINGLE STRING assignee field.
-function initializeTaskChangeListeners(userId) {
-  // --- THIS IS THE FIX ---
-  // Query for tasks where the 'assignedTo' STRING field equals the userId.
-  const tasksQuery = query(collection(db, "tasks"), where("assignedTo", "==", userId));
-  // --- End of Fix ---
-
-  let knownTasks = new Map();
-  let isFirstSnapshot = true;
-
-  unsubscribeTasks = onSnapshot(tasksQuery, async (snapshot) => {
-    const currentTasks = new Map(snapshot.docs.map(doc => [doc.id, doc.data()]));
-
-    if (isFirstSnapshot) {
-      knownTasks = currentTasks;
-      isFirstSnapshot = false;
-      return;
-    }
-
-    const notificationsToCreate = [];
-
-    // Check for NEWLY ASSIGNED or MODIFIED tasks
-    for (const [taskId, taskData] of currentTasks.entries()) {
-      const knownTask = knownTasks.get(taskId);
-      // Case 1: Task is new to the query results (new assignment).
-      if (!knownTask) {
-        const dueDateText = taskData.dueDate?.toDate ? `Due: ${taskData.dueDate.toDate().toLocaleDateString()}` : 'No due date set.';
-        notificationsToCreate.push({
-          title: `New Task Assigned: ${taskData.title}`,
-          body: `You have been assigned a new task. ${dueDateText}`,
-          taskId: taskId,
-        });
-      } 
-      // Case 2: Task was already known. Check if it was updated.
-      else if (knownTask.updatedAt?.toMillis() !== taskData.updatedAt?.toMillis()) {
-         notificationsToCreate.push({
-          title: `Task Updated: ${taskData.title}`,
-          body: `A task assigned to you has been updated. Check for changes.`,
-          taskId: taskId,
-        });
-      }
-    }
-
-    // Check for REMOVED tasks (user unassigned or task deleted)
-    for (const [taskId, taskData] of knownTasks.entries()) {
-      // Case 3: Task was known before, but is no longer in the query results.
-      if (!currentTasks.has(taskId)) {
-        notificationsToCreate.push({
-          title: `Removed from Task: ${taskData.title}`,
-          body: `You are no longer assigned to this task.`,
-          taskId: taskId,
-        });
-      }
-    }
-
-    // Write notifications to the database.
-    if (notificationsToCreate.length > 0) {
-      const userNotificationsRef = collection(db, "users", userId, "notifications");
-      for (const notif of notificationsToCreate) {
-        await addDoc(userNotificationsRef, {
-          ...notif,
-          isRead: false,
-          createdAt: serverTimestamp(),
-        });
-      }
-    }
-    knownTasks = currentTasks; // Update known state
-  });
-}
-
-// This function listens for new unread notifications (remains the same)
+// This function listens for new unread notifications from the unified backend
 function initializeUnreadNotificationListener(userId) {
   const notificationStore = useNotificationStore();
   const notificationsQuery = query(
@@ -83,26 +13,144 @@ function initializeUnreadNotificationListener(userId) {
     where("isRead", "==", false)
   );
   unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+    // Handle new notifications (added)
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
-        notificationStore.addNotification(change.doc.data());
+        const notificationData = change.doc.data();
+        console.log('📥 New notification added:', notificationData.title);
+        notificationStore.addNotification({
+          id: change.doc.id, // Include the database notification ID
+          title: notificationData.title,
+          body: notificationData.body,
+          taskId: notificationData.taskId,
+          type: notificationData.type || 'info'
+        });
       }
     });
+    
+    // Handle initial load - clear queue and reload all unread notifications
+    if (snapshot.docs.length > 0) {
+      console.log('📥 Loading existing unread notifications:', snapshot.docs.length);
+      // Clear existing queue to avoid duplicates
+      notificationStore.clearNotifications();
+      
+      // Add all unread notifications to the queue
+      snapshot.docs.forEach((doc) => {
+        const notificationData = doc.data();
+        notificationStore.addNotification({
+          id: doc.id, // Include the database notification ID
+          title: notificationData.title,
+          body: notificationData.body,
+          taskId: notificationData.taskId,
+          type: notificationData.type || 'info'
+        });
+      });
+    }
   });
 }
 
-// Exported functions remain the same
+// API functions to interact with backend notification endpoints
+const API_BASE_URL = 'http://localhost:3000/api';
+
+async function makeAuthenticatedRequest(endpoint, options = {}) {
+  const authStore = useAuthStore();
+  const token = await authStore.getToken();
+  
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// Get notifications from backend API
+export async function fetchNotifications(limit = 50, startAfter = null) {
+  try {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (startAfter) params.append('startAfter', startAfter);
+    
+    const result = await makeAuthenticatedRequest(`/notifications?${params}`);
+    return result.notifications;
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+}
+
+// Mark notification as read
+export async function markNotificationAsRead(notificationId) {
+  try {
+    await makeAuthenticatedRequest(`/notifications/${notificationId}/read`, {
+      method: 'PUT'
+    });
+    return true;
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return false;
+  }
+}
+
+// Mark all notifications as read
+export async function markAllNotificationsAsRead() {
+  try {
+    await makeAuthenticatedRequest('/notifications/read-all', {
+      method: 'PUT'
+    });
+    return true;
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    return false;
+  }
+}
+
+// Delete notification
+export async function deleteNotification(notificationId) {
+  try {
+    await makeAuthenticatedRequest(`/notifications/${notificationId}`, {
+      method: 'DELETE'
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return false;
+  }
+}
+
+// Clear all notifications
+export async function clearAllNotifications() {
+  try {
+    await makeAuthenticatedRequest('/notifications/clear-all', {
+      method: 'DELETE'
+    });
+    return true;
+  } catch (error) {
+    console.error('Error clearing all notifications:', error);
+    return false;
+  }
+}
+
+// Exported functions
 export function initializeListeners(userId) {
-  initializeTaskChangeListeners(userId);
+  // Only initialize the notification listener, not the task change listener
+  // Task changes are now handled by the backend unified notification system
   initializeUnreadNotificationListener(userId);
 }
+
 export async function fetchNotificationHistory(userId) {
-  const notificationsQuery = query(collection(db, "users", userId, "notifications"), orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(notificationsQuery);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // Use backend API instead of direct Firestore access
+  return await fetchNotifications(100);
 }
+
 export function cleanupListeners() {
-  if (unsubscribeTasks) unsubscribeTasks();
   if (unsubscribeNotifications) unsubscribeNotifications();
 }
 

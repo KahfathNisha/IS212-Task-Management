@@ -1,9 +1,32 @@
 <template>
   <v-container>
     <v-card max-width="800" class="mx-auto">
-      <v-card-title class="text-h5 d-flex align-center">
-        <v-icon start icon="mdi-bell-ring"></v-icon>
-        Notification History
+      <v-card-title class="text-h5 d-flex align-center justify-space-between">
+        <div class="d-flex align-center">
+          <v-icon start icon="mdi-bell-ring"></v-icon>
+          Notification History
+        </div>
+        <v-btn
+          v-if="history.some(n => !n.isRead)"
+          color="primary"
+          variant="outlined"
+          size="small"
+          @click="markAllAsRead"
+        >
+          <v-icon start>mdi-check-all</v-icon>
+          Mark all as read
+        </v-btn>
+        <v-btn
+          v-if="history.length > 0"
+          color="error"
+          variant="outlined"
+          size="small"
+          @click="clearAllNotificationsHandler"
+          class="ml-2"
+        >
+          <v-icon start>mdi-delete-sweep</v-icon>
+          Clear all
+        </v-btn>
       </v-card-title>
       
       <v-card-text v-if="loading" class="text-center pa-8">
@@ -18,9 +41,27 @@
             :key="notification.id"
             :title="notification.title"
             :subtitle="notification.body"
+            :class="{ 'bg-grey-lighten-4': !notification.isRead }"
           >
+            <template #prepend>
+              <v-icon 
+                :color="getNotificationColor(notification.type)"
+                :icon="getNotificationIcon(notification.type)"
+              ></v-icon>
+            </template>
             <template #append>
-              <span class="text-caption text-grey">{{ formatTimeAgo(notification.createdAt) }}</span>
+              <div class="d-flex flex-column align-end">
+                <span class="text-caption text-grey">{{ formatTimeAgo(notification.createdAt) }}</span>
+                <v-btn
+                  v-if="!notification.isRead"
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  @click="markAsRead(notification.id)"
+                >
+                  Mark as read
+                </v-btn>
+              </div>
             </template>
           </v-list-item>
         </v-list>
@@ -37,7 +78,7 @@
 <script setup>
 import { ref, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
-import { fetchNotificationHistory } from "@/services/notification-service";
+import { fetchNotificationHistory, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from "@/services/notification-service";
 
 const authStore = useAuthStore();
 const history = ref([]);
@@ -71,10 +112,75 @@ watch(() => [authStore.loading, authStore.userEmail], ([isLoading, userEmail]) =
   }
 }, { immediate: true }); // immediate: true runs the check once on component mount
 
-function formatTimeAgo(timestamp) {
-  if (!timestamp || typeof timestamp.toDate !== 'function') return "Invalid date";
+async function markAsRead(notificationId) {
   try {
-    const date = timestamp.toDate();
+    await markNotificationAsRead(notificationId);
+    // Update local state
+    const notification = history.value.find(n => n.id === notificationId);
+    if (notification) {
+      notification.isRead = true;
+    }
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+}
+
+async function markAllAsRead() {
+  try {
+    await markAllNotificationsAsRead();
+    // Update local state
+    history.value.forEach(notification => {
+      notification.isRead = true;
+    });
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+  }
+}
+
+async function clearAllNotificationsHandler() {
+  try {
+    await clearAllNotifications();
+    // Clear local state
+    history.value = [];
+    showMessage('All notifications cleared', 'success');
+  } catch (error) {
+    console.error('Error clearing all notifications:', error);
+    showMessage('Failed to clear notifications', 'error');
+  }
+}
+
+function showMessage(message, type) {
+  // Simple message display - you can replace this with your preferred notification system
+  console.log(`${type.toUpperCase()}: ${message}`);
+}
+
+function getNotificationColor(type) {
+  switch (type) {
+    case 'warning': return 'orange';
+    case 'error': return 'red';
+    case 'success': return 'green';
+    default: return 'blue';
+  }
+}
+
+function getNotificationIcon(type) {
+  switch (type) {
+    case 'warning': return 'mdi-alert';
+    case 'error': return 'mdi-alert-circle';
+    case 'success': return 'mdi-check-circle';
+    default: return 'mdi-information';
+  }
+}
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return "Invalid date";
+  try {
+    // Handle both Firestore timestamps and ISO strings
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : 
+                 (timestamp.toDate ? timestamp.toDate() : new Date(timestamp));
+    
+    if (isNaN(date.getTime())) return "Invalid date";
+    
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
 

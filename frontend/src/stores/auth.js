@@ -164,10 +164,25 @@ export const useAuthStore = defineStore("auth", () => {
     };
   };
 
+  // Get Firebase ID token for API requests
+  const getToken = async () => {
+    if (!user.value) {
+      throw new Error('User not authenticated');
+    }
+    try {
+      // Force refresh the token to ensure it's valid
+      const token = await user.value.getIdToken(true);
+      return token;
+    } catch (error) {
+      console.error('Error getting Firebase token:', error);
+      throw new Error('Failed to get authentication token');
+    }
+  };
+
   // Ensure all functions are exported.
   return {
     user, userData, loading, error, isAuthenticated, userRole, userName, userEmail,
-    initializeAuth, login, logout,
+    initializeAuth, login, logout, getToken,
     requestPasswordReset, verifySecurityAnswer, resetPassword,
     updateLastActivity, extendSession, setupActivityListeners
   };

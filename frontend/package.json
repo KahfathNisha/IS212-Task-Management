@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "test:notifications": "vitest src/tests/notification*.test.js",
+    "test:comprehensive": "vitest src/tests/notificationComprehensive.test.js",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {
     "@mdi/font": "^7.3.67",
