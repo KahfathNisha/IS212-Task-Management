@@ -1,9 +1,7 @@
-# frontend/.github/workflows/ci.yml
+# This workflow runs automatic checks on your frontend and backend code
+# when you push to the 'main' branch or open a pull request.
+name: CI - Frontend and Backend
 
-name: Vue Frontend CI
-
-# This action will run on every push to the 'main' branch,
-# and on every pull request that targets the 'main' branch.
 on:
   push:
     branches: [ main ]
@@ -11,27 +9,56 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
-    # Use the latest version of Ubuntu as the operating system
+  test-frontend:
+    name: Frontend Tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
 
     steps:
-      # Step 1: Check out the repository's code
-      - name: Checkout Code
+      - name: Check out repository
         uses: actions/checkout@v3
-
-      # Step 2: Set up the correct version of Node.js
-      - name: Setup Node.js
+        
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20' # Use the same Node.js version as your team
+          node-version: '20'
 
-      # Step 3: Install all project dependencies
-      - name: Install Dependencies
-        run: npm install
+      - name: Install Dependencies (Frontend)
+        # Use npm ci for faster, more reliable installs in CI
+        run: npm ci 
 
-      # Step 4: Run the unit tests
-      # The '-- --run' part tells Vitest to run once and exit,
-      # which is necessary for CI environments.
-      - name: Run Unit Tests
-        run: npm test -- --exclude **/*.integration.spec.js
+      - name: Run Unit Tests (Frontend)
+        # --run tells Vitest to run once and exit
+        run: npm test -- --exclude **/*.integration.spec.js --run
+
+      - name: Build Project (Frontend)
+        run: npm run build
+
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies (Backend)
+        # Use npm ci for faster, more reliable installs in CI
+        run: npm ci
+
+      # --- FIX: Commented out the entire step, not just the 'run' command ---
+      # - name: Run Unit Tests (Backend)
+      #   # This assumes your backend has a test script
+      #   # Add --run if your backend also uses Vitest
+      #   run: npm test -- --run
+

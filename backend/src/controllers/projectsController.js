@@ -103,6 +103,86 @@ exports.getProject = async (req, res) => {
   }
 };
 
+// Create project
+exports.createProject = async (req, res) => {
+  try {
+    const { email, role, department } = req.user;
+    const { name, description, status, department: projectDept, dueDate, categories } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Project name is required' });
+    }
+    
+    const projectData = {
+      name: name.trim(),
+      description: description || '',
+      status: status || 'Ongoing',
+      department: projectDept || department,
+      dueDate: dueDate || null,
+      categories: categories || [],
+      members: [email],
+      createdBy: email,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isDeleted: false,
+      totalTasks: 0,
+      completedTasks: 0,
+      progress: 0
+    };
+    
+    const projectRef = await db.collection('projects').add(projectData);
+    
+    console.log('✅ Created project:', projectRef.id);
+    res.status(201).json({ 
+      id: projectRef.id,
+      ...projectData 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error creating project:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update project
+exports.updateProject = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { name, description, status, department, dueDate, categories } = req.body;
+    
+    const projectRef = db.collection('projects').doc(projectId);
+    const projectDoc = await projectRef.get();
+    
+    if (!projectDoc.exists) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    
+    const updateData = {
+      updatedAt: new Date()
+    };
+    
+    if (name !== undefined) updateData.name = name.trim();
+    if (description !== undefined) updateData.description = description;
+    if (status !== undefined) updateData.status = status;
+    if (department !== undefined) updateData.department = department;
+    if (dueDate !== undefined) updateData.dueDate = dueDate;
+    if (categories !== undefined) updateData.categories = categories;
+    
+    await projectRef.update(updateData);
+    
+    console.log('✅ Updated project:', projectId);
+    res.status(200).json({ 
+      id: projectId,
+      ...projectDoc.data(),
+      ...updateData
+    });
+    
+  } catch (error) {
+    console.error('❌ Error updating project:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Add category to project
 exports.addCategory = async (req, res) => {
   try {

@@ -502,54 +502,66 @@
 
     <!-- Create/Edit Project Dialog -->
     <v-dialog v-model="showCreateDialog" max-width="700px">
-      <v-card class="create-project-card">
-        <v-card-title class="dialog-header">
-          <span class="dialog-title">{{ isEditing ? 'Edit Project' : 'Create New Project' }}</span>
-          <v-btn icon="mdi-close" variant="text" @click="cancelCreate" />
+      <v-card class="project-dialog-card">
+        <v-card-title class="d-flex justify-space-between align-center">
+          <span>{{ isEditing ? 'Edit Project' : 'Create New Project' }}</span>
+          <v-btn icon size="small" variant="text" @click="cancelCreate">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
         </v-card-title>
 
-        <v-card-text class="dialog-content">
+        <v-card-text class="pt-4">
           <v-text-field
             v-model="newProject.name"
-            label="Project Name"
+            label="Project Name *"
             variant="outlined"
-            required
+            density="comfortable"
+            :rules="[v => !!v || 'Project name is required']"
           />
 
           <v-textarea
             v-model="newProject.description"
             label="Description"
             variant="outlined"
+            density="comfortable"
             rows="3"
+            class="mt-2"
           />
 
-          <div class="form-row">
-            <v-select
-              v-model="newProject.status"
-              label="Status"
-              :items="projectStatuses"
-              variant="outlined"
-            />
+          <v-row class="mt-2">
+            <v-col cols="6">
+              <v-select
+                v-model="newProject.status"
+                label="Status *"
+                :items="projectStatuses"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
 
-            <v-select
-              v-model="newProject.department"
-              label="Department"
-              :items="departments"
-              variant="outlined"
-            />
-          </div>
+            <v-col cols="6">
+              <v-select
+                v-model="newProject.department"
+                label="Department *"
+                :items="departments"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
 
           <v-text-field
             v-model="newProject.dueDate"
             label="Due Date"
             type="date"
             variant="outlined"
+            density="comfortable"
+            class="mt-2"
           />
 
-          <!-- Categories Section -->
-          <div class="categories-input">
-            <label class="input-label">Categories</label>
-            <div class="selected-categories">
+          <div class="mt-4">
+            <div class="text-subtitle-2 mb-2">Categories</div>
+            <div v-if="newProject.categories?.length" class="d-flex flex-wrap ga-2 mb-2">
               <v-chip 
                 v-for="category in newProject.categories" 
                 :key="category"
@@ -558,35 +570,40 @@
                 :color="getCategoryColor(category)"
                 size="small"
               >
-                <v-icon size="14" start>mdi-tag</v-icon>
+                <v-icon start size="14">mdi-tag</v-icon>
                 {{ category }}
               </v-chip>
             </div>
-            <div class="category-input-row">
-              <v-combobox
-                v-model="newCategoryInput"
-                :items="allCategories"
-                label="Add Category"
-                variant="outlined"
-                density="compact"
-                hide-details
-                @keyup.enter="addCategory"
-              />
-              <v-btn 
-                color="primary" 
-                @click="addCategory"
-                :disabled="!newCategoryInput"
-              >
-                Add
-              </v-btn>
-            </div>
+            <v-row dense>
+              <v-col cols="9">
+                <v-select
+                  v-model="newCategoryInput"
+                  :items="allCategories"
+                  label="Add Category"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                />
+              </v-col>
+              <v-col cols="3">
+                <v-btn 
+                  color="primary" 
+                  block
+                  @click="addCategory"
+                  :disabled="!newCategoryInput"
+                  height="40"
+                >
+                  Add
+                </v-btn>
+              </v-col>
+            </v-row>
           </div>
         </v-card-text>
 
-        <v-card-actions class="dialog-actions">
+        <v-card-actions>
           <v-spacer />
-          <v-btn variant="outlined" @click="cancelCreate">Cancel</v-btn>
-          <v-btn color="primary" @click="saveProject">
+          <v-btn variant="text" @click="cancelCreate">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="saveProject">
             {{ isEditing ? 'Update' : 'Create' }}
           </v-btn>
         </v-card-actions>
@@ -668,8 +685,8 @@ const authStore = useAuthStore()
 const expandedProjects = ref([])
 const currentView = ref('projects')
 const showCreateDialog = ref(false)
-// const showManageCategoriesDialog = ref(false)
-// const showAddCategoryDialog = ref(false)
+const showManageCategoriesDialog = ref(false)
+const showAddCategoryDialog = ref(false)
 const showWorkloadDialog = ref(false)
 const isEditing = ref(false)
 const showSnackbar = ref(false)
@@ -677,7 +694,7 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 // const selectedProjectForCategories = ref(null)
 const newCategoryInput = ref('')
-// const newGlobalCategory = ref('')
+const newGlobalCategory = ref('')
 
 // View tabs
 const viewTabs = [
@@ -733,12 +750,7 @@ const newProject = ref({
   status: 'Ongoing',
   department: 'Engineering',
   dueDate: '',
-  members: [],
-  tasks: [],
-  categories: [],
-  progress: 0,
-  completedTasks: 0,
-  totalTasks: 0
+  categories: []
 })
 
 // Real Firebase data
@@ -1060,6 +1072,11 @@ const editProject = (project) => {
   isEditing.value = true
   showCreateDialog.value = true
 }
+const manageCategoriesForProject = (project) => {
+  // This would open a dialog to manage categories for a specific project
+  // For now, you can edit the project to change categories
+  editProject(project)
+}
 
 const addGlobalCategory = async (category) => {
   try {
@@ -1096,21 +1113,11 @@ const saveProject = async () => {
   try {
     if (isEditing.value) {
       // Update existing project
-      await projectService.updateProject(
-        newProject.value.id, 
-        newProject.value,
-        authStore.userRole,
-        authStore.userEmail
-      )
+      await axiosClient.put(`/projects/${newProject.value.id}`, newProject.value)
       showMessage('Project updated successfully', 'success')
     } else {
       // Create new project
-      await projectService.createProject(
-        newProject.value,
-        authStore.userEmail,
-        authStore.userRole,
-        authStore.userData?.department
-      )
+      await axiosClient.post('/projects', newProject.value)
       showMessage('Project created successfully', 'success')
     }
 
@@ -1136,16 +1143,22 @@ const resetForm = () => {
     status: 'Ongoing',
     department: 'Engineering',
     dueDate: '',
-    members: [],
-    tasks: [],
-    categories: [],
-    progress: 0,
-    completedTasks: 0,
-    totalTasks: 0
+    categories: []
   }
   isEditing.value = false
   newCategoryInput.value = ''
 }
+const addCategory = () => {
+  if (newCategoryInput.value && !newProject.value.categories.includes(newCategoryInput.value)) {
+    newProject.value.categories.push(newCategoryInput.value)
+    newCategoryInput.value = ''
+  }
+}
+
+const removeCategory = (category) => {
+  newProject.value.categories = newProject.value.categories.filter(c => c !== category)
+}
+
 
 const showMessage = (message, color = 'success') => {
   snackbarMessage.value = message
@@ -2346,8 +2359,20 @@ const loadProjectTasks = async (projectId) => {
 /* ===========================
    Dialog Styles
    =========================== */
+:deep(.v-dialog .v-card) {
+  background: white !important;
+}
+
+[data-theme="dark"] :deep(.v-dialog .v-card) {
+  background: #1e1e1e !important;
+}
+
 .create-project-card {
-  background: var(--bg-primary) !important;
+  background: white !important;
+}
+
+[data-theme="dark"] .create-project-card {
+  background: #1e1e1e !important;
 }
 
 .dialog-header {
@@ -2439,9 +2464,16 @@ const loadProjectTasks = async (projectId) => {
   color: var(--text-primary) !important;
 }
 
-[data-theme="dark"] :deep(.v-field) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: var(--text-primary) !important;
+:deep(.v-field) {
+  background: white !important;
+}
+
+:deep(.v-select .v-field) {
+  background: white !important;
+}
+
+:deep(.v-text-field .v-field) {
+  background: white !important;
 }
 
 [data-theme="dark"] :deep(.v-field input),
@@ -2521,5 +2553,30 @@ const loadProjectTasks = async (projectId) => {
   font-size: 14px;
   color: #6b7280;
   margin: 0;
+}
+
+/* Dialog Background Fix */
+.project-dialog-card {
+  background: white !important;
+}
+
+[data-theme="dark"] .project-dialog-card {
+  background: #2c2c2c !important;
+}
+
+:deep(.project-dialog-card) {
+  background: white !important;
+}
+
+[data-theme="dark"] :deep(.project-dialog-card) {
+  background: #2c2c2c !important;
+}
+
+:deep(.v-card.project-dialog-card) {
+  background: white !important;
+}
+
+[data-theme="dark"] :deep(.v-card.project-dialog-card) {
+  background: #2c2c2c !important;
 }
 </style>
