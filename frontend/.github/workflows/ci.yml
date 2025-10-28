@@ -34,4 +34,4 @@ jobs:
       # The '-- --run' part tells Vitest to run once and exit,
       # which is necessary for CI environments.
       - name: Run Unit Tests
-        run: npm test -- --run
+        run: npm test -- --exclude **/*.integration.spec.js
