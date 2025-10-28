@@ -111,15 +111,25 @@
         </div>
       </div>
       
-
-      <div class="main-view-area">
+      <div class="main-view-area" style="width: 100%;">
         <div class="view-header">
-          <div class="header-left">
+          <div class="header-left" style="flex: 1 1 auto; min-width: 0;">
             <h1>Good Morning, {{ currentUser?.name || 'User' }}!</h1>
             <p class="date-subtitle">It's {{ currentFormattedDate }}</p>
           </div>
           
           <div class="header-right">
+            
+            <v-btn 
+              icon="mdi-archive-arrow-down-outline" 
+              size="default" 
+              variant="flat" 
+              color="primary-lighten-2" 
+              @click="showArchived = true"
+              class="archive-btn"
+              rounded="lg"
+            />
+            
             <v-btn
               color="primary"
               prepend-icon="mdi-plus"
@@ -129,19 +139,7 @@
             >
               Add Task
             </v-btn>
-            <v-menu v-model="menu" :close-on-content-click="false" offset-y>
-              <template #activator="{ props }">
-                <v-btn icon v-bind="props" variant="text" class="triple-dot-btn">
-                  <v-icon>mdi-dots-vertical</v-icon>
-                </v-btn>
-              </template>
-              <v-list>
-                <v-list-item @click="showArchived = true">
-                  <v-list-item-title>Archived Tasks</v-list-item-title>
-                  <ArchivedTasks :show="showArchived" @close="showArchived = false" />
-                </v-list-item>
-              </v-list>
-            </v-menu>
+            
           </div>
         </div>
 
@@ -489,6 +487,8 @@
       @open-attachment="openAttachment" 
       @archive="archiveTask"
     />
+
+    <ArchivedTasks :show="showArchived" @close="showArchived = false" />
 
     <CreateTaskDialogue
       v-model="showCreateDialog"

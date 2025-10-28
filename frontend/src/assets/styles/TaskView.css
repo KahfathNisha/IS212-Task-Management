@@ -1,4 +1,3 @@
-
 /* ===========================
    Main Container
    =========================== */
@@ -138,10 +137,7 @@
 }
 
 /* ===========================
-   Calendar Area
-   =========================== */
-/* ===========================
-   Main View Area
+   Main View Area & Header
    =========================== */
 .main-view-area {
   flex: 1;
@@ -154,13 +150,31 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px 12px 24px;
+  
+  /* FIX: Minimal horizontal padding */
+  padding: 16px 8px 12px 8px; 
+  
   background: transparent;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .view-header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Archive Button Styling */
+.archive-btn {
+  /* FIX: Set size explicitly and remove any margins/padding */
+  min-width: 36px !important; 
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  padding: 0 !important; 
+  
+  /* Styling from screenshot */
+  background: rgba(107, 155, 107, 0.5) !important;
+  color: #6b9b6b !important;
+  box-shadow: none !important;
 }
 
 .view-controls {
@@ -207,8 +221,16 @@
 }
 
 .header-right {
+  /* FIX: Ensure flex properties are active for alignment */
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between the two buttons */
+  
   flex-shrink: 0;
   min-width: 0;
+  
+  /* FIX: Removed conflicting padding-right: 10px; */
+  /* padding-right: 10px; */ 
 }
 
 /* ===========================
@@ -264,8 +286,6 @@
   border: 1px solid #5a7a9b !important;
 }
 
-/* Find where your other task styles are (e.g., after .upcoming-task.overdue) */
-
 /* 🟢 START OF OVERDUE FIXES FOR CALENDAR VIEW */
 .task-item.task-overdue,
 .week-task-item.task-overdue {
@@ -308,6 +328,13 @@
 
 /* Add Task button - force green in light mode, blue in dark mode */
 :deep(.v-btn[prepend-icon="mdi-plus"]) {
+  /* FIX: Ensure the button is compact and has no margins */
+  height: 36px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+  margin: 0 !important; 
+  white-space: nowrap;
+  
   background: #6b9b6b !important;
   color: white !important;
   border: none !important;
