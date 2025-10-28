@@ -5,6 +5,8 @@ const { verifyToken } = require('../middleware/auth.js');
 
 router.get('/', verifyToken, projectsController.getAllProjects);
 router.get('/:id', verifyToken, projectsController.getProject);
+router.post('/', verifyToken, projectsController.createProject);
+router.put('/:id', verifyToken, projectsController.updateProject);
 
 // Category management routes
 router.post('/:id/categories', verifyToken, projectsController.addCategory);

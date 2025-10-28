@@ -7,7 +7,7 @@ import LoginView from '@/views/LoginView.vue';
 import PasswordResetView from '@/views/PasswordResetView.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import TasksView from '@/views/Tasks.vue';
-import ProjectsView from '@/views/Projects.vue'; // ADD THIS
+import ProjectsView from '@/views/Projects.vue'; 
 import ReportsView from '@/views/Reports.vue';
 import ProfileView from '@/views/Profile.vue';
 import SettingsView from '@/views/Settings.vue';
