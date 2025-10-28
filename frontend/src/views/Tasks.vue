@@ -111,6 +111,7 @@
         </div>
       </div>
       
+
       <div class="main-view-area" style="width: 100%;">
         <div class="view-header">
           <div class="header-left" style="flex: 1 1 auto; min-width: 0;">
@@ -255,6 +256,9 @@
                   placeholder="Search priorities"
                   class="search-input"
                 />
+                <div class="filter-count-display" style="font-size: 0.75rem; border-radius: 0; border-top: 1px solid #eee; text-align: center;">
+                  Showing {{ priorityFilteredTaskCount }} tasks with current selections
+                </div>
                 <div class="filter-options-list">
                   <label
                     v-for="option in filteredPriorityOptions"
@@ -290,6 +294,9 @@
                   placeholder="Search assignees"
                   class="search-input"
                 />
+                <div class="filter-count-display" style="font-size: 0.75rem; border-radius: 0; border-top: 1px solid #eee; text-align: center;">
+                  Showing {{ assigneeFilteredTaskCount }} tasks with current selections
+                </div>
                 <div class="filter-options-list">
                   <label
                     v-for="option in filteredAssigneeOptions"
@@ -568,54 +575,99 @@ const tasks = ref([]) // This will hold ALL tasks from the backend
 const projects = ref([]) // Will hold projects from Firebase
 const loadingProjects = ref(false)
 
-// --- 1. THIS IS THE NEW CENTRAL FILTER (FIXED) ---
-// This computed property returns only the tasks that the current user should see.
+// --- TASK VISIBILITY ---
 const userVisibleTasks = computed(() => {
   if (!currentUser.value || !currentUser.value.name) {
-    // If there's no user logged in, show no tasks.
     return [];
   }
   
   const userName = currentUser.value.name;
-  // Access the user's role from the auth store
   const userRole = authStore.userRole; 
-  
-  // 💥 FIX: Define the local alias 'currentDept' here by accessing the global computed ref's value
   const currentDept = userDepartment.value; 
 
-  // RBAC: HR role can see all tasks (Override logic)
   if (userRole === 'hr' || userRole === 'director') {
     return tasks.value; 
   }
 
-  // Standard visibility logic for Staff, Manager, Director, etc.
   return tasks.value.filter(task => {
-    // Check if the user is the task owner
     const isOwner = task.taskOwner === userName;
-    
-    // Check if the user is the assignee
     const isAssignee = task.assignedTo === userName;
-
-    // Check if the user is a collaborator
     const isCollaborator = Array.isArray(task.collaborators) && 
                            task.collaborators.some(c => c.name === userName);
-
-    // 🌟 UPDATED CHECK: Task is visible if its owner's department matches the user's department
     const isDepartmentTask = currentDept && task.taskOwnerDepartment === currentDept;
 
-    // The task is visible if ANY of these conditions are true
     return isOwner || isAssignee || isCollaborator || isDepartmentTask;
   });
 });
 
+// --- DYNAMIC FILTER OPTIONS & COUNTS ---
 
-// --- 2. ALL OTHER COMPUTED PROPERTIES ARE NOW UPDATED ---
-// They now use 'userVisibleTasks' as their starting point instead of the raw 'tasks' list.
+const departmentFilteredTaskCount = computed(() => {
+  let filtered = userVisibleTasks.value;
+  
+  if (tempSelectedDepartments.value.length > 0) {
+    filtered = filtered.filter(task => 
+      tempSelectedDepartments.value.includes(task.taskOwnerDepartment)
+    );
+  }
+  
+  return filtered.length;
+});
 
+const priorityFilteredTaskCount = computed(() => {
+  let filtered = userVisibleTasks.value;
+  
+  if (tempSelectedPriorities.value.length > 0) {
+    filtered = filtered.filter(task => 
+      tempSelectedPriorities.value.includes(task.priority)
+    );
+  }
+  
+  return filtered.length;
+});
+
+const assigneeFilteredTaskCount = computed(() => {
+  let filtered = userVisibleTasks.value;
+  
+  if (tempSelectedAssignees.value.length > 0) {
+    filtered = filtered.filter(task => 
+      tempSelectedAssignees.value.includes(task.assignedTo)
+    );
+  }
+  
+  return filtered.length;
+});
+
+// FIX: Scopes assignee list based on user role/department
+const assigneeFilterOptions = computed(() => {
+    const currentUserName = currentUser.value?.name;
+    const currentUserDept = userDepartment.value;
+    const userRole = authStore.userRole;
+    
+    // Create the base array of member objects
+    let options = teamMembers.map(member => ({ 
+        title: member.text, 
+        value: member.value,
+        department: member.department 
+    }));
+    
+    // If the user is HR or Director, return everyone (Org-wide scope)
+    if (userRole === 'hr' || userRole === 'director') {
+        return options;
+    }
+    
+    // Standard user sees only their department/themselves
+    return options.filter(member => 
+        member.department === currentUserDept || member.value === currentUserName
+    );
+});
+
+
+// --- TASK LISTS ---
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0];
   const filtered = userVisibleTasks.value.filter(task => task.dueDate === today && task.status !== 'Completed');
-  return filterTasks(filtered); // Applies secondary filters like priority, etc.
+  return filterTasks(filtered); 
 })
 
 const weekTasks = computed(() => {
@@ -637,15 +689,12 @@ const overdueTasks = computed(() => {
 })
 
 const filteredTasksList = computed(() => {
-  // The list view should show only visible tasks, plus any other active filters
   return filterTasks(userVisibleTasks.value);
 })
 
 
-// --- 3. THE 'getTasksForDate' FUNCTION IS ALSO UPDATED ---
 const getTasksForDate = (dateKey) => {
   let items = [];
-  // We iterate over the pre-filtered visible tasks list
   userVisibleTasks.value.forEach(task => {
     const taskDate = task.dueDate?.split('T')[0];
     if (task.subtasks && task.subtasks.length > 0) {
@@ -660,12 +709,11 @@ const getTasksForDate = (dateKey) => {
       items.push(task);
     }
   });
-  // Secondary filters (priority, etc.) are still applied at the end
   return filterTasks(items);
 }
 
 
-// --- The rest of your script setup remains unchanged ---
+// --- CORE FILTERS & DATA ---
 const viewMode = ref('month')
 const currentDate = ref(new Date())
 const viewType = ref('calendar')
@@ -722,7 +770,6 @@ const snackbarColor = ref('success')
 
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const teamMembers = [
-    // Ensure all departments are capitalized or consistently formatted (e.g., 'HR' not 'hr')
     { text: 'John Doe', value: 'John Doe', department: 'Engineering' },
     { text: 'Michael Brown', value: 'Michael Brown', department: 'Engineering' },
     { text: 'Sally Loh', value: 'Sally Loh', department: 'HR' },
@@ -750,20 +797,6 @@ const newTask = ref({
   projectId: null
 })
 
-const departmentFilteredTaskCount = computed(() => {
-  // Start with all user visible tasks
-  let filtered = userVisibleTasks.value;
-  
-  // Apply only the temporary department selections
-  if (tempSelectedDepartments.value.length > 0) {
-    filtered = filtered.filter(task => 
-      tempSelectedDepartments.value.includes(task.taskOwnerDepartment)
-    );
-  }
-  
-  return filtered.length;
-});
-
 const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
 const taskStatuses = ['Ongoing', 'Completed', 'Pending Review', 'Unassigned']
 const priorities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -778,12 +811,6 @@ const priorityFilterOptions = [
   { title: 'Priority 8', value: 8 },
   { title: 'Priority 9', value: 9 },
   { title: 'Priority 10', value: 10 }
-]
-
-const assigneeFilterOptions = [
-  { title: 'John Doe', value: 'John Doe' },
-  { title: 'Jane Smith', value: 'Jane Smith' },
-  { title: 'Alice Johnson', value: 'Alice Johnson' }
 ]
 
 const subtasks = ref([])
@@ -913,6 +940,7 @@ const isTaskOverdue = (dueDate, status) => {
   return dueDateOnly < todayDateOnly;
 };
 
+// FIX: Correctly filters tasks using taskOwnerDepartment
 const filterTasks = (taskArray) => {
     let filtered = taskArray;
     if (selectedPriorities.value.length > 0) {
@@ -921,14 +949,11 @@ const filterTasks = (taskArray) => {
     if (selectedAssignees.value.length > 0) {
         filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo));
     }
-    
-    // 💥 THE FIX: Use the existing 'taskOwnerDepartment' field for filtering
     if (selectedDepartments.value.length > 0) {
         filtered = filtered.filter(task => 
             selectedDepartments.value.includes(task.taskOwnerDepartment)
         );
     }
-    
     return filtered;
 }
 
@@ -944,8 +969,11 @@ const filteredPriorityOptions = computed(() => {
   return priorityFilterOptions.filter(opt => opt.title.toLowerCase().includes(searchPriority.value.toLowerCase()))
 })
 
+// FIX: Correctly filters the SCOPED assignee list using the search query
 const filteredAssigneeOptions = computed(() => {
-  return assigneeFilterOptions.filter(opt => opt.title.toLowerCase().includes(searchAssignee.value.toLowerCase()))
+  return assigneeFilterOptions.value.filter(opt => 
+    opt.title.toLowerCase().includes(searchAssignee.value.toLowerCase())
+  )
 })
 
 const filteredDepartmentOptions = computed(() => {
@@ -958,7 +986,7 @@ const selectedFilters = computed(() => {
   return [
     ...selectedDepartments.value.map(d => ({ key: `department-${d}`, label: d, type: 'department', value: d })),
     ...selectedPriorities.value.map(p => ({ key: `priority-${p}`, label: priorityFilterOptions.find(o => o.value === p)?.title || p, type: 'priority', value: p })),
-    ...selectedAssignees.value.map(a => ({ key: `assignee-${a}`, label: assigneeFilterOptions.find(o => o.value === a)?.title || a, type: 'assignee', value: a }))
+    ...selectedAssignees.value.map(a => ({ key: `assignee-${a}`, label: assigneeFilterOptions.value.find(o => o.value === a)?.title || a, type: 'assignee', value: a }))
   ]
 })
 
