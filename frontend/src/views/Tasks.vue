@@ -219,6 +219,9 @@
                   placeholder="Search departments"
                   class="search-input"
                 />
+                <div class="filter-count-display" style="font-size: 0.75rem; border-radius: 0; border-top: 1px solid #eee; text-align: center;">
+                  Showing {{ departmentFilteredTaskCount }} tasks with current selections
+                </div>
                 <div class="filter-options-list">
                   <label
                     v-for="option in filteredDepartmentOptions"
@@ -747,6 +750,20 @@ const newTask = ref({
   projectId: null
 })
 
+const departmentFilteredTaskCount = computed(() => {
+  // Start with all user visible tasks
+  let filtered = userVisibleTasks.value;
+  
+  // Apply only the temporary department selections
+  if (tempSelectedDepartments.value.length > 0) {
+    filtered = filtered.filter(task => 
+      tempSelectedDepartments.value.includes(task.taskOwnerDepartment)
+    );
+  }
+  
+  return filtered.length;
+});
+
 const taskTypes = ['Task', 'Meeting', 'Deadline', 'Review']
 const taskStatuses = ['Ongoing', 'Completed', 'Pending Review', 'Unassigned']
 const priorities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -904,9 +921,14 @@ const filterTasks = (taskArray) => {
     if (selectedAssignees.value.length > 0) {
         filtered = filtered.filter(task => selectedAssignees.value.includes(task.assignedTo));
     }
+    
+    // 💥 THE FIX: Use the existing 'taskOwnerDepartment' field for filtering
     if (selectedDepartments.value.length > 0) {
-        filtered = filtered.filter(task => selectedDepartments.value.includes(task.department));
+        filtered = filtered.filter(task => 
+            selectedDepartments.value.includes(task.taskOwnerDepartment)
+        );
     }
+    
     return filtered;
 }
 
