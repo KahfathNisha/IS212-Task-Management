@@ -41,9 +41,36 @@
 
               <!-- Email Reminder Settings -->
               <div v-if="settings.emailEnabled">
+                <!-- Email Reassignment Notifications -->
+                <div class="mb-4">
+                  <p class="text-subtitle-2 mb-2">Task Reassignment Notifications:</p>
+                  <v-list>
+                    <v-list-item>
+                      <v-switch
+                        v-model="settings.emailReassignmentAdd"
+                        label="Task Assignments"
+                        details="Receive email when you are assigned to a new task."
+                        color="primary"
+                        inset
+                        hide-details
+                      ></v-switch>
+                    </v-list-item>
+                    <v-list-item>
+                      <v-switch
+                        v-model="settings.emailReassignmentRemove"
+                        label="Task Removals"
+                        details="Receive email when you are removed from a task."
+                        color="primary"
+                        inset
+                        hide-details
+                      ></v-switch>
+                    </v-list-item>
+                  </v-list>
+                </div>
+
                 <!-- Default Preset Display -->
                 <div v-if="settings.emailReminderType === 'preset'">
-                  <p class="text-subtitle-2 mb-3">Reminder Schedule:</p>
+                  <p class="text-subtitle-2 mb-3">Deadline Reminder Schedule:</p>
                   <div class="d-flex flex-wrap gap-4 mb-6">
                     <v-chip
                       v-for="day in [7, 3, 1]"
@@ -283,6 +310,8 @@ const settings = ref({
   emailReminderType: 'preset',
   emailPresetReminders: [1, 3, 7],
   emailCustomReminders: [],
+  emailReassignmentAdd: true,
+  emailReassignmentRemove: true,
   timezone: 'UTC',
   TASK_UPDATE: true,
   TASK_REASSIGNMENT_ADD: true,
@@ -329,6 +358,8 @@ async function loadUserSettings(email) {
         emailReminderType: 'preset',
         emailPresetReminders: [1, 3, 7],
         emailCustomReminders: [],
+        emailReassignmentAdd: true,
+        emailReassignmentRemove: true,
         timezone: 'UTC',
         pushEnabled: true
       };

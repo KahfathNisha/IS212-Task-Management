@@ -1,6 +1,5 @@
 const { db, admin } = require('../config/firebase');
 const taskModel = require('../models/taskModel');
-const NotificationService = require('../services/notificationService');
 
 // --- Helper function for Timestamp conversion ---
 const formatTimestampToISO = (timestamp) => {
@@ -317,9 +316,18 @@ exports.updateTask = async (req, res) => {
         // ADDED: Include taskOwnerDepartment in updateData
         if (taskOwnerDepartment !== undefined) updateData.taskOwnerDepartment = taskOwnerDepartment;
 
+        // Check for assignee changes to trigger email notifications
+        const oldAssigneeId = originalTask.assigneeId;
+        const newAssigneeId = otherFields.assigneeId;
+
         const { id, createdAt, ...finalUpdateData } = updateData;
 
         await docRef.update(finalUpdateData);
+
+        // Send reassignment emails if assignee changed
+        if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId) {
+            sendReassignmentEmails(req.params.id, newAssigneeId, oldAssigneeId, loggedInUser.name);
+        }
 
         // Update project stats if projectId changed
         if (otherFields.projectId !== undefined) {
@@ -474,58 +482,89 @@ exports.updateTaskStatus = async (req, res) => {
     }
 };
 
+// Helper function to send reassignment emails
+const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reassignedBy) => {
+    try {
+        const taskDoc = await db.collection('tasks').doc(taskId).get();
+        if (!taskDoc.exists) return;
+
+        const taskData = taskDoc.data();
+        const reassignmentTime = admin.firestore.Timestamp.now();
+
+        // Send email to new assignee if assigned
+        if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
+            const newAssigneeDoc = await db.collection('users').doc(newAssigneeId).get();
+            if (newAssigneeDoc.exists()) {
+                const newAssigneeData = newAssigneeDoc.data();
+                const settings = newAssigneeData.notificationSettings || {};
+
+                if (settings.emailEnabled && settings.emailReassignmentAdd) {
+                    await EmailService.sendReassignmentNotification(
+                        newAssigneeId, // email is the document ID
+                        taskData,
+                        'assigned',
+                        reassignedBy,
+                        reassignmentTime,
+                        newAssigneeData.timezone || 'UTC'
+                    );
+                }
+            }
+        }
+
+        // Send email to old assignee if removed
+        if (oldAssigneeId && oldAssigneeId !== newAssigneeId) {
+            const oldAssigneeDoc = await db.collection('users').doc(oldAssigneeId).get();
+            if (oldAssigneeDoc.exists()) {
+                const oldAssigneeData = oldAssigneeDoc.data();
+                const settings = oldAssigneeData.notificationSettings || {};
+
+                if (settings.emailEnabled && settings.emailReassignmentRemove) {
+                    await EmailService.sendReassignmentNotification(
+                        oldAssigneeId, // email is the document ID
+                        taskData,
+                        'removed',
+                        reassignedBy,
+                        reassignmentTime,
+                        oldAssigneeData.timezone || 'UTC'
+                    );
+                }
+            }
+        }
+
+        // Send confirmation to original task owner if different from reassignedBy
+        if (taskData.taskOwner && taskData.taskOwner !== reassignedBy) {
+            const ownerDoc = await db.collection('users').where('name', '==', taskData.taskOwner).get();
+            if (!ownerDoc.empty) {
+                const ownerData = ownerDoc.docs[0].data();
+                const ownerEmail = ownerDoc.docs[0].id;
+                const settings = ownerData.notificationSettings || {};
+
+                if (settings.emailEnabled) {
+                    await EmailService.sendReassignmentNotification(
+                        ownerEmail,
+                        taskData,
+                        'transferred', // Special type for owner confirmation
+                        reassignedBy,
+                        reassignmentTime,
+                        ownerData.timezone || 'UTC'
+                    );
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error sending reassignment emails:', error);
+        // Don't throw error to avoid breaking the main flow
+    }
+};
+
 // Assign task
 exports.assignTask = async (req, res) => {
     try {
         const { assigneeId } = req.body;
-        
-        // Get the task details for notifications
-        const taskDoc = await db.collection('tasks').doc(req.params.id).get();
-        const task = taskDoc.data();
-        
-        // Notify old assignee if they were unassigned
-        if (task.assigneeId && task.assigneeId !== assigneeId) {
-            try {
-                const unassignNotificationData = {
-                    title: `Removed from Task`,
-                    body: `You are no longer assigned to task "${task.title}"`,
-                    taskId: req.params.id,
-                    type: 'info'
-                };
-
-                await NotificationService.sendNotification(task.assigneeId, unassignNotificationData, {
-                    sendPush: false,
-                    sendEmail: false
-                });
-            } catch (error) {
-                console.error('Failed to send unassignment notification:', error);
-            }
-        }
-        
         await db.collection('tasks').doc(req.params.id).update({
             assigneeId,
             updatedAt: admin.firestore.Timestamp.now()
         });
-        
-        // Notify new assignee
-        if (assigneeId) {
-            try {
-                const assignNotificationData = {
-                    title: `Task Assigned`,
-                    body: `You have been assigned to task "${task.title}"`,
-                    taskId: req.params.id,
-                    type: 'info'
-                };
-
-                await NotificationService.sendNotification(assigneeId, assignNotificationData, {
-                    sendPush: false,
-                    sendEmail: false
-                });
-            } catch (error) {
-                console.error('Failed to send assignment notification:', error);
-            }
-        }
-        
         res.status(200).json({ message: 'Task assigned successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });

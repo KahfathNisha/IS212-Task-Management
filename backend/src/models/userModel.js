@@ -29,11 +29,13 @@ const userModel = {
         TASK_REASSIGNMENT_ADD: true,          // Notifications when assigned to tasks
         TASK_REASSIGNMENT_REMOVE: true,       // Notifications when removed from tasks
 
-        // Email notification preferences (for deadline reminders)
+        // Email notification preferences
         emailEnabled: true,                   // Master toggle for email notifications
         emailReminderType: 'preset',          // 'preset' or 'custom'
         emailPresetReminders: [1, 3, 7],      // Default preset: days before deadline (1, 3, 7)
         emailCustomReminders: [],             // Custom reminders: array of hours before deadline
+        emailReassignmentAdd: true,           // Email notifications when assigned to tasks
+        emailReassignmentRemove: true,        // Email notifications when removed from tasks
         pushEnabled: true                     // Toggle for push notifications
     },
     

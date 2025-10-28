@@ -48,6 +48,66 @@ class EmailService {
             throw error;
         }
     }
+
+    //  method parameters:
+    // - userEmail: The recipient's email address
+    // - taskData: Object containing task details (title, dueDate, description, priority, id)
+    // - reassignmentType: 'assigned' or 'removed'
+    // - reassignedBy: Name of the person who made the reassignment
+    // - reassignmentTime: Timestamp when reassignment occurred
+    // - userTimezone: User's timezone string (e.g., 'America/New_York') for localized timestamp display
+    static async sendReassignmentNotification(userEmail, taskData, reassignmentType, reassignedBy, reassignmentTime, userTimezone) {
+        const subject = `Task Reassignment: ${taskData.title}`;
+
+        // Convert Firestore timestamps to user's timezone
+        const dueDate = new Date(taskData.dueDate.toDate());
+        const userDueDate = new Intl.DateTimeFormat('en-US', {
+            timeZone: userTimezone,
+            dateStyle: 'full',
+            timeStyle: 'short'
+        }).format(dueDate);
+
+        const reassignmentDateTime = new Date(reassignmentTime.toDate());
+        const userReassignmentTime = new Intl.DateTimeFormat('en-US', {
+            timeZone: userTimezone,
+            dateStyle: 'full',
+            timeStyle: 'short'
+        }).format(reassignmentDateTime);
+
+        // Determine action text
+        const actionText = reassignmentType === 'assigned' ? 'assigned to' : 'removed from';
+
+        // email body
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Task Reassignment Notification</h2>
+                <p><strong>Task:</strong> ${taskData.title}</p>
+                <p><strong>Action:</strong> You have been ${actionText} this task</p>
+                <p><strong>Reassigned by:</strong> ${reassignedBy}</p>
+                <p><strong>Reassignment Time:</strong> ${userReassignmentTime}</p>
+                <p><strong>Priority:</strong> ${taskData.priority || 'Not specified'}</p>
+                <p><strong>Due Date:</strong> ${userDueDate}</p>
+                ${taskData.description ? `<p><strong>Description:</strong> ${taskData.description}</p>` : ''}
+                <p><a href="${process.env.FRONTEND_URL}/tasks/${taskData.id}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Task</a></p>
+            </div>
+        `;
+
+        // to construct the email message obj
+        const msg = {
+            to: userEmail,
+            from: process.env.SENDGRID_FROM_EMAIL, // Verified sender email
+            subject: subject,
+            html: html
+        };
+
+        try {
+            await sgMail.send(msg);
+            console.log(`Reassignment email sent to ${userEmail} for task ${taskData.title} (${reassignmentType})`);
+        } catch (error) {
+            console.error('Reassignment email send error:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = EmailService;
