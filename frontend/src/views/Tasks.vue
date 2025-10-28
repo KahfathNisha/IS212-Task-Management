@@ -818,11 +818,6 @@ const priorityFilterOptions = [
   { title: 'Priority 10', value: 10 }
 ]
 
-const assigneeFilterOptions = [
-  { title: 'John Doe', value: 'john.doe@company.com' },
-  { title: 'Jane Smith', value: 'jane.smith@company.com' },
-  { title: 'Alice Johnson', value: 'alice.johnson@company.com' }
-]
 
 const subtasks = ref([])
 
