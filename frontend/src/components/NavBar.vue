@@ -2,10 +2,12 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUIStore } from '../stores/useUIStore'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const uiStore = useUIStore()
+const authStore = useAuthStore()
 const isOpen = ref(false)
 const isDarkMode = ref(false)
 const showProjectDialog = ref(false)
@@ -42,10 +44,9 @@ const menuItems = [
 const pageTitle = computed(() => {
   const titles = {
     '/': 'Home',
-    '/projects': 'Projects',
-    '/tasks': 'Task Management Board',
+    '/projects': 'Projects Board',
+    '/tasks': 'Tasks Board',
     '/reports': 'Reports',
-    '/dashboards': 'Dashboards',
     '/notifications': 'Notifications',
     '/profile': 'Profile',
     '/settings': 'Settings'
@@ -84,8 +85,13 @@ const handleSettings = () => {
   router.push('/settings')
 }
 
-const handleLogout = () => {
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    const result = await authStore.logout()
+    router.push(result.redirect)
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
 }
 
 const toggleTheme = () => {
@@ -146,31 +152,7 @@ const toggleTheme = () => {
             </router-link>
           </div>
         </div>
-
-        <!-- Workspaces/Project Filters Section -->
-        <div class="projects-section">
-          <div class="projects-header">
-            <h3>Workspaces</h3>
-            <v-btn icon="mdi-plus" size="small" variant="text" @click="showProjectDialog = true" />
-          </div>
-          
-          <div class="projects-list">
-            <div 
-              v-for="project in projects" 
-              :key="project.id"
-              class="project-item" 
-              :class="{ 'active-project': selectedProject === project.id }"
-              @click="selectProject(project.id)"
-            >
-              <v-icon class="project-icon" size="14" :color="project.color">mdi-circle</v-icon>
-              <span>{{ project.name }}</span>
-            </div>
-            <div class="project-item" @click="showProjectDialog = true">
-              <v-icon class="project-icon" size="14" color="purple">mdi-folder-plus</v-icon>
-              <span>Create Workspace</span>
-            </div>
-          </div>
-        </div>
+        
 
         <!-- Settings and Logout -->
         <div class="nav-bottom">

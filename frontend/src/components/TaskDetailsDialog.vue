@@ -105,6 +105,29 @@
             </div>
           </v-col>
         </v-row>
+
+        <v-row v-if="task.categories && task.categories.length > 0">
+          <v-col cols="12">
+            <div class="detail-section">
+              <div class="detail-section-icon-row">
+                <v-icon size="small" class="detail-icon">mdi-tag-multiple</v-icon>
+                <h4>Categories</h4>
+              </div>
+              <div class="categories-chips">
+                <v-chip
+                  v-for="category in task.categories"
+                  :key="category"
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  class="mr-2 mb-2"
+                >
+                  {{ category }}
+                </v-chip>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
         
         <v-row>
           <v-col cols="12">
@@ -705,5 +728,11 @@ const confirmArchive = () => {
 }
 .v-overlay__scrim {
   background: rgba(30, 30, 30, 0.7) !important;
+}
+.categories-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 </style>
