@@ -70,7 +70,6 @@
           </div>
 
           <v-select
-            v-if="localTask.projectId"
             v-model="localTask.categories"
             label="Categories"
             :items="availableCategories"
@@ -566,18 +565,29 @@ const onSave = () => {
 
 const availableCategories = ref([])
 
-const onProjectChange = async (projectId) => {
-  if (projectId) {
-    try {
-      const response = await axiosClient.get(`/projects/${projectId}`)
-      availableCategories.value = response.data.categories || []
-    } catch (error) {
-      console.error('Error fetching project categories:', error)
-    }
-  } else {
+// Load global categories from API
+const loadCategories = async () => {
+  try {
+    const response = await axiosClient.get('/categories')
+    availableCategories.value = response.data.map(cat => cat.name)
+    console.log('✅ Loaded categories for task:', availableCategories.value)
+  } catch (error) {
+    console.error('❌ Error loading categories:', error)
     availableCategories.value = []
-    localTask.value.categories = []
   }
+}
+
+// Load categories when dialog opens
+watch(() => props.show, (isOpen) => {
+  if (isOpen) {
+    console.log('🔄 Dialog opened, loading categories...')
+    loadCategories()
+  }
+})
+
+const onProjectChange = async (projectId) => {
+  // Projects don't affect categories anymore - categories are global
+  console.log('Project changed to:', projectId)
 }
 </script>
 

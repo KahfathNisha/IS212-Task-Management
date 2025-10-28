@@ -73,7 +73,7 @@
 
                 <!-- Login Button -->
                 <v-btn
-                  color="primary"
+                  color="secondary"
                   block
                   size="large"
                   :disabled="!valid || loading"
@@ -201,7 +201,7 @@ body, html {
 .login-wrapper {
   min-height: 100vh;
   width: 100vw;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f6fff1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -227,7 +227,7 @@ body, html {
 
 .login-card {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.98);
+  background: #ffffff;
   backdrop-filter: blur(10px);
   max-width: 100%;
   overflow: visible;

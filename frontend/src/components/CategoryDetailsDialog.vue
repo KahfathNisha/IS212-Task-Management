@@ -125,39 +125,6 @@
       <p>{{ searchQuery ? 'Try adjusting your search' : 'Create your first category to get started' }}</p>
     </div>
 
-    <!-- Add Global Category Dialog -->
-    <v-dialog v-model="showAddCategoryDialog" max-width="500px">
-      <v-card rounded="xl">
-        <v-card-title class="pa-6">
-          <h3>Add Global Category</h3>
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-6">
-          <v-text-field
-            v-model="newGlobalCategory"
-            label="Category Name"
-            placeholder="Enter category name"
-            variant="outlined"
-            density="comfortable"
-            autofocus
-            @keyup.enter="addGlobalCategory"
-          />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
-          <v-spacer />
-          <v-btn variant="text" @click="showAddCategoryDialog = false">Cancel</v-btn>
-          <v-btn
-            color="primary"
-            variant="flat"
-            :disabled="!newGlobalCategory.trim()"
-            @click="addGlobalCategory"
-          >
-            Add
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
     <!-- Category Detail Dialog -->
     <v-dialog v-model="showDetailDialog" max-width="800px">
@@ -200,11 +167,66 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Add Global Category Dialog -->
+    <v-dialog v-model="showAddCategoryDialog" max-width="500px">
+      <v-card rounded="xl">
+        <v-card-title class="pa-6">
+          <h3>Add Global Category</h3>
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-6">
+          <v-text-field
+            v-model="newGlobalCategory"
+            label="Category Name"
+            placeholder="Enter category name"
+            variant="outlined"
+            density="comfortable"
+            autofocus
+            @keyup.enter="addGlobalCategory"
+          />
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showAddCategoryDialog = false">Cancel</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :disabled="!newGlobalCategory.trim()"
+            @click="addGlobalCategory"
+          >
+            Add
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+
+import axios from 'axios'
+
+// Axios client setup
+const axiosClient = axios.create({
+  baseURL: 'http://localhost:3000',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+axiosClient.interceptors.request.use(config => {
+  const token = localStorage.getItem('firebaseIdToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+}, error => {
+  return Promise.reject(error)
+})
 
 const props = defineProps({
   projects: {
@@ -283,18 +305,40 @@ const getStatusColor = (status) => {
   return statusColors[status] || 'grey'
 }
 
-const addGlobalCategory = () => {
+const addGlobalCategory = async () => {
   const categoryName = newGlobalCategory.value.trim()
   if (!categoryName) return
   
-  emit('addGlobalCategory', categoryName)
-  newGlobalCategory.value = ''
-  showAddCategoryDialog.value = false
+  try {
+    // Call the API to create the category
+    const response = await axiosClient.post('/categories', {
+      name: categoryName
+    })
+    
+    // Emit event to parent to reload
+    emit('addGlobalCategory', response.data)
+    
+    newGlobalCategory.value = ''
+    showAddCategoryDialog.value = false
+  } catch (error) {
+    console.error('Error creating category:', error)
+    alert(error.response?.data?.error || 'Failed to create category')
+  }
 }
 
-const deleteCategory = (categoryName) => {
-  if (confirm(`Are you sure you want to delete the category "${categoryName}"? This will remove it from all projects.`)) {
+const deleteCategory = async (categoryName) => {
+  if (!confirm(`Are you sure you want to delete the category "${categoryName}"? This will remove it from all projects.`)) {
+    return
+  }
+  
+  try {
+    await axiosClient.delete(`/categories/${encodeURIComponent(categoryName)}`)
+    
+    // Emit event to parent to reload
     emit('deleteCategory', categoryName)
+  } catch (error) {
+    console.error('Error deleting category:', error)
+    alert(error.response?.data?.error || 'Failed to delete category')
   }
 }
 

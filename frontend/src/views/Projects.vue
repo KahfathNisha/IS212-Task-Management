@@ -636,7 +636,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { projectService } from '@/services/projectService'
 import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
@@ -744,6 +744,7 @@ const newProject = ref({
 // Real Firebase data
 const projects = ref([])
 const loadingProjects = ref(true)
+const globalCategories = ref([])
 
 // Load projects from Firebase
 const loadProjects = async () => {
@@ -771,21 +772,42 @@ const loadProjects = async () => {
     loadingProjects.value = false
   }
 }
+// Load global categories
+const loadCategories = async () => {
+  try {
+    const response = await axiosClient.get('/categories')
+    globalCategories.value = response.data
+    console.log('✅ Loaded categories:', response.data)
+  } catch (error) {
+    console.error('❌ Error loading categories:', error)
+    // Don't show error to user - categories are optional
+  }
+}
 
 // Load projects when component mounts
-onMounted(() => {
-  loadProjects()
+onMounted(async () => {
+  await loadCategories()  // Load global categories first
+  await loadProjects()     // Then load projects
 })
 
 
 // Computed
 const allCategories = computed(() => {
+  // Get categories from global collection
   const categories = new Set()
+  
+  // Add global categories
+  globalCategories.value.forEach(cat => {
+    categories.add(cat.name)
+  })
+  
+  // Also add categories from projects (in case some aren't in global yet)
   projects.value.forEach(project => {
     if (project.categories) {
       project.categories.forEach(cat => categories.add(cat))
     }
   })
+  
   return Array.from(categories).sort()
 })
 
@@ -1039,65 +1061,30 @@ const editProject = (project) => {
   showCreateDialog.value = true
 }
 
-// const manageCategoriesForProject = (project) => {
-//   selectedProjectForCategories.value = project
-//   showManageCategoriesDialog.value = true
-// }
-
-// const addCategory = () => {
-//   if (!newCategoryInput.value) return
-  
-//   const category = newCategoryInput.value.trim()
-//   if (category && !newProject.value.categories.includes(category)) {
-//     newProject.value.categories.push(category)
-//   }
-//   newCategoryInput.value = ''
-// }
-
-// const removeCategory = (category) => {
-//   newProject.value.categories = newProject.value.categories.filter(c => c !== category)
-// }
-
-// const addCategoryToProject = () => {
-//   if (!newCategoryInput.value || !selectedProjectForCategories.value) return
-  
-//   const category = newCategoryInput.value.trim()
-//   if (category && !selectedProjectForCategories.value.categories.includes(category)) {
-//     selectedProjectForCategories.value.categories.push(category)
-    
-//     // Update in main projects array
-//     const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
-//     if (index !== -1) {
-//       projects.value[index].categories.push(category)
-//     }
-//   }
-//   newCategoryInput.value = ''
-// }
-
-// const removeCategoryFromProject = (category) => {
-//   if (!selectedProjectForCategories.value) return
-  
-//   selectedProjectForCategories.value.categories = 
-//     selectedProjectForCategories.value.categories.filter(c => c !== category)
-  
-//   // Update in main projects array
-//   const index = projects.value.findIndex(p => p.id === selectedProjectForCategories.value.id)
-//   if (index !== -1) {
-//     projects.value[index].categories = 
-//       projects.value[index].categories.filter(c => c !== category)
-//   }
-// }
-
-const createGlobalCategory = () => {
-  if (!newGlobalCategory.value) return
-  
-  const category = newGlobalCategory.value.trim()
-  if (category && !allCategories.value.includes(category)) {
-    showMessage(`Category "${category}" created successfully`, 'success')
+const addGlobalCategory = async (category) => {
+  try {
+    // CategoriesDetail already created the category
+    // Just reload categories and projects
+    await loadCategories()
+    await loadProjects()
+    showMessage(`Category "${category.name}" added successfully`, 'success')
+  } catch (error) {
+    console.error('Error handling category addition:', error)
+    showMessage('Failed to refresh', 'error')
   }
-  
-  showAddCategoryDialog.value = false
-  newGlobalCategory.value = ''
+}
+
+const deleteGlobalCategory = async (categoryName) => {
+  try {
+    // CategoriesDetail already deleted the category
+    // Just reload categories and projects
+    await loadCategories()
+    await loadProjects()
+    showMessage(`Category "${categoryName}" removed successfully`, 'success')
+  } catch (error) {
+    console.error('Error handling category deletion:', error)
+    showMessage('Failed to refresh', 'error')
+  }
 }
 
 const saveProject = async () => {
@@ -1362,38 +1349,23 @@ const refreshProject = async (projectId) => {
     }
     
     // If this is the selected project, update it too
-    if (selectedProject.value && selectedProject.value.id === projectId) {
-      selectedProject.value = {
-        ...selectedProject.value,
-        totalTasks: updatedProject.totalTasks,
-        completedTasks: updatedProject.completedTasks,
-        progress: updatedProject.progress
-      };
-    }
+    // Update the project in the projects array
+    const projectIndex = projects.value.findIndex(p => p.id === projectId)
+      if (projectIndex !== -1) {
+        projects.value[projectIndex] = {
+          ...projects.value[projectIndex],
+          totalTasks: updatedProject.totalTasks,
+          completedTasks: updatedProject.completedTasks,
+          progress: updatedProject.progress
+        }
+      }
   } catch (error) {
     console.error('Error refreshing project:', error);
   }
 };
 
-// OPTION 1: Set up an interval to auto-refresh every 5 seconds
-onMounted(() => {
-  // ... your existing onMounted code ...
-  
-  // Auto-refresh project data every 5 seconds
-  const refreshInterval = setInterval(() => {
-    if (selectedProject.value) {
-      refreshProject(selectedProject.value.id);
-    }
-  }, 5000);
-  
-  // Clean up interval when component unmounts
-  onUnmounted(() => {
-    clearInterval(refreshInterval);
-  });
-});
 
 const projectTasks = ref([])
-const projectCategories = computed(() => selectedProject.value?.categories || [])
 
 const loadProjectTasks = async (projectId) => {
   try {
@@ -1406,41 +1378,7 @@ const loadProjectTasks = async (projectId) => {
   }
 }
 
-const addGlobalCategory = async (categoryName) => {
-  try {
-    // Add category to all selected projects or create a global list
-    // For now, we'll just show a success message
-    // You can enhance this to add to a global categories collection
-    showMessage(`Category "${categoryName}" created successfully`, 'success')
-    
-    // Reload projects to reflect changes
-    await loadProjects()
-  } catch (error) {
-    console.error('Error adding global category:', error)
-    showMessage('Failed to add category', 'error')
-  }
-}
 
-const deleteGlobalCategory = async (categoryName) => {
-  try {
-    // Remove category from all projects that have it
-    const projectsWithCategory = projects.value.filter(p => 
-      p.categories && p.categories.includes(categoryName)
-    )
-    
-    for (const project of projectsWithCategory) {
-      await axiosClient.delete(`/projects/${project.id}/categories/${encodeURIComponent(categoryName)}`)
-    }
-    
-    showMessage(`Category "${categoryName}" deleted from all projects`, 'success')
-    
-    // Reload projects
-    await loadProjects()
-  } catch (error) {
-    console.error('Error deleting category:', error)
-    showMessage('Failed to delete category', 'error')
-  }
-}
 
 
 
