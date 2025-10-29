@@ -212,7 +212,7 @@ import axios from 'axios'
 
 // Axios client setup
 const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: 'http://localhost:3000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -311,7 +311,7 @@ const addGlobalCategory = async () => {
   
   try {
     // Call the API to create the category
-    const response = await axiosClient.post('/api/categories', {
+    const response = await axiosClient.post('/categories', {
       name: categoryName
     })
     

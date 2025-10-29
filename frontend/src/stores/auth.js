@@ -30,13 +30,17 @@ export const useAuthStore = defineStore("auth", () => {
       if (firebaseUser) {
         user.value = firebaseUser;
         try {
-          const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email);
-          if (userDoc) {
-            userData.value = userDoc;
+          const idToken = await firebaseUser.getIdToken();
+          localStorage.setItem('firebaseIdToken', idToken);
+          const meResponse = await authApiClient.get('/me', {
+            headers: { Authorization: `Bearer ${idToken}` }
+          });
+          if (meResponse.data?.success) {
+            userData.value = meResponse.data.user;
             initializeListeners(firebaseUser.email);
           }
         } catch (err) {
-          console.error("Error fetching user data on auth state change:", err);
+          console.error("Error fetching user profile from backend:", err);
         }
         startSessionTimer();
         updateLastActivity();

@@ -1,6 +1,6 @@
 const express = require('express');
 const authController = require('../controllers/authController');
-const { loginRateLimiter } = require('../middleware/auth');
+const { loginRateLimiter, verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -45,5 +45,13 @@ router.post('/verify-security-answer', authController.verifySecurityAnswer);
  * Reset password with new password
  */
 router.post('/reset-password', authController.resetPassword);
+
+/**
+ * GET /api/auth/me
+ * Return the authenticated user's profile using Firebase token
+ */
+router.get('/me', verifyToken, (req, res) => {
+  return res.status(200).json({ success: true, user: req.user });
+});
 
 module.exports = router;

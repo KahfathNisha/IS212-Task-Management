@@ -535,11 +535,11 @@ import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
 import ArchivedTasks from '../components/ArchivedTasks.vue'
 import { useAuthStore } from '@/stores/auth'; // Import your auth store
-import { projectService } from '@/services/projectService'  // ADD THIS LINE
+// import { projectService } from '@/services/projectService'
 
 // Axios client configuration (this is correct)
 const axiosClient = axios.create({
-    baseURL: 'http://localhost:3000', 
+    baseURL: 'http://localhost:3000/api', 
     headers: {
         'Content-Type': 'application/json',
     },
@@ -828,7 +828,7 @@ onMounted(async () => {
   // Try to load tasks from backend
   try {
     console.log('📤 Fetching tasks from backend...')
-    const response = await axiosClient.get('/api/tasks');
+    const response = await axiosClient.get('/tasks');
     console.log('✅ Backend response:', response.data)
     
     const uniqueTasks = response.data.filter((task, index, self) =>
@@ -858,21 +858,13 @@ onMounted(async () => {
   }
 });
 
-// Load projects from Firebase
+// Load projects from backend API (avoid client Firestore permissions)
 const loadProjects = async () => {
   loadingProjects.value = true
   try {
-    const fetchedProjects = await projectService.getAllProjects(
-      authStore.userEmail,
-      authStore.userRole,
-      authStore.userData?.department
-    )
-    
-    // Format projects for dropdown (id and name)
-    projects.value = fetchedProjects.map(p => ({
-      title: p.name,  // Display name
-      value: p.id     // Store ID
-    }))
+    const projectsResponse = await axiosClient.get('/projects')
+    const fetchedProjects = projectsResponse.data || []
+    projects.value = fetchedProjects.map(p => ({ title: p.name, value: p.id }))
     
     console.log('📦 Loaded projects for tasks:', projects.value)
   } catch (error) {
@@ -1023,7 +1015,7 @@ const handleCreateSave = async (taskData) => {
       taskOwnerDepartment: payload.taskOwnerDepartment
     });
 
-    const response = await axiosClient.post('/api/tasks', payload);
+    const response = await axiosClient.post('/tasks', payload);
     console.log('✅ [Tasks.vue] Create task response:', response.status, response.data);
 
     const newTaskId = response.data.id;
@@ -1118,7 +1110,7 @@ const createTask = async () => {
       projectId: newTask.value.projectId || null,
       recurrence: newTask.value.recurrence || { enabled: false, type: '', interval: 1, startDate: null, endDate: null }
     };
-    const response = await axiosClient.post('/api/tasks', taskData); 
+    const response = await axiosClient.post('/tasks', taskData); 
     const newTaskWithId = { 
         ...taskData, 
         id: response.data.id,
