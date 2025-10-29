@@ -828,7 +828,7 @@ onMounted(async () => {
   // Try to load tasks from backend
   try {
     console.log('📤 Fetching tasks from backend...')
-    const response = await axiosClient.get('/tasks');
+    const response = await axiosClient.get('/api/tasks');
     console.log('✅ Backend response:', response.data)
     
     const uniqueTasks = response.data.filter((task, index, self) =>
@@ -1023,7 +1023,7 @@ const handleCreateSave = async (taskData) => {
       taskOwnerDepartment: payload.taskOwnerDepartment
     });
 
-    const response = await axiosClient.post('/tasks', payload);
+    const response = await axiosClient.post('/api/tasks', payload);
     console.log('✅ [Tasks.vue] Create task response:', response.status, response.data);
 
     const newTaskId = response.data.id;
@@ -1118,7 +1118,7 @@ const createTask = async () => {
       projectId: newTask.value.projectId || null,
       recurrence: newTask.value.recurrence || { enabled: false, type: '', interval: 1, startDate: null, endDate: null }
     };
-    const response = await axiosClient.post('/tasks', taskData); 
+    const response = await axiosClient.post('/api/tasks', taskData); 
     const newTaskWithId = { 
         ...taskData, 
         id: response.data.id,

@@ -311,7 +311,7 @@ const addGlobalCategory = async () => {
   
   try {
     // Call the API to create the category
-    const response = await axiosClient.post('/categories', {
+    const response = await axiosClient.post('/api/categories', {
       name: categoryName
     })
     

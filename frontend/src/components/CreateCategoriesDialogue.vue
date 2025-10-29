@@ -175,7 +175,7 @@ const addCategory = async () => {
   }
 
   try {
-    const response = await axiosClient.post(`/projects/${props.projectId}/categories`, {
+    const response = await axiosClient.post(`/api/projects/${props.projectId}/categories`, {
       category: categoryName
     })
     
@@ -191,7 +191,7 @@ const addCategory = async () => {
 
 const removeCategory = async (category) => {
   try {
-    const response = await axiosClient.delete(`/projects/${props.projectId}/categories/${encodeURIComponent(category)}`)
+    const response = await axiosClient.delete(`/api/projects/${props.projectId}/categories/${encodeURIComponent(category)}`)
     
     categories.value = response.data.categories
     showMessage('Category removed successfully', 'success')

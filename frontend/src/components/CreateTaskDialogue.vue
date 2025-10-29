@@ -568,7 +568,7 @@ const availableCategories = ref([])
 // Load global categories from API
 const loadCategories = async () => {
   try {
-    const response = await axiosClient.get('/categories')
+    const response = await axiosClient.get('/api/categories')
     availableCategories.value = response.data.map(cat => cat.name)
     console.log('✅ Loaded categories for task:', availableCategories.value)
   } catch (error) {
