@@ -3,8 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
-// We only import the functions we need, not the service itself initially
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,86 +14,68 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-console.log('🔥 Initializing Firebase with config:', { 
-  projectId: firebaseConfig.projectId,
-  authDomain: firebaseConfig.authDomain 
-});
+// Guard conditions
+const hasApiKey = Boolean(import.meta.env.VITE_FIREBASE_API_KEY);
+const isTest = Boolean(import.meta.env.VITEST); // Vite/Vitest set this when running tests
+const isBrowser = typeof window !== 'undefined';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// --- THIS IS THE FIX ---
-// 1. Declare 'messaging' only ONCE using 'let'.
+let app = null;
 let messaging = null;
+let auth = null;
+let db = null;
+let functions = null;
+let storage = null;
 
-// 2. Conditionally initialize it only if we are NOT in a test environment.
-if (typeof window !== 'undefined' && !import.meta.env.VITEST) {
+if (!isTest && hasApiKey && isBrowser) {
+  console.log('🔥 Initializing Firebase with config:', {
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+  });
+  app = initializeApp(firebaseConfig);
   try {
     messaging = getMessaging(app);
   } catch (err) {
-    console.warn("Firebase Messaging is not supported in this environment.", err);
+    console.warn('Firebase Messaging is not supported in this environment.', err);
   }
+  auth = getAuth(app);
+  db = getFirestore(app);
+  functions = getFunctions(app);
+  storage = getStorage(app);
+  console.log('✅ Firebase initialized successfully');
+} else {
+  if (isTest) console.log('⏸ Skipping Firebase initialization for test environment (VITEST).');
+  else if (!hasApiKey) console.warn('⚠️ Skipping Firebase initialization: missing VITE_FIREBASE_API_KEY.');
 }
 
-// Initialize other Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const functions = getFunctions(app);
-export const storage = getStorage(app);
-
-// Export the potentially null 'messaging' object and its related functions
-export { messaging, getToken, onMessage };
-
-console.log('✅ Firebase initialized successfully');
-
+// Collection names
 export const collections = {
+  projects: 'projects',
   users: 'users',
   tasks: 'tasks',
-  projects: 'projects',
-  passwordResets: 'passwordResets',
-  loginAttempts: 'loginAttempts',
-  notifications: 'notifications',
-  reports: 'reports'
+  notifications: 'notifications'
 };
 
-// Your existing helper functions are preserved and correct.
+// Firestore helper functions
 export const firestoreHelpers = {
-  createUserDocument: async (uid, userData) => {
-    const { doc, setDoc } = await import('firebase/firestore');
-    const userRef = doc(db, collections.users, userData.email);
-    const userDoc = {
-      uid,
-      email: userData.email,
-      name: userData.name || '',
-      role: userData.role || 'staff',
-      createdAt: new Date().toISOString(),
-      // ... other fields
-    };
-    await setDoc(userRef, userDoc, { merge: true });
-    return userDoc;
-  },
-
-  getUserByEmail: async (email) => {
-    const { doc, getDoc } = await import('firebase/firestore');
-    const userRef = doc(db, collections.users, email);
-    const userDoc = await getDoc(userRef);
-    return userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } : null;
-  },
-
-  updateLastLogin: async (email) => {
-    const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
-    const userRef = doc(db, collections.users, email);
-    await updateDoc(userRef, {
-      lastLogin: serverTimestamp(),
-      failedAttempts: 0,
-      lockedUntil: null
-    });
-  },
-
-  recordFailedLogin: async (email) => {
-    // ... your existing logic for this helper
+  async getUserByEmail(email) {
+    if (!db) return null;
+    try {
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const usersRef = collection(db, collections.users);
+      const q = query(usersRef, where('email', '==', email));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...doc.data() };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      return null;
+    }
   }
 };
 
+// Exports: in tests these will be null / mocked by Vitest setup
+export { auth, db, functions, storage, messaging, getToken, onMessage };
 export default app;
-

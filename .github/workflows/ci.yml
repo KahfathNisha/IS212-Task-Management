@@ -60,5 +60,5 @@ jobs:
       # - name: Run Unit Tests (Backend)
       #   # This assumes your backend has a test script
       #   # Add --run if your backend also uses Vitest
-      #   run: npm test -- --run
+        run: npm test -- --run
 

@@ -6,13 +6,15 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'jsdom',
+    setupFiles: './src/tests/setup.js',
     globals: true,
-    setupFiles: ['./src/tests/setup.js']
+    passWithNoTests: false,
   },
   resolve: {
     alias: {
       '@': resolve(__dirname, './src')
     }
-  }
+  },
+  css: false // Disable CSS processing to avoid .css file extension errors
 });
 
