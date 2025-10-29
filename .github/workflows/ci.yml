@@ -56,9 +56,7 @@ jobs:
         # Use npm ci for faster, more reliable installs in CI
         run: npm ci
 
-      # --- FIX: Commented out the entire step, not just the 'run' command ---
-      # - name: Run Unit Tests (Backend)
-      #   # This assumes your backend has a test script
-      #   # Add --run if your backend also uses Vitest
+      - name: Run Unit Tests (Backend)
         run: npm test -- --run
+
 
