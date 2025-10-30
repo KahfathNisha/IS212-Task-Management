@@ -122,6 +122,16 @@
           <div class="header-right">
             
             <v-btn 
+              icon="mdi-repeat" 
+              size="default" 
+              variant="flat" 
+              color="purple-lighten-2" 
+              @click="showRecurringTasks = true"
+              class="recurring-btn"
+              rounded="lg"
+            />
+            
+            <v-btn 
               icon="mdi-archive-arrow-down-outline" 
               size="default" 
               variant="flat" 
@@ -137,6 +147,7 @@
               @click="showCreateDialog = true"
               rounded="lg"
               class="add-task-btn"
+              size="default"
             >
               Add Task
             </v-btn>
@@ -496,6 +507,7 @@
     />
 
     <ArchivedTasks :show="showArchived" @close="showArchived = false" />
+    <RecurringTasksSidebar :show="showRecurringTasks" @close="showRecurringTasks = false" />
 
     <CreateTaskDialogue
       v-model="showCreateDialog"
@@ -534,6 +546,8 @@ import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
 import TimelineView from './Timeline.vue'
 import ListView from './ListView.vue'
 import ArchivedTasks from '../components/ArchivedTasks.vue'
+import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
+
 import { useAuthStore } from '@/stores/auth'; // Import your auth store
 // import { projectService } from '@/services/projectService'
 
@@ -775,6 +789,7 @@ const departmentFilterOptions = departments.map(dept => ({ title: dept, value: d
 
 const menu = ref(false)
 const showArchived = ref(false)
+const showRecurringTasks = ref(false)
 
 const newTask = ref({
   title: '',
@@ -1447,4 +1462,72 @@ const handleMessage = ({ message, color }) => showMessage(message, color);
 
 <style scoped>
 @import url('@/assets/styles/TaskView.css');
+
+.header-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  min-width: fit-content !important;
+}
+
+/* Ensure all icon buttons are the same size */
+.recurring-btn,
+.archive-btn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  flex-shrink: 0 !important;
+}
+
+.add-task-btn {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  height: 36px !important; /* Match icon buttons */
+  min-width: 80px !important; /* Reduced from 100px */
+  max-width: 100px !important; /* Add max width */
+  padding: 0 8px !important; /* Reduced padding */
+  font-size: 12
+  px !important; /* Smaller font */
+}
+
+/* Responsive adjustments if needed */
+@media (max-width: 1024px) {
+  .header-right {
+    gap: 6px !important;
+  }
+  
+  .recurring-btn,
+  .archive-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+  }
+  
+  .add-task-btn {
+    height: 32px !important;
+    min-width: 60px !important;
+    padding: 0 6px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Ensure the main header has proper flex behavior */
+.view-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  gap: 16px !important;
+  flex-wrap: nowrap !important;
+}
+
+.header-left {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.header-right {
+  flex: 0 0 auto !important; /* This prevents the right side from shrinking */
+}
 </style>
