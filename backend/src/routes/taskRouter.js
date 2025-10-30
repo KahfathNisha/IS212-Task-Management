@@ -13,6 +13,9 @@ router.get('/', verifyToken, taskController.getAllTasks);
 // Get all recurring tasks
 router.get('/recurring', verifyToken, taskController.getAllRecurringTasks);
 
+// Get tasks by project ID
+router.get('/project/:projectId', taskController.getTasksByProject);
+
 // Get a specific task by ID
 router.get('/:id', verifyToken, taskController.getTask);
 
@@ -35,7 +38,3 @@ router.put('/:id', verifyToken, taskController.updateTask);
 router.put('/recurring/:id', verifyToken, taskController.updateRecurringTask);
 
 module.exports = router;
-
-
-
-

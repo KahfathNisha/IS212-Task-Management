@@ -252,6 +252,39 @@ exports.getAllTasks = async (req, res) => {
     }
 };
 
+// Get Tasks by Project ID
+exports.getTasksByProject = async (req, res) => {
+    try {
+        const { projectId } = req.params; // Get projectId from URL params
+        
+        if (!projectId) {
+            return res.status(400).json({ error: 'Project ID is required' });
+        }
+
+        const tasksQuery = db.collection('tasks')
+            .where('projectId', '==', projectId)
+            .where('archived', '==', false);
+
+        const snapshot = await tasksQuery.get();
+        const tasks = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                dueDate: formatTimestampToISO(data.dueDate),
+                createdAt: formatTimestampToISO(data.createdAt),
+                updatedAt: formatTimestampToISO(data.updatedAt)
+            };
+        });
+
+        console.log(`Found ${tasks.length} tasks for project: ${projectId}`);
+        res.status(200).json(tasks);
+    } catch (err) {
+        console.error('Get tasks by project error:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // Update entire task
 exports.updateTask = async (req, res) => {
     try {
