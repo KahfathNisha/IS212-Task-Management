@@ -1,7 +1,10 @@
-import { createVuetify } from 'vuetify';
 import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
 
+import 'vuetify/labs/VDataTable/VDataTable.css';
+// Component Imports
+import { createVuetify } from 'vuetify';
+import { VDataTable } from 'vuetify/labs/VDataTable';
 import {
   VApp,
   VMain,
@@ -25,7 +28,6 @@ import {
   VSpacer,
   VListItemTitle,
   VIcon,
-
 } from 'vuetify/components';
 
 export default createVuetify({
@@ -52,9 +54,13 @@ export default createVuetify({
     VCol,
     VSpacer,
     VIcon,
-
+    VDataTable,
   },
   theme: {
-    defaultTheme: 'light',  // Optional: customize theme
+    defaultTheme: 'light', // Optional: customize theme
+  },
+  icons: {
+    defaultSet: 'mdi',
   },
 });
+
