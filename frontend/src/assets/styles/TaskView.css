@@ -143,7 +143,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; 
+  
+  /* 🌟 CRITICAL FIX: Ensure main view content does not obscure the fixed dropdown */
+  /* This is often needed to establish a lower stacking context for the main content */
+  /* if the dropdown is positioned relative to the body/viewport. */
+  position: relative; 
+  z-index: 1; /* Keep the main content *below* the dropdown (z-index: 1000) */
 }
 
 .view-header {

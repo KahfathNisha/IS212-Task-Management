@@ -644,26 +644,13 @@ const assigneeFilteredTaskCount = computed(() => {
 
 // FIX: Scopes assignee list based on user role/department
 const assigneeFilterOptions = computed(() => {
-    const currentUserName = currentUser.value?.name;
-    const currentUserDept = userDepartment.value;
-    const userRole = authStore.userRole;
-    
-    // Create the base array of member objects
-    let options = teamMembers.map(member => ({ 
+    // 🌟 MODIFIED: Return all team members for the filter list, 
+    // allowing the search input to handle large lists.
+    return teamMembers.map(member => ({ 
         title: member.text, 
         value: member.value,
         department: member.department 
     }));
-    
-    // If the user is HR or Director, return everyone (Org-wide scope)
-    if (userRole === 'hr' || userRole === 'director') {
-        return options;
-    }
-    
-    // Standard user sees only their department/themselves
-    return options.filter(member => 
-        member.department === currentUserDept || member.value === currentUserName
-    );
 });
 
 
