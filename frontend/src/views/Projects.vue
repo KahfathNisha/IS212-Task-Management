@@ -18,6 +18,14 @@
           >
             New Project
           </v-btn>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-plus"
+            @click="showAddDepartmentDialog = true"
+            rounded="lg"
+            v-if="authStore.userRole === 'director' || authStore.userRole === 'hr'">
+            New Department
+          </v-btn>
         </div>
       </header>
 
@@ -444,7 +452,7 @@
       <div v-else-if="currentView === 'workload'" class="workload-view">
         <div class="workload-grid">
           <div 
-            v-for="dept in departments" 
+            v-for="dept in visibleDepartments" 
             :key="dept"
             class="department-card"
           >
@@ -543,7 +551,7 @@
               <v-select
                 v-model="newProject.department"
                 label="Department *"
-                :items="departments"
+                :items="realDepartments"
                 variant="outlined"
                 density="comfortable"
               />
@@ -649,6 +657,24 @@
     >
       {{ snackbarMessage }}
     </v-snackbar>
+
+    <!-- Add Department Dialog -->
+    <v-dialog v-model="showAddDepartmentDialog" max-width="500px">
+      <v-card>
+        <v-card-title class="d-flex justify-space-between align-center">Add New Department
+          <v-btn icon size="small" @click="showAddDepartmentDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+        </v-card-title>
+        <v-card-text>
+          <v-text-field v-model="newDepartmentTitle" label="Department Title" :rules="[v => !!v || 'Department title is required']"/>
+          <v-autocomplete v-model="newDepartmentMembers" :items="allUsers" item-title="name" item-value="email" label="Add Members" multiple chips/>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer/>
+          <v-btn @click="showAddDepartmentDialog = false">Cancel</v-btn>
+          <v-btn color="primary" :loading="departmentWriteLoading" :disabled="!newDepartmentTitle || newDepartmentMembers.length == 0" @click="createDepartment">Create</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -658,6 +684,8 @@ import { useAuthStore } from '@/stores/auth'
 import { projectService } from '@/services/projectService'
 import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
 import axios from 'axios'
+import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -696,6 +724,13 @@ const snackbarColor = ref('success')
 const newCategoryInput = ref('')
 const newGlobalCategory = ref('')
 
+// State for Add Department Modal
+const showAddDepartmentDialog = ref(false);
+const newDepartmentTitle = ref('');
+const newDepartmentMembers = ref([]);
+const departmentWriteLoading = ref(false);
+const allUsers = ref([]);
+
 // View tabs
 const viewTabs = [
   { label: 'Projects', value: 'projects' },
@@ -731,16 +766,10 @@ const categoryDropdownRef = ref(null)
 
 // Constants
 const projectStatuses = ['Ongoing', 'Pending Review', 'Completed', 'Unassigned']
-const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
 
 const statusFilterOptions = projectStatuses.map(status => ({ 
   title: status, 
   value: status
-}))
-
-const departmentFilterOptions = departments.map(dept => ({ 
-  title: dept, 
-  value: dept 
 }))
 
 // New project form
@@ -800,6 +829,7 @@ const loadCategories = async () => {
 onMounted(async () => {
   await loadCategories()  // Load global categories first
   await loadProjects()     // Then load projects
+  fetchAllUsers();
 })
 
 
@@ -1388,6 +1418,65 @@ const loadProjectTasks = async (projectId) => {
     )
   } catch (error) {
     console.error('Error loading project tasks:', error)
+  }
+}
+
+// Computed for visible departments by role
+defineProps(); // To support script setup even if not used for now
+
+const visibleDepartments = computed(() => {
+  if (authStore.userRole === 'director' || authStore.userRole === 'hr') {
+    return realDepartments.value;
+  } else if (authStore.userRole === 'manager') {
+    if (authStore.userData?.department && realDepartments.value.includes(authStore.userData.department)) {
+      return [authStore.userData.department];
+    } else {
+      return [];
+    }
+  }
+  return [];
+});
+
+const isStaff = computed(() => authStore.userRole === 'staff');
+
+// Fetch all users for member dropdown
+async function fetchAllUsers() {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id,
+      department: doc.data().department || '',
+      role: doc.data().role || ''
+    }));
+  } catch (e) {
+    allUsers.value = [];
+  }
+}
+
+// Compute actual department list (from projects)
+const realDepartments = computed(() => {
+  return Array.from(new Set(projects.value.filter(p => p.department).map(p => p.department))).sort();
+});
+
+// Department create method
+async function createDepartment() {
+  departmentWriteLoading.value = true;
+  try {
+    // Write to 'departments' collection
+    await addDoc(collection(db, 'departments'), {
+      title: newDepartmentTitle.value.trim(),
+      members: newDepartmentMembers.value, // array of user emails
+      createdAt: new Date().toISOString()
+    });
+    // Optionally, reload/filter projects after department creation (or reload departments if used elsewhere)
+    showAddDepartmentDialog.value = false;
+    newDepartmentTitle.value = '';
+    newDepartmentMembers.value = [];
+  } catch (error) {
+    // handle error
+  } finally {
+    departmentWriteLoading.value = false;
   }
 }
 
