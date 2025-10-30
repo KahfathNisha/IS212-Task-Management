@@ -932,10 +932,25 @@ const weekDates = computed(() => {
 
 const isTaskOverdue = (dueDate, status) => {
   if (status === 'Completed' || !dueDate) return false;
+  
   const now = new Date();
-  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDateOnly = new Date(dueDate);
-  return dueDateOnly < todayDateOnly;
+  
+  // 1. Define TODAY at midnight (local time relative to mock)
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate()); 
+
+  // 2. Parse the DUE DATE string and define it at midnight (local time relative to mock)
+  const dueDateObj = new Date(dueDate);
+  
+  if (isNaN(dueDateObj.getTime())) return false; 
+  
+  const dueDateOnly = new Date(
+      dueDateObj.getFullYear(), 
+      dueDateObj.getMonth(), 
+      dueDateObj.getDate()
+  );
+  
+  // This comparison is now safe, as both dates are normalized to midnight
+  return dueDateOnly < todayDateOnly; 
 };
 
 // FIX: Correctly filters tasks using taskOwnerDepartment
