@@ -292,39 +292,39 @@
   border: 1px solid #5a7a9b !important;
 }
 
-/* 🟢 START OF OVERDUE FIXES FOR CALENDAR VIEW */
+/* 🟢 START OF OVERDUE FIXES FOR CALENDAR VIEW (REVISED) */
 .task-item.task-overdue,
 .week-task-item.task-overdue {
-  /* Use dashed border for a softer outline */
-  border: 1px dashed var(--v-theme-error, #f44336) !important; 
-  /* Force override background color with a light red */
-  background-color: var(--v-theme-error-lighten5, #fff5f5) !important; 
-  box-shadow: 0 0 5px rgba(244, 67, 54, 0.2);
+  /* Use a slightly darker, more professional red for the border */
+  border: 1px solid #e57373 !important; /* Lighter red for the dashed border */
+  /* Force override background color with a softer, pastel red */
+  background-color: #ffebee !important; /* Very light red, almost pink */
+  box-shadow: 0 0 5px rgba(239, 83, 80, 0.2); /* Soft red shadow */
   
-  /* Ensure the left border is always RED and prominent */
-  border-left: 4px solid var(--v-theme-error, #f44336) !important; 
+  /* Ensure the left border is always a prominent, standard red */
+  border-left: 4px solid #ef5350 !important; /* Standard material red */
   opacity: 1 !important; 
 }
 
 [data-theme="dark"] .task-item.task-overdue,
 [data-theme="dark"] .week-task-item.task-overdue {
-  background-color: rgba(244, 67, 54, 0.15) !important; 
-  border: 1px dashed var(--v-theme-error, #f44336) !important;
-  border-left: 4px solid var(--v-theme-error, #f44336) !important;
+  background-color: rgba(239, 83, 80, 0.15) !important; /* Darker red tint */
+  border: 1px dashed #e57373 !important; /* Lighter red for dashed border in dark mode */
+  border-left: 4px solid #ef5350 !important; /* Standard material red */
 }
 
 /* Text and Chip Styling inside overdue task to make it legible and prominent */
 .task-overdue .task-title, 
 .task-overdue .week-task-title {
-  color: var(--v-theme-error-darken2, #c62828) !important; 
+  color: #c62828 !important; /* Darker red for text */
 }
 
 .task-overdue .v-chip {
-  background-color: var(--v-theme-error, #f44336) !important;
+  background-color: #ef5350 !important; /* Standard red for chips */
   color: white !important;
   font-weight: bold;
 }
-/* 🟢 END OF OVERDUE FIXES */
+/* 🟢 END OF OVERDUE FIXES (REVISED) */
 
 
 [data-theme="dark"] .filter-btn:hover {

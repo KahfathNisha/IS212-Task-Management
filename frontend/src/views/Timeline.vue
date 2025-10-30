@@ -6,7 +6,7 @@
         <h1>Task Timeline</h1>
         <p class="date-subtitle">Visualize tasks over time with the Frappe Gantt chart</p>
       </div>
-      </div>
+    </div>
 
     <div class="view-controls">
       <div class="controls-row">
@@ -23,7 +23,14 @@
           </div>
         </div>
       </div>
-    </div>
+      
+      <div class="color-key-container">
+        <div class="color-key-item" v-for="status in taskColorKey" :key="status.label">
+          <div class="color-swatch" :style="{ 'background-color': status.color, 'border-color': status.border }"></div>
+          <span class="color-label">{{ status.label }}</span>
+        </div>
+      </div>
+      </div>
 
     <div class="gantt-chart-container">
       <div ref="ganttChart" class="gantt-target"></div>
@@ -71,6 +78,16 @@ const viewModes = [
   { label: 'Month', value: 'Month' },
 ];
 
+// 🟢 NEW: Color Key Data 
+const taskColorKey = computed(() => [
+  { label: 'Overdue', color: '#f44336', border: '#d32f2f' }, // Bright Red
+  { label: 'Ongoing', color: '#2196f3', border: '#2196f3' }, // Blue
+  { label: 'Pending Review', color: '#ff9800', border: '#ff9800' }, // Orange
+  { label: 'Completed', color: '#4caf50', border: '#4caf50' }, // Green
+  { label: 'Unassigned/Other', color: '#9e9e9e', border: '#9e9e9e' } // Grey
+]);
+
+
 // Helper function to convert complex date format to YYYY-MM-DD
 const parseGanttDate = (dateString) => {
   if (!dateString || typeof dateString !== 'string') return null;
@@ -116,20 +133,26 @@ const isTaskOverdue = (dueDate, status) => {
   
   const now = new Date();
   const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDateOnly = new Date(dueDate);
+  
+  // Parse the due date string into a Date object for comparison
+  const dueDateOnly = new Date(parseGanttDate(dueDate));
+  
+  // Set the time on the due date to midnight to ensure accurate comparison
+  dueDateOnly.setHours(0, 0, 0, 0); 
   
   return dueDateOnly < todayDateOnly;
 };
 
 
-// 🟢 FIX: Function made robust for status matching AND Overdue check
+// 🟢 IMPROVED: Overdue class is now visually distinct
 const getGanttTaskClass = (task) => {
   const status = task.status;
   const dueDate = task.dueDate;
   const normalizedStatus = status ? status.trim().toLowerCase() : '';
 
   if (isTaskOverdue(dueDate, status)) {
-    return 'bar-overdue'; // 👈 Apply Overdue class first
+    // 👈 Applied a distinct class name for better CSS targeting
+    return 'bar-deadline-passed'; 
   }
 
   switch (normalizedStatus) {
@@ -275,11 +298,15 @@ watch(ganttViewMode, (newMode) => {
   justify-content: space-between;
   align-items: center;
 }
+[data-theme="dark"] .view-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 
 .view-controls {
   padding: 10px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
+/* No bottom border here, as it's moved to the color key separator */
 
 .controls-row {
   justify-content: flex-start;
@@ -291,6 +318,42 @@ watch(ganttViewMode, (newMode) => {
     gap: 20px; 
 }
 
+/* 🟢 NEW: COLOR KEY STYLES */
+.color-key-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    padding: 12px 0 0 0; /* Padding from controls */
+    border-top: 1px solid rgba(0, 0, 0, 0.08); /* Separator line */
+    margin-top: 12px;
+}
+[data-theme="dark"] .color-key-container {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.color-key-item {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.color-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    margin-right: 8px;
+    border: 1px solid transparent;
+}
+.color-label {
+    font-weight: 500;
+    color: #5a6c7d;
+}
+[data-theme="dark"] .color-label {
+    color: #9cb1c5;
+}
+
+
 /* === Frappe Gantt Container Styles === */
 .gantt-chart-container {
   flex: 1;
@@ -299,7 +362,14 @@ watch(ganttViewMode, (newMode) => {
   position: relative;
   background: var(--bg-secondary);
   min-height: 400px; 
+  /* 🟢 FIX: Add a top border since the view-controls one was removed/moved */
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
+[data-theme="dark"] .gantt-chart-container {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
+}
+
 
 .gantt-target {
   min-height: 350px; 
@@ -307,13 +377,15 @@ watch(ganttViewMode, (newMode) => {
 
 /* 🚀 FINAL COLOR FIX (using :deep() for scope bypass) */
 
-/* 🟢 NEW: Overdue Task Bar Styling for Frappe Gantt */
-:deep(.bar-overdue rect), 
-:deep(.bar-overdue .bar-progress) {
-  fill: #f44336 !important; /* Red */
-  stroke: #d32f2f !important; /* Darker red border */
+/* 🟢 NEW: Deadline Passed Task Bar Styling for Frappe Gantt */
+:deep(.bar-deadline-passed rect), 
+:deep(.bar-deadline-passed .bar-progress) {
+  /* Using a bolder red for maximum visibility of passed deadlines */
+  fill: #f44336 !important; /* Bright Red */
+  stroke: #c62828 !important; /* Darker red border */
+  /* Add an aggressive shadow/glow to make it pop */
+  filter: drop-shadow(0 0 4px rgba(244, 67, 54, 0.5));
 }
-/* No white label text here, handled by general text rule below */
 
 
 /* 1. Completed Tasks */
@@ -362,10 +434,6 @@ watch(ganttViewMode, (newMode) => {
 }
 
 /* Dark mode adjustments for Frappe Gantt - using :deep() where necessary */
-[data-theme="dark"] .gantt-chart-container {
-  background: transparent;
-}
-
 [data-theme="dark"] :deep(.gantt .grid-header) {
   fill: #2c3e50; 
 }
