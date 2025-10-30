@@ -326,6 +326,14 @@
             <!-- Expanded Details -->
             <div v-if="expandedProjects.includes(project.id)" class="project-details">
               <!-- Tasks by Category -->
+              <ProjectTasks
+                  :key="`project-tasks-${project.id}`"
+                  :project-id="project.id"
+                  :show="true"
+                  @view-task="viewTask"
+                  @task-updated="refreshProject"
+              />
+
               <div class="details-section">
                 <div class="section-header">
                   <h4>Tasks by Category</h4>
@@ -653,11 +661,12 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { projectService } from '@/services/projectService'
 import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
 import axios from 'axios'
+import ProjectTasks from '@/components/ProjectTasks.vue'
 
 // Axios client configuration
 const axiosClient = axios.create({
@@ -1345,6 +1354,10 @@ const resetFilters = () => {
   selectedCategories.value = []
 }
 
+const viewTask = (task) => {
+  console.log('📋 Viewing task:', task)
+}
+
 const refreshProject = async (projectId) => {
   try {
     const response = await axiosClient.get(`/projects/${projectId}`);
@@ -1391,10 +1404,22 @@ const loadProjectTasks = async (projectId) => {
   }
 }
 
+// Fix the watchers - this should be at the bottom of your script
+watch(() => props.show, (newValue) => {
+  console.log('👀 ProjectTasks show prop changed:', newValue, 'for project:', props.projectId)
+  if (newValue && props.projectId) {
+    loadTasks()
+  }
+}, { immediate: true })
 
+watch(() => props.projectId, (newValue, oldValue) => {
+  console.log('🔄 ProjectTasks projectId changed from', oldValue, 'to', newValue)
+  if (newValue && props.show) {
+    loadTasks()
+  }
+})
 
-
-
+// Remove any onMounted hook - the watcher handles it
 </script>
 
 
