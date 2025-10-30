@@ -18,14 +18,60 @@
         </div>
       </div>
 
-      <!-- All Tasks List -->
-      <div class="all-tasks-list">
-        <ProjectTaskItem
-          v-for="task in tasks"
-          :key="task.id"
-          :task="task"
-          @view-task="openTaskDialog"
-        />
+      <!-- Tasks by Status -->
+      <div class="tasks-by-status">
+        <div 
+          v-for="status in visibleStatuses" 
+          :key="status" 
+          class="status-group"
+        >
+          <!-- Status Header with Caret -->
+          <div 
+            class="status-header" 
+            @click="toggleStatusSection(status)"
+            :class="{ 'expanded': expandedStatuses.includes(status) }"
+          >
+            <div class="status-info">
+              <v-icon 
+                :icon="expandedStatuses.includes(status) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                class="caret-icon"
+                size="20"
+              />
+              <v-chip 
+                :color="getStatusColor(status)"
+                size="small"
+                variant="outlined"
+                class="status-chip"
+              >
+                <v-icon 
+                  :icon="getStatusIcon(status)" 
+                  size="14"
+                  start
+                />
+                {{ status }}
+              </v-chip>
+            </div>
+            
+            <!-- Task Count on Right -->
+            <span class="task-count">{{ getTasksByStatus(status).length }} tasks</span>
+          </div>
+
+          <!-- Collapsible Tasks List -->
+          <v-expand-transition>
+            <div 
+              v-show="expandedStatuses.includes(status)" 
+              class="status-tasks"
+            >
+              <ProjectTaskItem
+                v-for="task in getTasksByStatus(status)"
+                :key="task.id"
+                :task="task"
+                @view-task="openTaskDialog"
+                class="status-task-item"
+              />
+            </div>
+          </v-expand-transition>
+        </div>
       </div>
     </div>
 
@@ -40,11 +86,7 @@
     <ProjectTaskItemDetails
       :model="selectedTask"
       :show="showTaskDialog"
-      :task-statuses="taskStatuses"
       @update:show="showTaskDialog = $event"
-      @edit="handleEditTask"
-      @change-status="handleStatusChange"
-      @archive="handleArchiveTask"
       @view-parent="handleViewParent"
       @open-attachment="handleOpenAttachment"
     />
@@ -52,10 +94,10 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import axios from 'axios'
 import ProjectTaskItem from './ProjectTaskItem.vue'
-import ProjectTaskItemDetails from './ProjectTaskItemDetails.vue' // Changed import
+import ProjectTaskItemDetails from './ProjectTaskItemDetails.vue'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -69,9 +111,15 @@ const tasks = ref([])
 const loadingTasks = ref(false)
 const selectedTask = ref(null)
 const showTaskDialog = ref(false)
+const expandedStatuses = ref([]) // Default: all sections closed
 
 // Constants
 const taskStatuses = ['Pending', 'Ongoing', 'Pending Review', 'Completed']
+
+// Computed
+const visibleStatuses = computed(() => {
+  return taskStatuses.filter(status => getTasksByStatus(status).length > 0)
+})
 
 // Axios client
 const axiosClient = axios.create({
@@ -117,84 +165,52 @@ const loadTasks = async () => {
   }
 }
 
+const getTasksByStatus = (status) => {
+  return tasks.value.filter(task => task.status === status)
+}
+
+const toggleStatusSection = (status) => {
+  const index = expandedStatuses.value.indexOf(status)
+  if (index > -1) {
+    // Close the section
+    expandedStatuses.value.splice(index, 1)
+    console.log('📁 Closed status section:', status)
+  } else {
+    // Open the section
+    expandedStatuses.value.push(status)
+    console.log('📂 Opened status section:', status)
+  }
+  console.log('🔄 Current expanded sections:', expandedStatuses.value)
+}
+
+const getStatusColor = (status) => {
+  const colors = {
+    'Pending': 'orange',
+    'Ongoing': 'blue',
+    'Pending Review': 'purple',
+    'Completed': 'green'
+  }
+  return colors[status] || 'grey'
+}
+
+const getStatusIcon = (status) => {
+  const icons = {
+    'Pending': 'mdi-clock-outline',
+    'Ongoing': 'mdi-play-circle-outline',
+    'Pending Review': 'mdi-eye-outline',
+    'Completed': 'mdi-check-circle-outline'
+  }
+  return icons[status] || 'mdi-circle-outline'
+}
+
 const openTaskDialog = (task) => {
   console.log('📋 Opening task dialog for:', task.title)
   selectedTask.value = task
   showTaskDialog.value = true
 }
 
-const handleEditTask = (task) => {
-  console.log('✏️ Edit task clicked:', task.title, 'ID:', task.id)
-  
-  // Close the dialog first
-  showTaskDialog.value = false
-  selectedTask.value = null
-  
-  // Emit to parent component (Projects.vue) to handle editing
-  emit('edit-task', task)
-  
-  // Or if you want to handle editing within this component, 
-  // you could open an edit dialog or navigate to an edit page
-  // For example:
-  // router.push(`/edit-task/${task.id}`)
-  // or openEditDialog(task)
-  
-  console.log('✅ Edit task event emitted')
-}
-
-const handleStatusChange = async ({ taskId, status }) => {
-  console.log('🔄 Changing task status:', taskId, 'to', status)
-  
-  try {
-    // Update task status via API
-    const response = await axiosClient.put(`/tasks/${taskId}`, { status })
-    
-    // Update local task in the list
-    const taskIndex = tasks.value.findIndex(t => t.id === taskId)
-    if (taskIndex !== -1) {
-      tasks.value[taskIndex] = { ...tasks.value[taskIndex], status }
-    }
-    
-    // Update the selected task in dialog
-    if (selectedTask.value && selectedTask.value.id === taskId) {
-      selectedTask.value = { ...selectedTask.value, status }
-    }
-    
-    console.log('✅ Task status updated successfully')
-    emit('task-updated', taskId)
-    
-  } catch (error) {
-    console.error('❌ Error updating task status:', error)
-    // You might want to show a notification here
-  }
-}
-
-const handleArchiveTask = async (taskId) => {
-  console.log('🗄️ Archiving task:', taskId)
-  
-  try {
-    // Archive task via API
-    await axiosClient.put(`/tasks/${taskId}`, { archived: true })
-    
-    // Remove task from local list
-    tasks.value = tasks.value.filter(t => t.id !== taskId)
-    
-    // Close dialog
-    showTaskDialog.value = false
-    selectedTask.value = null
-    
-    console.log('✅ Task archived successfully')
-    emit('task-updated', taskId)
-    
-  } catch (error) {
-    console.error('❌ Error archiving task:', error)
-  }
-}
-
 const handleViewParent = (parentTask) => {
   console.log('👀 Viewing parent task:', parentTask.title)
-  // You can handle viewing parent task here
-  // For now, just close current dialog and open parent
   selectedTask.value = parentTask
 }
 
@@ -216,19 +232,20 @@ watch(() => props.show, (newValue) => {
     loadingTasks.value = false
     showTaskDialog.value = false
     selectedTask.value = null
+    expandedStatuses.value = [] // Reset expanded sections when hiding
   }
 }, { immediate: true })
 
 watch(() => props.projectId, (newValue, oldValue) => {
   console.log('🔄 ProjectTasks projectId changed from', oldValue, 'to', newValue)
   if (newValue && props.show) {
+    expandedStatuses.value = [] // Reset expanded sections when switching projects
     loadTasks()
   }
 })
 </script>
 
 <style scoped>
-/* Full Width Container */
 .project-tasks-container {
   width: 100%;
   padding: 24px;
@@ -238,7 +255,6 @@ watch(() => props.projectId, (newValue, oldValue) => {
   min-height: 300px;
 }
 
-/* Loading State - Full Width */
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -256,14 +272,12 @@ watch(() => props.projectId, (newValue, oldValue) => {
   font-weight: 500;
 }
 
-/* Tasks Content - Full Width */
 .tasks-content {
   display: flex;
   flex-direction: column;
   width: 100%;
 }
 
-/* Tasks Header - Full Width */
 .tasks-header {
   display: flex;
   justify-content: flex-start;
@@ -292,17 +306,96 @@ watch(() => props.projectId, (newValue, oldValue) => {
   font-weight: 500;
 }
 
-/* All Tasks List - Full Width */
-.all-tasks-list {
+/* Status Groups Styling */
+.tasks-by-status {
   width: 100%;
   padding: 0 16px;
 }
 
-/* Empty State - Full Width */
+.status-group {
+  margin-bottom: 12px;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.status-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Status Header */
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  border-bottom: none;
+}
+
+.status-header:hover {
+  background: #e9ecef;
+}
+
+.status-header.expanded {
+  background: #e3f2fd;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.status-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.caret-icon {
+  color: #6c757d;
+  transition: transform 0.2s ease;
+}
+
+.status-chip {
+  font-weight: 600;
+}
+
+.task-count {
+  font-size: 14px;
+  color: #6c757d;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+/* Status Tasks */
+.status-tasks {
+  padding: 16px;
+  background: white;
+}
+
+.status-task-item {
+  margin-bottom: 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.status-task-item:last-child {
+  margin-bottom: 0 !important;
+}
+
+.status-task-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-1px);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
-  align-items: center;  
+  align-items: center;
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
@@ -332,8 +425,12 @@ watch(() => props.projectId, (newValue, oldValue) => {
     padding: 0 8px;
   }
   
-  .all-tasks-list {
+  .tasks-by-status {
     padding: 0 8px;
+  }
+  
+  .status-header {
+    padding: 14px 16px;
   }
   
   .empty-state {
@@ -346,8 +443,21 @@ watch(() => props.projectId, (newValue, oldValue) => {
     padding: 12px;
   }
   
-  .all-tasks-list {
+  .tasks-by-status {
     padding: 0 4px;
+  }
+  
+  .status-header {
+    padding: 12px 14px;
+  }
+  
+  .status-info {
+    gap: 8px;
+  }
+  
+  .task-count {
+    font-size: 12px;
+    padding: 2px 8px;
   }
   
   .empty-state {
