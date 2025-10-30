@@ -1,73 +1,136 @@
 <template>
-  <v-dialog v-model="dialog" max-width="700px" persistent>
-    <v-card>
+  <v-dialog v-model="dialog" max-width="800px" persistent>
+    <v-card class="recurring-tasks-card">
       <v-card-title class="recurring-tasks-header">
         <div class="header-content">
-          <v-icon color="primary" size="24" class="header-icon">mdi-repeat</v-icon>
+          <v-icon color="primary" size="28" class="header-icon">mdi-repeat</v-icon>
           <h3>Recurring Tasks</h3>
+          <v-chip size="small" color="primary" variant="outlined">
+            {{ recurringTasks.length }} {{ recurringTasks.length === 1 ? 'task' : 'tasks' }}
+          </v-chip>
         </div>
-        <v-btn icon @click="dialog = false">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
+        <v-btn icon="mdi-close" variant="text" @click="dialog = false" />
       </v-card-title>
       
       <v-card-text class="recurring-tasks-content">
-        <v-list v-if="recurringTasks.length > 0">
-          <v-list-item
+        <!-- Loading State -->
+        <div v-if="loading" class="loading-state">
+          <v-progress-circular indeterminate color="primary" size="32" />
+          <p>Loading recurring tasks...</p>
+        </div>
+
+        <!-- Tasks List -->
+        <div v-else-if="recurringTasks.length > 0" class="tasks-list">
+          <div
             v-for="task in recurringTasks"
             :key="task.id"
-            class="recurring-task-item"
+            class="task-card"
           >
-            <v-list-item-content>
-              <div class="task-header">
-                <v-list-item-title class="task-title">{{ task.title }}</v-list-item-title>
-                <v-btn
-                  color="primary"
-                  size="small"
-                  variant="outlined"
-                  @click="onEditRecurringTask(task)"
-                  class="edit-btn"
-                >
-                  <v-icon left size="18">mdi-pencil</v-icon>
-                  Edit Recurrence
-                </v-btn>
-              </div>
-              
-              <v-list-item-subtitle class="task-desc">{{ task.description || 'No description' }}</v-list-item-subtitle>
-              
-              <div class="task-details">
-                <div><strong>Status:</strong> {{ task.status }}</div>
-                <div><strong>Priority:</strong> {{ task.priority || 'Not set' }}</div>
-                <div v-if="task.dueDate"><strong>Due:</strong> {{ formatDate(task.dueDate) }}</div>
-                <div v-if="task.assignedTo"><strong>Assigned to:</strong> {{ task.assignedTo }}</div>
-                <div v-if="task.recurrence && task.recurrence.enabled">
-                  <strong>Recurrence:</strong>
-                  {{ formatRecurrence(task.recurrence) }}
+            <!-- Task Header -->
+            <div class="task-header">
+              <div class="task-title-section">
+                <h4 class="task-title">{{ task.title }}</h4>
+                <div class="task-badges">
+                  <v-chip 
+                    size="small" 
+                    :color="getStatusColor(task.status)"
+                    variant="outlined"
+                  >
+                    {{ task.status }}
+                  </v-chip>
+                  <v-chip 
+                    size="small" 
+                    :color="task.recurrence?.enabled ? 'success' : 'warning'"
+                    variant="flat"
+                  >
+                    <v-icon start size="12">
+                      {{ task.recurrence?.enabled ? 'mdi-repeat' : 'mdi-repeat-off' }}
+                    </v-icon>
+                    {{ task.recurrence?.enabled ? 'Active' : 'Inactive' }}
+                  </v-chip>
                 </div>
-                <div v-if="task.projectName"><strong>Project:</strong> {{ task.projectName }}</div>
               </div>
               
-              <!-- Recurrence Status Badge -->
-              <div class="recurrence-status">
-                <v-chip 
-                  size="small" 
-                  :color="task.recurrence?.enabled ? 'success' : 'warning'"
-                  variant="outlined"
-                >
-                  <v-icon start size="14">
-                    {{ task.recurrence?.enabled ? 'mdi-repeat' : 'mdi-repeat-off' }}
-                  </v-icon>
-                  {{ task.recurrence?.enabled ? 'Active' : 'Inactive' }}
-                </v-chip>
+              <v-btn
+                color="primary"
+                size="small"
+                variant="outlined"
+                @click="onEditRecurringTask(task)"
+                class="edit-btn"
+              >
+                <v-icon start size="16">mdi-pencil</v-icon>
+                Edit
+              </v-btn>
+            </div>
+            
+            <!-- Task Description -->
+            <p class="task-description">{{ task.description || 'No description provided' }}</p>
+            
+            <!-- Task Details Grid -->
+            <div class="task-details-grid">
+              <div class="detail-item" v-if="task.assignedTo">
+                <v-icon size="16" class="detail-icon">mdi-account</v-icon>
+                <span class="detail-label">Assigned to:</span>
+                <span class="detail-value">{{ task.assignedTo }}</span>
               </div>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list>
+              
+              <div class="detail-item" v-if="task.priority">
+                <v-icon size="16" class="detail-icon">mdi-flag</v-icon>
+                <span class="detail-label">Priority:</span>
+                <span class="detail-value">{{ task.priority }}</span>
+              </div>
+              
+              <div class="detail-item" v-if="task.dueDate">
+                <v-icon size="16" class="detail-icon">mdi-calendar</v-icon>
+                <span class="detail-label">Due Date:</span>
+                <span class="detail-value">{{ formatDate(task.dueDate) }}</span>
+              </div>
+              
+              <div class="detail-item" v-if="task.projectName">
+                <v-icon size="16" class="detail-icon">mdi-folder</v-icon>
+                <span class="detail-label">Project:</span>
+                <span class="detail-value">{{ task.projectName }}</span>
+              </div>
+              
+              <div class="detail-item" v-if="task.recurrence && task.recurrence.enabled">
+                <v-icon size="16" class="detail-icon">mdi-repeat</v-icon>
+                <span class="detail-label">Recurrence:</span>
+                <span class="detail-value">{{ formatRecurrence(task.recurrence) }}</span>
+              </div>
+              
+              <div class="detail-item" v-if="task.categories && task.categories.length > 0">
+                <v-icon size="16" class="detail-icon">mdi-tag-multiple</v-icon>
+                <span class="detail-label">Categories:</span>
+                <div class="categories-chips">
+                  <v-chip
+                    v-for="category in task.categories"
+                    :key="category"
+                    size="x-small"
+                    color="secondary"
+                    variant="outlined"
+                  >
+                    {{ category }}
+                  </v-chip>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recurrence Details -->
+            <div v-if="task.recurrence && task.recurrence.enabled" class="recurrence-details">
+              <div class="recurrence-info">
+                <v-icon size="18" color="success">mdi-information-outline</v-icon>
+                <span>Next occurrence: {{ getNextOccurrence(task.recurrence) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
         
+        <!-- Empty State -->
         <div v-else class="empty-state">
-          <v-icon size="64" color="grey-lighten-1">mdi-repeat-off</v-icon>
-          <h4>No recurring tasks found</h4>
-          <p>Create recurring tasks to see them here</p>
+          <v-icon size="80" color="grey-lighten-2">mdi-repeat-off</v-icon>
+          <h4>No Recurring Tasks Found</h4>
+          <p>You haven't set up any recurring tasks yet.</p>
+          <p class="empty-subtitle">Create a task and enable recurrence to see it here.</p>
         </div>
       </v-card-text>
     </v-card>
@@ -98,6 +161,7 @@ const emit = defineEmits(['close'])
 const dialog = ref(props.show)
 const recurringTasks = ref([])
 const editingId = ref(null)
+const loading = ref(false)
 
 // Computed
 const editingTask = computed(() =>
@@ -133,6 +197,7 @@ axiosClient.interceptors.request.use(config => {
 
 // Methods
 const fetchRecurringTasks = async () => {
+  loading.value = true
   try {
     console.log('🔄 Fetching recurring tasks...')
     const response = await axiosClient.get('/tasks/recurring')
@@ -141,6 +206,8 @@ const fetchRecurringTasks = async () => {
   } catch (error) {
     console.error('❌ Error fetching recurring tasks:', error)
     recurringTasks.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -172,6 +239,16 @@ const saveEdit = async (newRecurrence) => {
   } catch (error) {
     console.error('❌ Error updating recurrence:', error)
   }
+}
+
+const getStatusColor = (status) => {
+  const colors = {
+    'Pending': 'orange',
+    'Ongoing': 'blue',
+    'Pending Review': 'purple',
+    'Completed': 'green'
+  }
+  return colors[status] || 'grey'
 }
 
 const formatDate = (dateString) => {
@@ -210,12 +287,41 @@ const formatRecurrence = (recurrence) => {
       return 'Custom recurrence'
   }
 }
+
+const getNextOccurrence = (recurrence) => {
+  // This is a placeholder - implement based on your recurrence logic
+  const now = new Date()
+  let nextDate = new Date(now)
+  
+  switch (recurrence.type) {
+    case 'daily':
+      nextDate.setDate(now.getDate() + 1)
+      break
+    case 'weekly':
+      nextDate.setDate(now.getDate() + 7)
+      break
+    case 'monthly':
+      nextDate.setMonth(now.getMonth() + 1)
+      break
+    case 'yearly':
+      nextDate.setFullYear(now.getFullYear() + 1)
+      break
+    case 'custom':
+      nextDate.setDate(now.getDate() + (recurrence.interval || 1))
+      break
+    default:
+      return 'Unknown'
+  }
+  
+  return formatDate(nextDate)
+}
 </script>
 
 <style scoped>
-.v-card {
-  background: #f5f5f5 !important;
-  max-height: 80vh;
+.recurring-tasks-card {
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
   overflow: hidden;
 }
 
@@ -223,85 +329,253 @@ const formatRecurrence = (recurrence) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e0e0e0;
-  background: white;
+  padding: 24px 28px;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .header-content h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
-  color: #333;
+  color: #2c3e50;
 }
 
 .header-icon {
   background: rgba(25, 118, 210, 0.1);
-  padding: 8px;
-  border-radius: 50%;
+  padding: 10px;
+  border-radius: 12px;
 }
 
 .recurring-tasks-content {
   padding: 0;
-  max-height: 60vh;
+  max-height: 70vh;
   overflow-y: auto;
 }
 
-.recurring-task-item {
-  margin-bottom: 20px;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 16px 24px;
-  background: white;
-  margin: 0 0 2px 0;
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+  gap: 16px;
 }
 
-.recurring-task-item:hover {
-  background: #fafafa;
+.loading-state p {
+  margin: 0;
+  font-size: 16px;
+  color: #6c757d;
+}
+
+.tasks-list {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+.task-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .task-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 16px;
+}
+
+.task-title-section {
+  flex: 1;
+  min-width: 0;
 }
 
 .task-title {
-  font-weight: 600;
+  margin: 0 0 8px 0;
   font-size: 18px;
-  color: #333;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.4;
 }
 
-.task-desc {
-  margin: 6px 0 12px 0;
-  color: #616161;
+.task-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-description {
+  margin: 0 0 16px 0;
+  color: #6c757d;
   font-size: 14px;
+  line-height: 1.5;
+  font-style: italic;
 }
 
-.task-details {
+.task-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
-  color: #333;
-  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
 }
 
-.recurrence-status {
-  margin-top: 8px;
+.detail-icon {
+  color: #6c757d;
+  flex-shrink: 0;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: #495057;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.categories-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.recurrence-details {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(76, 175, 80, 0.05);
+  border-left: 4px solid #4caf50;
+  border-radius: 0 8px 8px 0;
+}
+
+.recurrence-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.edit-btn {
+  flex-shrink: 0;
+  height: 36px;
+  min-width: 80px;
 }
 
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
   text-align: center;
-  padding: 40px 24px;
-  color: #999;
 }
 
-.empty-state v-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
+.empty-state h4 {
+  margin: 20px 0 12px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.empty-state p {
+  margin: 0 0 8px 0;
+  color: #6c757d;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.empty-subtitle {
+  font-size: 14px !important;
+  color: #adb5bd !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .recurring-tasks-header {
+    padding: 20px 24px;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .tasks-list {
+    padding: 16px;
+  }
+  
+  .task-card {
+    padding: 16px;
+  }
+  
+  .task-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .edit-btn {
+    width: 100%;
+  }
+  
+  .task-details-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .empty-state {
+    padding: 60px 20px;
+  }
+}
+
+/* Custom scrollbar */
+.recurring-tasks-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.recurring-tasks-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.recurring-tasks-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.recurring-tasks-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 </style>
