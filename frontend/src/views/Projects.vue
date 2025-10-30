@@ -325,7 +325,6 @@
 
             <!-- Expanded Details -->
             <div v-if="expandedProjects.includes(project.id)" class="project-details">
-              <!-- Tasks by Category -->
               <ProjectTasks
                   :key="`project-tasks-${project.id}`"
                   :project-id="project.id"
@@ -333,7 +332,7 @@
                   @view-task="viewTask"
                   @task-updated="refreshProject"
               />
-
+              <!-- Tasks by Category -->
               <div class="details-section">
                 <div class="section-header">
                   <h4>Tasks by Category</h4>
