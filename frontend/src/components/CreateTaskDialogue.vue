@@ -42,6 +42,7 @@
               :min="todayDate"
               variant="outlined"
               class="flex-1"
+              :disabled="isEditing && !isTaskOwner"
             />
           </div>
 
@@ -355,7 +356,8 @@ const props = defineProps({
   projects: { type: Array, default: () => [] },
   // NOTE: teamMembers must be an array of objects: { text, value, department }
   teamMembers: { type: Array, default: () => [] }, 
-  todayDate: { type: String, default: () => new Date().toISOString().split('T')[0] }
+  todayDate: { type: String, default: () => new Date().toISOString().split('T')[0] },
+  currentUser: { type: Object, default: () => null }
 })
 
 const emit = defineEmits(['update:show', 'save', 'cancel'])
@@ -397,6 +399,15 @@ const taskOwnerDepartment = computed(() => {
         return member ? member.department : null; 
     }
     return null;
+});
+
+// Check if current user is the task owner (for readonly due date)
+const isTaskOwner = computed(() => {
+  if (!props.currentUser || !localTask.value.taskOwner) return true; // Allow on create
+  const userEmail = props.currentUser.email || '';
+  const userName = props.currentUser.name || '';
+  const taskOwner = localTask.value.taskOwner || '';
+  return taskOwner === userEmail || taskOwner === userName;
 });
 // --------------------------------------------------------------------------
 
