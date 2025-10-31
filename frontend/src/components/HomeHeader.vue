@@ -2,8 +2,11 @@
   <header class="home-header">
     <div class="header-content">
       <div class="welcome-section">
-        <div class="welcome-greeting">Welcome,</div>
-        <h1 class="welcome-name">{{ userName }}</h1>
+        <img src="@/assets/SPM.png" alt="Company Logo" class="logo">
+        <div class="welcome-text">
+          <div class="welcome-greeting">Welcome,</div>
+          <h1 class="welcome-name">{{ userName }}</h1>
+        </div>
       </div>
       <div class="header-actions">
         <button class="logout-btn" @click="handleLogout">
@@ -38,12 +41,14 @@ const handleLogout = async () => {
 .home-header {
   background: white;
   border-bottom: 1px solid #C5D4F0;
-  padding: 24px 0;
+  padding: 14px 0;
+  padding-bottom: 1px;
+  padding-top: 2px;
 }
 
 .header-content {
   max-width: 100%;
-  padding: 0 32px;
+  padding: 0 28px;
   margin: 0;
   display: flex;
   justify-content: space-between;
@@ -52,13 +57,24 @@ const handleLogout = async () => {
 
 .welcome-section {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 14px;
   padding: 4px 0;
 }
 
+.logo {
+  width: 180px;
+  height: 180px;
+}
+
+.welcome-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .welcome-greeting {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: #7f8c8d;
   text-transform: uppercase;

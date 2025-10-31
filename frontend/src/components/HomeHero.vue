@@ -27,8 +27,8 @@
 
 .hero-title {
   margin: 0 0 24px 0;
-  font-size: 48px;
-  font-weight: 700;
+  font-size: 44px;
+  font-weight: 600;
   color: white;
   line-height: 1.2;
 }
