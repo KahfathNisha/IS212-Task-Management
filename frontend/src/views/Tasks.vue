@@ -654,27 +654,55 @@ const handleReadonlyAction = () => {
 // --- TASK VISIBILITY ---
 const userVisibleTasks = computed(() => {
   if (!currentUser.value || !currentUser.value.name) {
+    console.log('⚠️ [userVisibleTasks] No current user');
     return [];
   }
   
   const userName = currentUser.value.name;
+  const userEmailAddr = userEmail.value;
   const userRole = authStore.userRole; 
   const currentDept = userDepartment.value; 
 
-  if (userRole === 'hr' || userRole === 'director') {
-    // HR and Director see all tasks
+  console.log('🔍 [userVisibleTasks] Filtering for:', { userName, userEmailAddr, userRole, currentDept });
+  console.log('🔍 [userVisibleTasks] Total tasks:', tasks.value.length);
+
+  if (userRole === 'director') {
+    // Only Director sees all tasks at organizational level
     return tasks.value; 
   }
 
-  return tasks.value.filter(task => {
-    const isOwner = task.taskOwner === userName;
-    const isAssignee = task.assignedTo === userName;
-    const isCollaborator = Array.isArray(task.collaborators) && 
-                           task.collaborators.some(c => c.name === userName);
-    const isDepartmentTask = currentDept && task.taskOwnerDepartment === currentDept;
+  if (userRole === 'hr') {
+    // HR can view all tasks but cannot edit
+    return tasks.value;
+  }
 
-    return isOwner || isAssignee || isCollaborator || isDepartmentTask;
+  // Manager sees: their own tasks + department tasks + projects they're in
+  if (userRole === 'manager') {
+    const filtered = tasks.value.filter(task => {
+      const isOwner = task.taskOwner === userName || task.taskOwner === userEmailAddr;
+      const isAssignee = task.assignedTo === userName || task.assignedTo === userEmailAddr;
+      const isCollaborator = Array.isArray(task.collaborators) && 
+                             task.collaborators.some(c => (c.name === userName || c.name === userEmailAddr));
+      const isDepartmentTask = currentDept && task.taskOwnerDepartment && task.taskOwnerDepartment.toLowerCase() === currentDept.toLowerCase();
+
+      return isOwner || isAssignee || isCollaborator || isDepartmentTask;
+    });
+    console.log('✅ [userVisibleTasks] Manager filtered:', filtered.length, 'tasks');
+    return filtered;
+  }
+
+  // Staff sees ONLY tasks they're directly involved in (owner/assignee/collaborator)
+  // NO department-level visibility for staff
+  const filtered = tasks.value.filter(task => {
+    const isOwner = task.taskOwner === userName || task.taskOwner === userEmailAddr;
+    const isAssignee = task.assignedTo === userName || task.assignedTo === userEmailAddr;
+    const isCollaborator = Array.isArray(task.collaborators) && 
+                           task.collaborators.some(c => (c.name === userName || c.name === userEmailAddr));
+
+    return isOwner || isAssignee || isCollaborator;
   });
+  console.log('✅ [userVisibleTasks] Staff filtered:', filtered.length, 'tasks');
+  return filtered;
 });
 
 // --- DYNAMIC FILTER OPTIONS & COUNTS ---

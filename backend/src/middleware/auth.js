@@ -78,7 +78,7 @@ const verifyToken = async (req, res, next) => {
       uid: decodedToken.uid,
       email: decodedToken.email,
       name: userProfile.name,
-      role: userProfile.role,           // ✅ Added
+      role: userProfile.role?.toLowerCase() || userProfile.role,           // ✅ Added - normalize case
       department: userProfile.department // ✅ Added
     };
 
