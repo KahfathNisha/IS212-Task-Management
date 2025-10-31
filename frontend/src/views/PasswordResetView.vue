@@ -461,7 +461,7 @@ body, html {
 .reset-wrapper {
   min-height: 100vh;
   width: 100vw;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #c5d49a 0%, #f5f4f2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
