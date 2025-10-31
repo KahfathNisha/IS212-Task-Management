@@ -138,7 +138,7 @@ exports.checkLockout = async (req, res) => {
       });
     }
     
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -205,7 +205,7 @@ exports.loginSuccess = async (req, res) => {
       });
     }
     
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     await userRef.update({
       failedAttempts: 0,
       lockedUntil: null,
@@ -241,7 +241,7 @@ exports.recordFailedAttempt = async (req, res) => {
       });
     }
     
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -337,7 +337,7 @@ exports.requestPasswordReset = async (req, res) => {
     }
     
     // Get user from Firestore
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -415,7 +415,7 @@ exports.verifySecurityAnswer = async (req, res) => {
     }
     
     // Get user data
-    const userRef = db.collection('users').doc(resetData.email);
+    const userRef = db.collection('Users').doc(resetData.email);
     const userDoc = await userRef.get();
     const userData = userDoc.data();
     
@@ -503,7 +503,7 @@ exports.resetPassword = async (req, res) => {
     });
     
     // Reset failed login attempts
-    const userRef = db.collection('users').doc(resetData.email);
+    const userRef = db.collection('Users').doc(resetData.email);
     await userRef.update({
       failedAttempts: 0,
       lockedUntil: null,
