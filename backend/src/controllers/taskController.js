@@ -120,10 +120,7 @@ exports.createTask = async (req, res) => {
 
         if (task.recurrence && task.recurrence.enabled) {
             const recurrence = task.recurrence;
-            
-            // ADDED: taskOwnerDepartment to the recurring task master document
             const recurringTaskRef = await db.collection('recurringTasks').add({
-                userId: assigneeId,
                 taskOwner: task.taskOwner,
                 taskOwnerDepartment: taskOwnerDepartment, // ADDED
                 recurrence: recurrence,
@@ -151,7 +148,7 @@ exports.createTask = async (req, res) => {
             }
 
             if (addFn) {
-                addFn(current); // Move to the next recurrence date after the first
+                addFn(current);
                 while (current <= end) {
                     let dueDateInstance = new Date(current);
                     if (recurrence.dueOffset && recurrence.dueOffsetUnit) {
@@ -164,7 +161,6 @@ exports.createTask = async (req, res) => {
                         createdAt: admin.firestore.Timestamp.now(),
                         updatedAt: admin.firestore.Timestamp.now(),
                         recurringTaskId: recurringTaskRef.id
-                        // taskOwnerDepartment is already included in 'task' via req.body spread
                     };
                     await db.collection('tasks').add(recurringTaskInstance);
                     const next = new Date(current);
@@ -690,17 +686,30 @@ exports.unarchiveTask = async (req, res) => {
 
 // Get All Recurring Tasks
 exports.getAllRecurringTasks = async (req, res) => {
-// No changes needed here.
     try {
-        const snapshot = await db.collection('recurringTasks').get();
+        // Get userId from query parameters or request user
+        const userId = req.user.email;
+        
+        if (!userId) {
+            return res.status(400).json({ error: 'User ID is required' });
+        }
+
+        // Query recurring tasks for the specific user
+        const snapshot = await db.collection('recurringTasks')
+            .where('taskOwner', '==', userId)
+            .get();
+            
         const recurringTasks = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             createdAt: formatTimestampToISO(doc.data().createdAt),
             updatedAt: formatTimestampToISO(doc.data().updatedAt),
         }));
+        
+        console.log(`Found ${recurringTasks.length} recurring tasks for user: ${userId}`);
         res.status(200).json(recurringTasks);
     } catch (err) {
+        console.error('Get recurring tasks error:', err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -709,15 +718,15 @@ exports.getAllRecurringTasks = async (req, res) => {
 exports.updateRecurringTask = async (req, res) => {
     try {
         const recurringTaskId = req.params.id;
-        // ADDED: taskOwnerDepartment destructuring
-        const { userId, recurrence, taskOwner, taskOwnerDepartment } = req.body;
+        
+        const {recurrence, taskOwner, taskOwnerDepartment } = req.body;
 
         const recurringUpdateData = {
             recurrence,
             updatedAt: admin.firestore.Timestamp.now()
         };
         if (taskOwner) recurringUpdateData.taskOwner = taskOwner;
-        // ADDED: Update taskOwnerDepartment in the recurring task master document
+        
         if (taskOwnerDepartment) recurringUpdateData.taskOwnerDepartment = taskOwnerDepartment; 
 
         await db.collection('recurringTasks').doc(recurringTaskId).update(recurringUpdateData);
