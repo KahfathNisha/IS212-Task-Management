@@ -1,5 +1,6 @@
 const { db, admin } = require('../config/firebase');
 const taskModel = require('../models/taskModel');
+const NotificationService = require('../services/notificationService');
 
 // --- Helper function for Timestamp conversion ---
 const formatTimestampToISO = (timestamp) => {
@@ -231,6 +232,9 @@ exports.getTask = async (req, res) => {
 exports.getAllTasks = async (req, res) => {
 // No changes needed here, it returns all stored data.
     try {
+        const { email, role, department } = req.user;
+        console.log('📋 [getAllTasks] Fetching tasks for:', { email, role, department });
+        
         const snapshot = await db.collection('tasks').get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -242,6 +246,7 @@ exports.getAllTasks = async (req, res) => {
                 updatedAt: formatTimestampToISO(data.updatedAt)
             };
         });
+        console.log('✅ [getAllTasks] Returning', tasks.length, 'tasks');
         res.status(200).json(tasks);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -310,7 +315,9 @@ exports.updateTask = async (req, res) => {
             const newDueDate = new Date(dueDate).toISOString().split('T')[0];
 
             // If the date is being changed AND the logged-in user is NOT the task owner
-            if (originalDueDateISO !== newDueDate && originalTask.taskOwner !== loggedInUser.name) {
+            // Check both email and name for compatibility
+            const isOwner = originalTask.taskOwner === loggedInUser.email || originalTask.taskOwner === loggedInUser.name;
+            if (originalDueDateISO !== newDueDate && !isOwner) {
                 return res.status(403).json({ message: "Forbidden: Only the task owner can change the due date." });
             }
         }
@@ -348,6 +355,39 @@ exports.updateTask = async (req, res) => {
         // Check for assignee changes to trigger email notifications
         const oldAssigneeId = originalTask.assigneeId;
         const newAssigneeId = otherFields.assigneeId;
+
+        // VALIDATION: Prevent same-tier assignment and transfer ownership when assigned
+        if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId) {
+            // Fetch new assignee's user data to check their role
+            const newAssigneeDoc = await db.collection('Users').doc(newAssigneeId).get();
+            
+            if (!newAssigneeDoc.exists) {
+                return res.status(404).json({ message: 'New assignee not found' });
+            }
+            
+            const newAssigneeData = newAssigneeDoc.data();
+            
+            // Hierarchy: director > manager > staff (HR has special permissions but can't be assigned)
+            const roleHierarchy = { 'director': 3, 'manager': 2, 'staff': 1, 'hr': 0 };
+            const assignerRole = roleHierarchy[loggedInUser.role.toLowerCase()] || 0;
+            const assigneeRole = roleHierarchy[newAssigneeData.role?.toLowerCase()] || 0;
+            
+            // Prevent assignment if assignee is same tier or higher
+            if (assigneeRole >= assignerRole) {
+                return res.status(403).json({ message: 'Cannot assign tasks to users of the same or higher tier' });
+            }
+            
+            // Transfer ownership to assignee
+            updateData.taskOwner = newAssigneeId;
+            
+            // Also update taskOwnerDepartment to match assignee's department
+            const newAssigneeDept = newAssigneeData.department;
+            if (newAssigneeDept) {
+                updateData.taskOwnerDepartment = newAssigneeDept;
+            }
+            
+            console.log(`✅ [updateTask] Transferring ownership to: ${newAssigneeId} (${newAssigneeData.role})`);
+        }
 
         const { id, createdAt, ...finalUpdateData } = updateData;
 

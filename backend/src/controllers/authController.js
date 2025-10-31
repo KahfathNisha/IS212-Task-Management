@@ -523,4 +523,82 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
+/**
+ * POST /api/auth/register
+ * Creates a new user in Firebase Auth and Firestore.
+ */
+exports.registerUser = async (req, res) => {
+  try {
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      department,
+      role,
+      title, // From your 'Michelle Goh' example
+      securityQuestion,
+      securityAnswer
+    } = req.body;
+
+    // --- Backend Validation (AC4, AC6) ---
+    if (!email || !password || !firstName || !lastName || !department || !role || !title || !securityQuestion || !securityAnswer) {
+      return res.status(400).json({ success: false, message: "All fields are required." });
+    }
+    
+    // Password strength check
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passRegex.test(password)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Password must be 8+ characters and include an uppercase, lowercase, number, and special character." 
+      });
+    }
+
+    // --- Check if user already exists (AC8) ---
+    try {
+      await admin.auth().getUserByEmail(email);
+      // If the above line does not throw an error, the user exists.
+      return res.status(409).json({ success: false, message: "This account is already in use" });
+    } catch (error) {
+      // "auth/user-not-found" is the expected error, which means we can proceed.
+      if (error.code !== 'auth/user-not-found') {
+        throw error; // Re-throw any other unexpected auth errors
+      }
+    }
+
+    // --- Create User in Firebase Authentication ---
+    const userRecord = await admin.auth().createUser({
+      email: email,
+      password: password,
+      displayName: `${firstName} ${lastName}`,
+    });
+
+    // --- Create User Profile in Firestore (AC1) ---
+    // Using 'Users' (uppercase) as we fixed before
+    const userDocRef = db.collection('Users').doc(email); 
+    
+    await userDocRef.set({
+      uid: userRecord.uid,
+      name: `${firstName} ${lastName}`,
+      email: email,
+      role: role,
+      department: department,
+      title: title,
+      securityQuestion: securityQuestion,
+      securityAnswer: securityAnswer, // Note: In a real app, you'd HASH this answer
+      testEmail: "breannong@gmail.com", // The constant testEmail we implemented
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      failedAttempts: 0,
+      lockedUntil: null
+    });
+
+    // --- Success (AC7) ---
+    return res.status(201).json({ success: true, message: "Registration was successful." });
+
+  } catch (error) {
+    console.error('Error in /register controller:', error);
+    return res.status(500).json({ success: false, message: error.message || 'An internal server error occurred.' });
+  }
+};
 

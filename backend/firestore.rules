@@ -23,19 +23,19 @@ service cloud.firestore {
     }
     
     function isDirector() {
-      return isSignedIn() && getUserRole() == 'director';
+      return isSignedIn() && (getUserRole() == 'director' || getUserRole() == 'Director');
     }
     
     function isManager() {
-      return isSignedIn() && getUserRole() == 'manager';
+      return isSignedIn() && (getUserRole() == 'manager' || getUserRole() == 'Manager');
     }
     
     function isHR() {
-      return isSignedIn() && getUserRole() == 'hr';
+      return isSignedIn() && (getUserRole() == 'hr' || getUserRole() == 'HR');
     }
     
     function isStaff() {
-      return isSignedIn() && getUserRole() == 'staff';
+      return isSignedIn() && (getUserRole() == 'staff' || getUserRole() == 'Staff');
     }
     
     function isProjectMember(projectData) {
@@ -96,7 +96,7 @@ service cloud.firestore {
                     (getUserDepartment() == resource.data.department || isProjectMember(resource.data));
       allow read: if isHR();
       allow read: if isStaff() && isProjectMember(resource.data);
-      allow create: if isSignedIn() && !isHR();
+      allow create: if (isDirector() || isManager() || isStaff()) && !isHR();
       allow update: if isProjectMember(resource.data) && !isHR();
       allow delete: if isOwner(resource.data);
     }
@@ -175,8 +175,8 @@ service cloud.firestore {
     match /categories/{categoryId} {
       // Anyone signed in can read categories
       allow read: if isSignedIn();
-      // Only directors and managers can create/update/delete categories
-      allow write: if isDirector() || isManager();
+      // Directors, managers, and staff can create/update/delete categories
+      allow write: if isDirector() || isManager() || isStaff();
     }
 
     // ========================================

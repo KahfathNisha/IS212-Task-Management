@@ -486,7 +486,7 @@
         :task-statuses="taskStatuses"
         @change-view="currentView = $event"
         @select-task="handleSelectTask"
-        @edit-task="isTaskEditable(selectedListTask) ? editTask : handleReadonlyAction"
+        @edit-task="handleEditTask"
         @change-status="isTaskEditable(selectedListTask) ? handleListStatusChange : handleReadonlyAction"
         @view-parent="viewTaskDetails"
         @open-attachment="openAttachment"
@@ -503,7 +503,7 @@
       :model="selectedTask"
       :taskStatuses="taskStatuses"
       :parentTaskProgress="parentTaskProgress"
-      @edit="isTaskEditable(selectedTask) ? editTask : handleReadonlyAction"
+      @edit="handleEditTask"
       @change-status="isTaskEditable(selectedTask) ? changeTaskStatus : handleReadonlyAction"
       @view-parent="viewTaskDetails"
       @open-attachment="openAttachment" 
@@ -616,10 +616,22 @@ const loadingProjects = ref(false)
 // 🟢 NEW: Granular Task Edit Permission Check (The Core of the HR rule)
 const isTaskEditable = (task) => {
     // If the task is null (i.e., new task being created), check general permission
-    if (!task) return canCreateEdit.value; 
+    if (!task) {
+        console.log('🔍 [isTaskEditable] Task is null, checking canCreateEdit:', canCreateEdit.value);
+        return canCreateEdit.value; 
+    }
+
+    console.log('🔍 [isTaskEditable] Checking permissions:', { 
+        userRole: userRole.value, 
+        isHR: isHR.value, 
+        canCreateEdit: canCreateEdit.value,
+        taskOwner: task.taskOwner,
+        currentUserEmail: userEmail.value
+    });
 
     // Director/Non-HR roles are governed by canCreateEdit logic (assumed full edit)
     if (!isHR.value) {
+        console.log('✅ [isTaskEditable] Non-HR user, editable:', canCreateEdit.value);
         return canCreateEdit.value; 
     }
 
@@ -635,7 +647,9 @@ const isTaskEditable = (task) => {
     const isEditor = Array.isArray(task.collaborators) && 
                      task.collaborators.some(c => (c.email || c.name) === currentUserEmail && c.permission === 'Edit');
     
-    return isOwner || isAssignee || isEditor;
+    const isEditable = isOwner || isAssignee || isEditor;
+    console.log('✅ [isTaskEditable] HR user, editable:', isEditable, { isOwner, isAssignee, isEditor });
+    return isEditable;
 };
 
 // 🟢 NEW: Handler for unauthorized edits
@@ -654,27 +668,55 @@ const handleReadonlyAction = () => {
 // --- TASK VISIBILITY ---
 const userVisibleTasks = computed(() => {
   if (!currentUser.value || !currentUser.value.name) {
+    console.log('⚠️ [userVisibleTasks] No current user');
     return [];
   }
   
   const userName = currentUser.value.name;
+  const userEmailAddr = userEmail.value;
   const userRole = authStore.userRole; 
   const currentDept = userDepartment.value; 
 
-  if (userRole === 'hr' || userRole === 'director') {
-    // HR and Director see all tasks
+  console.log('🔍 [userVisibleTasks] Filtering for:', { userName, userEmailAddr, userRole, currentDept });
+  console.log('🔍 [userVisibleTasks] Total tasks:', tasks.value.length);
+
+  if (userRole === 'director') {
+    // Only Director sees all tasks at organizational level
     return tasks.value; 
   }
 
-  return tasks.value.filter(task => {
-    const isOwner = task.taskOwner === userName;
-    const isAssignee = task.assignedTo === userName;
-    const isCollaborator = Array.isArray(task.collaborators) && 
-                           task.collaborators.some(c => c.name === userName);
-    const isDepartmentTask = currentDept && task.taskOwnerDepartment === currentDept;
+  if (userRole === 'hr') {
+    // HR can view all tasks but cannot edit
+    return tasks.value;
+  }
 
-    return isOwner || isAssignee || isCollaborator || isDepartmentTask;
+  // Manager sees: their own tasks + department tasks + projects they're in
+  if (userRole === 'manager') {
+    const filtered = tasks.value.filter(task => {
+      const isOwner = task.taskOwner === userName || task.taskOwner === userEmailAddr;
+      const isAssignee = task.assignedTo === userName || task.assignedTo === userEmailAddr;
+      const isCollaborator = Array.isArray(task.collaborators) && 
+                             task.collaborators.some(c => (c.name === userName || c.name === userEmailAddr));
+      const isDepartmentTask = currentDept && task.taskOwnerDepartment && task.taskOwnerDepartment.toLowerCase() === currentDept.toLowerCase();
+
+      return isOwner || isAssignee || isCollaborator || isDepartmentTask;
+    });
+    console.log('✅ [userVisibleTasks] Manager filtered:', filtered.length, 'tasks');
+    return filtered;
+  }
+
+  // Staff sees ONLY tasks they're directly involved in (owner/assignee/collaborator)
+  // NO department-level visibility for staff
+  const filtered = tasks.value.filter(task => {
+    const isOwner = task.taskOwner === userName || task.taskOwner === userEmailAddr;
+    const isAssignee = task.assignedTo === userName || task.assignedTo === userEmailAddr;
+    const isCollaborator = Array.isArray(task.collaborators) && 
+                           task.collaborators.some(c => (c.name === userName || c.name === userEmailAddr));
+
+    return isOwner || isAssignee || isCollaborator;
   });
+  console.log('✅ [userVisibleTasks] Staff filtered:', filtered.length, 'tasks');
+  return filtered;
 });
 
 // --- DYNAMIC FILTER OPTIONS & COUNTS ---
@@ -1349,11 +1391,21 @@ const viewTaskDetails = (task) => {
 
 const openAttachment = (url) => window.open(url, '_blank');
 
-const editTask = (task) => {
+const handleEditTask = (task) => {
+  console.log('🔧 [handleEditTask] Called with task:', task?.title);
+  
   if (!isTaskEditable(task)) {
+      console.log('❌ [handleEditTask] Task not editable, calling handleReadonlyAction');
       handleReadonlyAction();
       return;
   }
+  
+  console.log('✅ [handleEditTask] Opening edit dialog');
+  editTask(task);
+}
+
+const editTask = (task) => {
+  console.log('🔧 [editTask] Called with task:', task?.title);
   
   newTask.value = { ...task, collaborators: task.collaborators || [], attachments: task.attachments || [], status: task.status || 'Ongoing', statusHistory: task.statusHistory || [] };
   subtasks.value = task.subtasks ? [...task.subtasks] : [];
@@ -1365,6 +1417,7 @@ const editTask = (task) => {
   isEditing.value = true;
   showCreateDialog.value = true;
   showDetailsDialog.value = false;
+  console.log('✅ [editTask] Dialog should now be visible, showCreateDialog:', showCreateDialog.value);
 }
 
 const cancelCreate = () => {

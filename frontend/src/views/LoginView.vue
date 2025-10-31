@@ -83,6 +83,13 @@
                 >
                   Sign In
                 </v-btn>
+                <v-btn
+                variant="text"
+                block
+                @click="$router.push('/register')"
+              >
+                Don't have an account? Register
+              </v-btn>
               </v-form>
             </v-card-text>
 
