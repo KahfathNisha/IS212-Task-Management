@@ -54,18 +54,47 @@ exports.getAllProjects = async (req, res) => {
       projects = Array.from(projectMap.values());
       
     } else {
-      // Staff see only projects they're members of
-      const snapshot = await projectsRef
-        .where('members', 'array-contains', email)
-        .where('isDeleted', '==', false)
-        .get();
+      // Staff see only projects where they have tasks (owner/assignee/collaborator)
+      console.log('🔍 [getAllProjects] Staff user. Filtering projects by task involvement.');
       
-      projects = snapshot.docs.map(doc => ({
+      // 1. Fetch all tasks where the staff user is involved
+      const tasksSnapshot = await db.collection('tasks').get();
+      const userTasks = tasksSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(task => {
+          const isOwner = task.taskOwner === email || task.taskOwner === req.user.name;
+          const isAssignee = task.assignedTo === email || task.assignedTo === req.user.name;
+          const isCollaborator = Array.isArray(task.collaborators) && 
+                                 task.collaborators.some(c => {
+                                   const collabEmail = typeof c === 'string' ? c : c.email || c.name;
+                                   const collabName = typeof c === 'string' ? c : c.name || c.email;
+                                   return collabEmail === email || collabName === email || 
+                                          collabEmail === req.user.name || collabName === req.user.name;
+                                 });
+          return isOwner || isAssignee || isCollaborator;
+        });
+
+      // 2. Extract unique project IDs from these tasks
+      const projectIdsFromTasks = new Set();
+      userTasks.forEach(task => {
+        if (task.projectId) {
+          projectIdsFromTasks.add(task.projectId);
+        }
+      });
+      console.log('🔍 [getAllProjects] Found', userTasks.length, 'tasks for staff user');
+      console.log('🔍 [getAllProjects] Project IDs from user tasks:', Array.from(projectIdsFromTasks));
+
+      // 3. Fetch all projects and filter by projectIds from tasks
+      const allProjectsSnapshot = await projectsRef.where('isDeleted', '==', false).get();
+      const allProjects = allProjectsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate?.() || new Date(),
         updatedAt: doc.data().updatedAt?.toDate?.() || new Date(),
       }));
+
+      projects = allProjects.filter(project => projectIdsFromTasks.has(project.id));
+      console.log('✅ [getAllProjects] Returning', projects.length, 'projects for staff user (filtered by task involvement)');
     }
     
     // Sort by createdAt
@@ -109,10 +138,16 @@ exports.createProject = async (req, res) => {
     const { email, role, department } = req.user;
     const { name, description, status, department: projectDept, dueDate, owners } = req.body;
     
+    console.log('🔍 [createProject] User:', { email, role, department });
+    console.log('🔍 [createProject] Request body:', { name, projectDept, status });
+    
     // RBAC: Only director, manager, and staff can create projects
     if (role !== 'director' && role !== 'manager' && role !== 'staff') {
+      console.log('❌ [createProject] Role check failed:', role);
       return res.status(403).json({ message: 'Insufficient permissions to create projects' });
     }
+    
+    console.log('✅ [createProject] Role check passed');
     
     if (!name || !name.trim()) {
       return res.status(400).json({ message: 'Project name is required' });
@@ -120,9 +155,12 @@ exports.createProject = async (req, res) => {
     
     // Manager can only create projects in their department
     let finalDepartment = projectDept || department;
-    if (role === 'manager' && projectDept && projectDept !== department) {
+    if (role === 'manager' && projectDept && projectDept.toLowerCase() !== department.toLowerCase()) {
+      console.log('❌ [createProject] Department mismatch - user:', department, 'vs project:', projectDept);
       return res.status(403).json({ message: 'Insufficient permissions: You can only create projects in your department' });
     }
+    
+    console.log('✅ [createProject] Department check passed, using:', finalDepartment);
     
     const projectData = {
       name: name.trim(),

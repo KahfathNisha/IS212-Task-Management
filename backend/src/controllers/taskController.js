@@ -1,5 +1,6 @@
 const { db, admin } = require('../config/firebase');
 const taskModel = require('../models/taskModel');
+const NotificationService = require('../services/notificationService');
 
 // --- Helper function for Timestamp conversion ---
 const formatTimestampToISO = (timestamp) => {
@@ -231,6 +232,9 @@ exports.getTask = async (req, res) => {
 exports.getAllTasks = async (req, res) => {
 // No changes needed here, it returns all stored data.
     try {
+        const { email, role, department } = req.user;
+        console.log('📋 [getAllTasks] Fetching tasks for:', { email, role, department });
+        
         const snapshot = await db.collection('tasks').get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -242,6 +246,7 @@ exports.getAllTasks = async (req, res) => {
                 updatedAt: formatTimestampToISO(data.updatedAt)
             };
         });
+        console.log('✅ [getAllTasks] Returning', tasks.length, 'tasks');
         res.status(200).json(tasks);
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -8,10 +8,10 @@ const { verifyToken, checkRole } = require('../middleware/auth');
 // Get all global categories - accessible to all authenticated users
 router.get('/', verifyToken, categoriesController.getAllCategories);
 
-// Create a new global category - only manager and director
-router.post('/', verifyToken, checkRole('manager', 'director'), categoriesController.createCategory);
+// Create a new global category - director, manager, and staff
+router.post('/', verifyToken, checkRole('director', 'manager', 'staff'), categoriesController.createCategory);
 
-// Delete a global category - only manager and director
-router.delete('/:name', verifyToken, checkRole('manager', 'director'), categoriesController.deleteCategory);
+// Delete a global category - director, manager, and staff
+router.delete('/:name', verifyToken, checkRole('director', 'manager', 'staff'), categoriesController.deleteCategory);
 
 module.exports = router;
