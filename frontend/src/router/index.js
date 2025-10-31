@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth';
 
 // Import views
 import LoginView from '@/views/LoginView.vue';
+import RegisterView from '@/views/RegisterView.vue';
 import PasswordResetView from '@/views/PasswordResetView.vue';
 import Home from '@/views/Home.vue';
 import TasksView from '@/views/Tasks.vue';
@@ -16,6 +17,12 @@ const routes = [
   {
     path: '/',
     redirect: '/login'
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: RegisterView,
+    meta: { public: true } // public: true means user doesn't need to be logged in
   },
   {
     path: '/login',

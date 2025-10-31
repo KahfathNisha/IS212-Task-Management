@@ -45,7 +45,11 @@ router.post('/verify-security-answer', authController.verifySecurityAnswer);
  * Reset password with new password
  */
 router.post('/reset-password', authController.resetPassword);
-
+/**
+ * POST /api/auth/register
+ * Handles a new user self-registering.
+ */
+router.post('/register', authController.registerUser);
 /**
  * GET /api/auth/me
  * Return the authenticated user's profile using Firebase token
