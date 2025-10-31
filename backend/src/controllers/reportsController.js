@@ -28,9 +28,12 @@ exports.generateProjectReport = async (req, res) => {
     }
     // Allow directors to access all projects; managers must be members
     const isDirector = userData.role === 'director';
+    const isManager = userData.role === 'manager';
     if (!isDirector) {
-      if (!projectData.members || !projectData.members.includes(requesterId)) {
-        return res.status(403).json({ success: false, message: 'Forbidden: You are not a member of this project.' });
+      const sameDepartment = isManager && projectData.department && userData.department && projectData.department === userData.department;
+      const isMember = projectData.members && projectData.members.includes(requesterId);
+      if (!sameDepartment && !isMember) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Managers may view only projects in their department or where they are a member.' });
       }
     }
 
@@ -120,7 +123,12 @@ exports.generateDepartmentReport = async (req, res) => {
 
     // Query users by department
     console.log('Querying users with department:', department);
-    const usersSnapshot = await db.collection('users').where('department', '==', department).get();
+    let usersSnapshot;
+    if (department === 'ALL') {
+      usersSnapshot = await db.collection('users').get();
+    } else {
+      usersSnapshot = await db.collection('users').where('department', '==', department).get();
+    }
     const departmentUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     const userEmails = departmentUsers.map(user => user.email);
     console.log(`[DeptReport] Found users:`, userEmails);
@@ -129,9 +137,14 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(200).json({ success: true, report: { departmentName: department, generatedAt: new Date().toISOString(), employeeWorkloads: {}, totalTasks: 0 } });
     }
 
-    // Query tasks for department
-    console.log('Querying tasks with taskOwnerDepartment:', department);
-    const tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
+    // Query tasks for department or all
+    console.log('Querying tasks with taskOwnerDepartment or ALL');
+    let tasksSnapshot;
+    if (department === 'ALL') {
+      tasksSnapshot = await db.collection('tasks').get();
+    } else {
+      tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
+    }
     const allTasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     console.log(`[DeptReport] Found tasks:`, allTasks.map(t => t.id));
 
@@ -178,7 +191,7 @@ exports.generateDepartmentReport = async (req, res) => {
     });
 
     const report = {
-      departmentName: department,
+      departmentName: department === 'ALL' ? 'Company (All)' : department,
       generatedAt: new Date().toISOString(),
       employeeWorkloads,
       totalTasks: tasksSnapshot.size,

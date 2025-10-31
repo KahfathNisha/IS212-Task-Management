@@ -203,7 +203,7 @@
                   <div class="d-flex flex-column align-end">
                     <v-chip-group>
                       <v-chip v-if="task.assignee || task.assignedTo" size="small" class="ml-1 assignee-chip" variant="flat">
-                        {{ (task.assignee && task.getDisplayName(assignee.name) || (task.assignedTo && task.assignedTo)) }}
+                        {{ (task.assignee && task.assignee.name) || (task.assignedTo && task.assignedTo.split('@')[0]) }}
                       </v-chip>
                     </v-chip-group>
                     <div v-if="task.assignee && task.assignee.department" class="text-caption text-medium-emphasis mt-1">
@@ -241,7 +241,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, computed } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
 import Chart from 'chart.js/auto';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -258,43 +258,6 @@ import SPMlogo from '@/assets/SPM.png';
 const authStore = useAuthStore();
 const reportLoading = ref(false);
 const exporting = ref(false);
-const allUsers = ref([]);
-
-// Load users for email to name conversion
-onMounted(async () => {
-  try {
-    const usersSnapshot = await getDocs(collection(db, 'users'))
-    allUsers.value = usersSnapshot.docs.map(doc => ({
-      email: doc.id,
-      name: doc.data().name || doc.id
-    }))
-  } catch (e) {
-    allUsers.value = []
-  }
-})
-
-// Helper to convert assignedTo to display name
-const getDisplayName = (assignedValue) => {
-  if (!assignedValue) return ''
-  
-  let lookupValue
-  if (typeof assignedValue === 'object') {
-    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
-  } else {
-    lookupValue = assignedValue
-  }
-  
-  if (!lookupValue) return ''
-  
-  // If it's already a name, return it
-  if (!lookupValue.includes('@')) {
-    return lookupValue
-  }
-  
-  // If it's an email, look up the name
-  const user = allUsers.value.find(u => u.email === lookupValue)
-  return user && user.name ? user.name : lookupValue
-}
 
 // --- Manager State ---
 const projects = ref([]);
@@ -305,7 +268,7 @@ let statusChart = null;
 let workloadChart = null;
 
 // --- HR State ---
-const departments = ref(['Engineering', 'Finance', 'HR and Admin', 'Operations']); // From your org chart
+const departments = ref(['Company (All)', 'Engineering', 'Finance', 'HR and Admin', 'Operations']);
 const selectedDepartment = ref(null);
 const deptReportData = ref(null);
 let deptWorkloadChart = null;
@@ -371,10 +334,12 @@ async function fetchManagerProjects() {
   projectsLoading.value = true;
   try {
     const token = await authStore.getToken();
-    const response = await fetch(`/api/projects?department=${roleDetails.value.managerDepartment}`, {
+    const response = await fetch(`/api/projects`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    projects.value = response.ok ? await response.json() : [];
+    const raw = response.ok ? await response.json() : [];
+    // Filter to manager department only
+    projects.value = raw.filter(p => (p.department || '').toLowerCase() === roleDetails.value.managerDepartment);
   } catch (e) {
     console.error(e);
     projects.value = [];
@@ -411,7 +376,13 @@ async function fetchProjectReport(projectId) {
   const requesterId = authStore.userEmail;
   try {
     const response = await fetch(`/api/reports/project/${projectId}?requesterId=${requesterId}`);
-    if (!response.ok) throw new Error('Failed to fetch project report');
+    if (!response.ok) {
+      if (response.status === 403) {
+        projectReportData.value = { projectName: 'Unauthorized', generatedAt: new Date().toISOString(), summary: { totalTasks: 0, statusCounts: {}, memberWorkload: {} }, tasks: [] };
+        return;
+      }
+      throw new Error('Failed to fetch project report');
+    }
     const data = await response.json();
     if (data.success) {
       projectReportData.value = data.report;
@@ -437,15 +408,17 @@ async function fetchDepartmentReport(departmentName) {
   deptWorkloadChart = null;
 
   const requesterId = authStore.userEmail;
+  const param = departmentName === 'Company (All)' ? 'ALL' : encodeURIComponent(departmentName);
   try {
-    const response = await fetch(`/api/reports/department?department=${departmentName}&requesterId=${requesterId}`);
+    const response = await fetch(`/api/reports/department?department=${param}&requesterId=${requesterId}`);
     if (!response.ok) throw new Error('Failed to fetch department report');
     const data = await response.json();
     if (data.success) {
       deptReportData.value = data.report;
       if (data.report.totalTasks > 0) {
         await nextTick();
-        renderDepartmentChart();
+        // slight delay to ensure canvas sizing
+        setTimeout(() => renderDepartmentChart(), 80);
       }
     } else {
       console.error('Failed to fetch dept report:', data.message);
@@ -481,7 +454,7 @@ function renderProjectCharts() {
     workloadChart = new Chart(workloadCtx, {
       type: 'bar',
       data: {
-        labels: Object.keys(summary.memberWorkload).map(e => getDisplayName(e)),
+        labels: Object.keys(summary.memberWorkload).map(e => e.split('@')[0]),
         datasets: [{ label: 'Number of Tasks Assigned', data: Object.values(summary.memberWorkload), backgroundColor: '#7E57C2' }]
       },
        options: { responsive: true, maintainAspectRatio: false }
@@ -505,7 +478,8 @@ function renderDepartmentChart() {
 
   const workloadCtx = document.getElementById('dept-workload-chart');
   if (workloadCtx) {
-    deptWorkloadChart = new Chart(workloadCtx, {
+    const ctx = workloadCtx.getContext('2d');
+    deptWorkloadChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
@@ -529,33 +503,54 @@ async function exportToPDF(elementId, reportName) {
   }
   
   exporting.value = true;
-  const reportElement = document.getElementById(elementId);
-  const exportButton = document.getElementById(elementId === 'proj-report-content' ? 'export-button-proj' : 'export-button-hr');
-  const pdfLogos = document.querySelectorAll('.pdf-only');
+  const sourceEl = document.getElementById(elementId);
+  if (!sourceEl) { exporting.value = false; return; }
 
-  if (!reportElement) { exporting.value = false; return; }
-  if (exportButton) exportButton.style.display = 'none';
-  // Show PDF-only elements
-  pdfLogos.forEach(el => el.style.display = 'flex');
+  // Create an offscreen clone for crisp A4 export (no flicker on page)
+  const cloneWrapper = document.createElement('div');
+  cloneWrapper.style.position = 'fixed';
+  cloneWrapper.style.left = '-99999px';
+  cloneWrapper.style.top = '0';
+  cloneWrapper.style.width = '900px';
+  cloneWrapper.style.background = '#ffffff';
+  cloneWrapper.style.padding = '18px';
+  cloneWrapper.style.borderRadius = '12px';
+
+  // Add logo to the clone only
+  const logoDiv = document.createElement('div');
+  logoDiv.style.display = 'flex';
+  logoDiv.style.justifyContent = 'center';
+  logoDiv.style.marginBottom = '16px';
+  const img = document.createElement('img');
+  img.src = SPMlogo;
+  img.alt = 'SPM Logo';
+  img.style.maxWidth = '230px';
+  img.style.maxHeight = '100px';
+  img.style.objectFit = 'contain';
+  logoDiv.appendChild(img);
+  cloneWrapper.appendChild(logoDiv);
+
+  const contentClone = sourceEl.cloneNode(true);
+  contentClone.style.width = '900px';
+  contentClone.style.background = '#ffffff';
+  cloneWrapper.appendChild(contentClone);
+  document.body.appendChild(cloneWrapper);
 
   try {
-      await new Promise(resolve => setTimeout(resolve, 120));
-      const canvas = await html2canvas(reportElement, { scale: 2, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const margin = 10;
-      const pdfWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', margin, margin, pdfWidth, pdfHeight);
-      pdf.save(`${reportName}_Report.pdf`);
-  } catch (error) {
-      console.error("Error generating PDF:", error);
+    await new Promise(r => setTimeout(r, 80));
+    const canvas = await html2canvas(cloneWrapper, { scale: 2, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
+    const pdfWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, 'PNG', margin, margin, pdfWidth, pdfHeight);
+    pdf.save(`${reportName}_Report.pdf`);
+  } catch (e) {
+    console.error('Error generating PDF:', e);
   } finally {
-      if (exportButton) exportButton.style.display = '';
-      // Hide PDF-only elements back
-      pdfLogos.forEach(el => el.style.display = 'none');
-      exporting.value = false;
+    document.body.removeChild(cloneWrapper);
+    exporting.value = false;
   }
 }
 </script>
