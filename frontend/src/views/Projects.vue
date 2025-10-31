@@ -370,10 +370,19 @@
             class="department-card"
           >
             <div class="dept-header">
-              <h3>{{ dept }}</h3>
-              <v-chip size="small">
-                {{ getProjectsByDepartment(dept).length }} projects
-              </v-chip>
+              <div>
+                <h3>{{ dept }}</h3>
+                <v-chip size="small">
+                  {{ getProjectsByDepartment(dept).length }} projects
+                </v-chip>
+              </div>
+              <v-btn 
+                v-if="authStore.userRole === 'director' || authStore.userRole === 'hr'"
+                icon="mdi-pencil" 
+                size="small" 
+                variant="text"
+                @click.stop="editDepartment(dept)"
+              />
             </div>
 
             <div class="dept-stats">
@@ -563,11 +572,11 @@
       {{ snackbarMessage }}
     </v-snackbar>
 
-    <!-- Add Department Dialog -->
+    <!-- Add/Edit Department Dialog -->
     <v-dialog v-model="showAddDepartmentDialog" max-width="600px">
       <v-card>
         <v-card-title class="d-flex justify-space-between align-center">
-          <span>Add New Department</span>
+          <span>{{ isEditingDepartment ? 'Edit Department' : 'Add New Department' }}</span>
           <v-btn icon size="small" @click="showAddDepartmentDialog = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
@@ -611,14 +620,14 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer/>
-          <v-btn @click="showAddDepartmentDialog = false">Cancel</v-btn>
+          <v-btn @click="cancelDepartmentEdit">Cancel</v-btn>
           <v-btn 
             color="primary" 
             :loading="departmentWriteLoading" 
             :disabled="!newDepartmentTitle || newDepartmentMembers.length == 0" 
             @click="createDepartment"
           >
-            Create
+            {{ isEditingDepartment ? 'Update' : 'Create' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -632,7 +641,7 @@ import { useAuthStore } from '@/stores/auth'
 import { projectService } from '@/services/projectService'
 import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
 import axios from 'axios'
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import ProjectTasks from '@/components/ProjectTasks.vue'
 
@@ -673,18 +682,21 @@ const snackbarColor = ref('success')
 const newCategoryInput = ref('')
 const newGlobalCategory = ref('')
 
-// State for Add Department Modal
+// State for Add/Edit Department Modal
 const showAddDepartmentDialog = ref(false);
+const isEditingDepartment = ref(false);
+const editingDepartmentId = ref(null);
 const newDepartmentTitle = ref('');
 const newDepartmentMembers = ref([]);
 const departmentWriteLoading = ref(false);
 const allUsers = ref([]);
+const allDepartments = ref([]);
 
 // View tabs
 const viewTabs = [
   { label: 'Projects', value: 'projects' },
   { label: 'Categories', value: 'categories' },
-  { label: 'Workload', value: 'workload' }
+  { label: 'Department', value: 'workload' }
 ]
 
 // Filter states
@@ -774,11 +786,26 @@ const loadCategories = async () => {
   }
 }
 
+// Load departments from Firebase
+async function loadDepartments() {
+  try {
+    const deptSnapshot = await getDocs(collection(db, 'departments'));
+    allDepartments.value = deptSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error loading departments:', error);
+    allDepartments.value = [];
+  }
+}
+
 // Load projects when component mounts
 onMounted(async () => {
   await loadCategories()  // Load global categories first
   await loadProjects()     // Then load projects
   await fetchAllUsers();
+  await loadDepartments();
 })
 
 
@@ -1510,7 +1537,7 @@ defineProps(); // To support script setup even if not used for now
 const visibleDepartments = computed(() => {
   if (authStore.userRole === 'director' || authStore.userRole === 'hr') {
     return realDepartments.value;
-  } else if (authStore.userRole === 'manager') {
+  } else if (authStore.userRole === 'manager' || authStore.userRole === 'staff') {
     if (authStore.userData?.department && realDepartments.value.includes(authStore.userData.department)) {
       return [authStore.userData.department];
     } else {
@@ -1537,29 +1564,65 @@ async function fetchAllUsers() {
   }
 }
 
-// Department create method
+// Edit department function
+function editDepartment(deptName) {
+  const dept = allDepartments.value.find(d => d.title === deptName);
+  if (dept) {
+    editingDepartmentId.value = dept.id;
+    newDepartmentTitle.value = dept.title;
+    newDepartmentMembers.value = dept.members || [];
+    isEditingDepartment.value = true;
+    showAddDepartmentDialog.value = true;
+  }
+}
+
+// Cancel department edit
+function cancelDepartmentEdit() {
+  showAddDepartmentDialog.value = false;
+  newDepartmentTitle.value = '';
+  newDepartmentMembers.value = [];
+  editingDepartmentId.value = null;
+  isEditingDepartment.value = false;
+}
+
+// Department create/edit method
 async function createDepartment() {
-  // RBAC: Only directors and HR can create departments
+  // RBAC: Only directors and HR can create/edit departments
   if (authStore.userRole !== 'director' && authStore.userRole !== 'hr') {
-    showMessage('Only directors and HR can create departments', 'error')
+    showMessage('Only directors and HR can create/edit departments', 'error')
     return
   }
   
   departmentWriteLoading.value = true;
   try {
-    // Write to 'departments' collection
-    await addDoc(collection(db, 'departments'), {
-      title: newDepartmentTitle.value.trim(),
-      members: newDepartmentMembers.value, // array of user emails
-      createdAt: new Date().toISOString()
-    });
-    showMessage(`Department "${newDepartmentTitle.value}" created successfully`, 'success')
+    if (isEditingDepartment.value && editingDepartmentId.value) {
+      // Update existing department
+      const deptRef = doc(db, 'departments', editingDepartmentId.value);
+      await updateDoc(deptRef, {
+        title: newDepartmentTitle.value.trim(),
+        members: newDepartmentMembers.value,
+        updatedAt: new Date().toISOString()
+      });
+      showMessage(`Department "${newDepartmentTitle.value}" updated successfully`, 'success')
+    } else {
+      // Create new department
+      await addDoc(collection(db, 'departments'), {
+        title: newDepartmentTitle.value.trim(),
+        members: newDepartmentMembers.value, // array of user emails
+        createdAt: new Date().toISOString()
+      });
+      showMessage(`Department "${newDepartmentTitle.value}" created successfully`, 'success')
+    }
+    
     showAddDepartmentDialog.value = false;
     newDepartmentTitle.value = '';
     newDepartmentMembers.value = [];
+    editingDepartmentId.value = null;
+    isEditingDepartment.value = false;
+    await loadDepartments();
   } catch (error) {
-    console.error('Error creating department:', error)
-    showMessage('Failed to create department: ' + error.message, 'error')
+    console.error('Error creating/updating department:', error)
+    showMessage('Failed to save department: ' + error.message, 'error')
   } finally {
     departmentWriteLoading.value = false;
   }
