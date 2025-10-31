@@ -16,6 +16,7 @@
 
           <div class="header-actions">
             <v-btn icon="mdi-close" class="close-btn" variant="text" size="small" @click="$emit('update:show', false)" />
+            
             <v-select
               :model-value="task.status"
               :items="taskStatuses"
@@ -25,6 +26,7 @@
               @update:modelValue="onChangeStatus"
               class="status-dropdown"
               hide-details
+              :disabled="isReadOnly" 
             ></v-select>
           </div>
         </div>
@@ -270,17 +272,29 @@
       </v-card-text>
 
       <v-card-actions class="task-details-actions">
-        <v-btn color="primary" @click="onEdit" prepend-icon="mdi-pencil" rounded="lg">
+        <v-btn 
+          color="primary" 
+          @click="onEdit" 
+          prepend-icon="mdi-pencil" 
+          rounded="lg"
+          :disabled="isReadOnly"
+        >
           {{ task.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
         </v-btn>
         <v-spacer />
-        <v-btn color="error" @click="onArchive" prepend-icon="mdi-archive" rounded="lg">
+        <v-btn 
+          color="error" 
+          @click="onArchive" 
+          prepend-icon="mdi-archive" 
+          rounded="lg"
+          :disabled="isReadOnly"
+        >
           Archive
         </v-btn>
       </v-card-actions>
 
       <v-dialog v-model="showArchiveConfirm" max-width="400">
-        <v-card class="archive-confirm-card">
+        <v-card v-if="!isReadOnly" class="archive-confirm-card">
           <v-card-title>Archive Task?</v-card-title>
           <v-card-text>
             Are you sure you want to archive this task? You can unarchive it later from the archived tasks list.
@@ -306,7 +320,9 @@ const props = defineProps({
   model: { type: Object, default: null },
   show: { type: Boolean, default: false },
   taskStatuses: { type: Array, default: () => ['To Do', 'In Progress', 'Done'] },
-  parentTaskProgress: { type: Number, default: 0 }
+  parentTaskProgress: { type: Number, default: 0 },
+  // 🟢 NEW PROP: Accept the read-only status
+  isReadOnly: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:show', 'edit', 'change-status', 'view-parent', 'open-attachment', 'archive'])
@@ -365,12 +381,16 @@ const getPermissionColor = (permission) => {
 const formatDate = (s) => s ? new Date(s).toLocaleDateString() : ''
 const formatDateTime = (s) => s ? new Date(s).toLocaleString() : ''
 
+// 🟢 RESTRICTED: Add check to onEdit
 const onEdit = () => {
+  if (props.isReadOnly) return; // Prevent action even if button is somehow clicked
   if (!task.value) return
   emit('edit', task.value)
 }
 
+// 🟢 RESTRICTED: Add check to onChangeStatus
 const onChangeStatus = (newStatus) => {
+  if (props.isReadOnly) return; // Prevent action
   if (!task.value || !task.value.id) return;
   emit('change-status', { taskId: task.value.id, status: newStatus }) 
 }
@@ -385,7 +405,9 @@ const onOpenAttachment = (url) => {
   emit('open-attachment', url)
 }
 
+// 🟢 RESTRICTED: Add check to onArchive
 const onArchive = () => {
+  if (props.isReadOnly) return; // Prevent action
   showArchiveConfirm.value = true
 }
 

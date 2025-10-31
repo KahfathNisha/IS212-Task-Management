@@ -309,7 +309,7 @@
 [data-theme="dark"] .task-item.task-overdue,
 [data-theme="dark"] .week-task-item.task-overdue {
   background-color: rgba(239, 83, 80, 0.15) !important; /* Darker red tint */
-  border: 1px dashed #e57373 !important; /* Lighter red for dashed border in dark mode */
+  border: 1px solid #e57373 !important; /* Lighter red for dashed border in dark mode */
   border-left: 4px solid #ef5350 !important; /* Standard material red */
 }
 
@@ -1255,4 +1255,72 @@
 [data-theme="dark"] .view-tab.active {
   color: #f7fafc;
   border-bottom-color: #5a7a9b;
+}
+
+.header-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  min-width: fit-content !important;
+}
+
+/* Ensure all icon buttons are the same size */
+.recurring-btn,
+.archive-btn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  flex-shrink: 0 !important;
+}
+
+.add-task-btn {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  height: 36px !important; /* Match icon buttons */
+  min-width: 80px !important; /* Reduced from 100px */
+  max-width: 100px !important; /* Add max width */
+  padding: 0 8px !important; /* Reduced padding */
+  font-size: 12
+  px !important; /* Smaller font */
+}
+
+/* Responsive adjustments if needed */
+@media (max-width: 1024px) {
+  .header-right {
+    gap: 6px !important;
+  }
+  
+  .recurring-btn,
+  .archive-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+  }
+  
+  .add-task-btn {
+    height: 32px !important;
+    min-width: 60px !important;
+    padding: 0 6px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Ensure the main header has proper flex behavior */
+.view-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  gap: 16px !important;
+  flex-wrap: nowrap !important;
+}
+
+.header-left {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.header-right {
+  flex: 0 0 auto !important; /* This prevents the right side from shrinking */
 }
