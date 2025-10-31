@@ -80,21 +80,7 @@ const deleteCategory = async (req, res) => {
     // Delete the category
     await categorySnapshot.docs[0].ref.delete();
     
-    // Also remove this category from all projects
-    const projectsRef = db.collection('projects');
-    const projectsSnapshot = await projectsRef
-      .where('categories', 'array-contains', decodeURIComponent(name))
-      .get();
-    
-    const batch = db.batch();
-    projectsSnapshot.docs.forEach(doc => {
-      const updatedCategories = doc.data().categories.filter(
-        cat => cat !== decodeURIComponent(name)
-      );
-      batch.update(doc.ref, { categories: updatedCategories });
-    });
-    
-    await batch.commit();
+    // Categories are task-level only, no need to clean up projects
     
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {

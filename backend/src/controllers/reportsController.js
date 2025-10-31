@@ -14,7 +14,7 @@ exports.generateProjectReport = async (req, res) => {
 
     const [projectDoc, userDoc] = await Promise.all([
       db.collection('projects').doc(projectId).get(),
-      db.collection('users').doc(requesterId).get()
+      db.collection('Users').doc(requesterId).get()
     ]);
 
     if (!projectDoc.exists) return res.status(404).json({ success: false, message: 'Project not found.' });
@@ -42,7 +42,7 @@ exports.generateProjectReport = async (req, res) => {
 
     // Batch fetch assignee info for all assigned emails
     const assigneeEmails = Array.from(new Set(tasks.map(t => t.assignedTo).filter(Boolean)));
-    const userDocs = await Promise.all(assigneeEmails.map(email => db.collection('users').doc(email).get()));
+    const userDocs = await Promise.all(assigneeEmails.map(email => db.collection('Users').doc(email).get()));
     const emailToUser = {};
     userDocs.forEach(doc => {
       if (doc.exists) emailToUser[doc.id] = {
@@ -105,7 +105,7 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized.' });
     }
     // Authorization: Check if requester is HR
-    const userDoc = await db.collection('users').doc(requesterId).get();
+    const userDoc = await db.collection('Users').doc(requesterId).get();
     if (!userDoc.exists || userDoc.data().role !== 'hr') {
       console.log('Requester is not HR, forbidden. Role:', userDoc.data()?.role);
       return res.status(403).json({ success: false, message: 'Forbidden: Only HR can generate this report.' });
@@ -125,9 +125,9 @@ exports.generateDepartmentReport = async (req, res) => {
     console.log('Querying users with department:', department);
     let usersSnapshot;
     if (department === 'ALL') {
-      usersSnapshot = await db.collection('users').get();
+      usersSnapshot = await db.collection('Users').get();
     } else {
-      usersSnapshot = await db.collection('users').where('department', '==', department).get();
+      usersSnapshot = await db.collection('Users').where('department', '==', department).get();
     }
     const departmentUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     const userEmails = departmentUsers.map(user => user.email);

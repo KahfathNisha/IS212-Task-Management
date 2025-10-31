@@ -1,6 +1,6 @@
 
 // Note: Email serves as the Firestore document ID, so it's not stored as a field
-// User documents are accessed as: db.collection('users').doc(email)
+// User documents are accessed as: db.collection('Users').doc(email)
 
 const userModel = {
     // Core user information

@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.token.email)).data;
+      return get(/databases/$(database)/documents/Users/$(request.auth.token.email)).data;
     }
     
     function getUserRole() {
@@ -50,7 +50,7 @@ service cloud.firestore {
     // ========================================
     // Users Collection
     // ========================================
-    match /users/{userId} {
+    match /Users/{userId} {
       // Users can read their own profile
       allow read: if isSignedIn() && request.auth.token.email == userId;
       
@@ -167,6 +167,26 @@ service cloud.firestore {
       allow read: if isSignedIn() && 
                     resource.data.userId == request.auth.token.email;
       allow write: if isSignedIn();
+    }
+
+    // ========================================
+    // Categories Collection
+    // ========================================
+    match /categories/{categoryId} {
+      // Anyone signed in can read categories
+      allow read: if isSignedIn();
+      // Only directors and managers can create/update/delete categories
+      allow write: if isDirector() || isManager();
+    }
+
+    // ========================================
+    // Departments Collection
+    // ========================================
+    match /departments/{departmentId} {
+      // Anyone signed in can read departments
+      allow read: if isSignedIn();
+      // Only directors and HR can create/update/delete departments
+      allow write: if isDirector() || isHR();
     }
   }
 }

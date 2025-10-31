@@ -7,7 +7,7 @@ router.post('/save-fcm-token', async (req, res) => {
     if (!userId || !fcmToken) return res.status(400).json({ error: "Missing fields" });
 
     try {
-        await db.collection('users').doc(userId).update({ fcmToken });
+        await db.collection('Users').doc(userId).update({ fcmToken });
         console.log(`✅ Saved FCM token for ${userId}`);
         res.json({ success: true });
     } catch (err) {

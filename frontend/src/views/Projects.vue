@@ -1552,7 +1552,7 @@ const isStaff = computed(() => authStore.userRole === 'staff');
 // Fetch all users for member dropdown
 async function fetchAllUsers() {
   try {
-    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const usersSnapshot = await getDocs(collection(db, 'Users'));
     allUsers.value = usersSnapshot.docs.map(doc => ({
       email: doc.id,
       name: doc.data().name || doc.id,

@@ -4,7 +4,7 @@ const NotificationService = require('../services/notificationService');
 
 async function processDeadlineReminders(now) {
     // Get all users with notifications enabled
-    const usersSnapshot = await db.collection("users")
+    const usersSnapshot = await db.collection("Users")
         .where("notificationSettings.emailEnabled", "==", true)
         .get();
 
@@ -125,7 +125,7 @@ if (!global.reminderJobStarted) {
                 await doc.ref.update({ sent: true, sentAt: now });
 
                 // Fetch user document
-                const userDoc = await db.collection("users").doc(reminder.userId).get();
+                const userDoc = await db.collection("Users").doc(reminder.userId).get();
                 if (!userDoc.exists || !userDoc.data().fcmToken) {
                     console.log(`[ReminderJob] User ${reminder.userId} has no FCM token`);
                     continue;
@@ -207,7 +207,7 @@ if (!global.reminderJobStarted) {
 //                 console.log(`[ReminderJob] Reminder due → Task: ${reminder.taskId}, User: ${reminder.userId}`);
 
 //                 // Lookup user device token: email (eg. john.doe@company.com)
-//                 const userDoc = await db.collection("users").doc(reminder.userId).get();
+//                 const userDoc = await db.collection("Users").doc(reminder.userId).get();
 //                 const userToken = userDoc.exists ? userDoc.data().fcmToken : null;
 
 //                 if (userToken) {

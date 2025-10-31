@@ -174,7 +174,7 @@ const allUsers = ref([])
 // Load users for email to name conversion
 onMounted(async () => {
   try {
-    const usersSnapshot = await getDocs(collection(db, 'users'))
+    const usersSnapshot = await getDocs(collection(db, 'Users'))
     allUsers.value = usersSnapshot.docs.map(doc => ({
       email: doc.id,
       name: doc.data().name || doc.id
