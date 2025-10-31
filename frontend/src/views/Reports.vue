@@ -87,7 +87,7 @@
                 <template #append>
                   <div class="d-flex flex-column align-end">
                     <v-chip-group>
-                      <v-chip v-for="assignee in task.assignedTo" :key="assignee" size="small" class="ml-1">{{ assignee.split('@')[0] }}</v-chip>
+                      <v-chip v-for="assignee in task.assignedTo" :key="assignee" size="small" class="ml-1">{{ getDisplayName(assignee) }}</v-chip>
                     </v-chip-group>
                     <span v-if="task.dueDate" class="text-caption text-medium-emphasis mt-1">
                       Due: {{ task.dueDate ? new Date(task.dueDate.seconds * 1000).toLocaleDateString() : 'N/A' }}
@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, onMounted } from 'vue';
 import Chart from 'chart.js/auto';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -123,6 +123,43 @@ const projectsLoading = ref(true);
 const reportLoading = ref(false);
 const exporting = ref(false);
 const reportData = ref(null);
+const allUsers = ref([]);
+
+// Load users for email to name conversion
+onMounted(async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id
+    }))
+  } catch (e) {
+    allUsers.value = []
+  }
+})
+
+// Helper to convert assignedTo to display name
+const getDisplayName = (assignedValue) => {
+  if (!assignedValue) return ''
+  
+  let lookupValue
+  if (typeof assignedValue === 'object') {
+    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
+  } else {
+    lookupValue = assignedValue
+  }
+  
+  if (!lookupValue) return ''
+  
+  // If it's already a name, return it
+  if (!lookupValue.includes('@')) {
+    return lookupValue
+  }
+  
+  // If it's an email, look up the name
+  const user = allUsers.value.find(u => u.email === lookupValue)
+  return user && user.name ? user.name : lookupValue
+}
 
 let statusChart = null;
 let workloadChart = null;
@@ -227,7 +264,7 @@ function renderCharts() {
     workloadChart = new Chart(workloadCtx, {
       type: 'bar',
       data: {
-        labels: Object.keys(summary.memberWorkload).map(e => e.split('@')[0]),
+        labels: Object.keys(summary.memberWorkload).map(e => getDisplayName(e)),
         datasets: [{ label: 'Number of Tasks Assigned', data: Object.values(summary.memberWorkload), backgroundColor: '#7E57C2' }]
       },
        options: { responsive: true, maintainAspectRatio: false }

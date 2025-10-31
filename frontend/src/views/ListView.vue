@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/config/firebase'
 
 // ===========================
 // Props Definition
@@ -524,12 +526,50 @@ function onDocClick(e) {
   if (!sortWrapper.value?.contains(e.target)) sortOpen.value = false
 }
 
-onMounted(() => document.addEventListener('click', onDocClick, { capture: true }))
+// Load users for email to name conversion
+const allUsers = ref([])
+
+onMounted(async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id
+    }))
+  } catch (e) {
+    allUsers.value = []
+  }
+  document.addEventListener('click', onDocClick, { capture: true })
+})
+
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick, { capture: true }))
 
 // ===========================
 // Utility Methods
 // ===========================
+
+// Helper to convert assignedTo to display name
+const getDisplayName = (assignedValue) => {
+  if (!assignedValue) return ''
+  
+  let lookupValue
+  if (typeof assignedValue === 'object') {
+    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
+  } else {
+    lookupValue = assignedValue
+  }
+  
+  if (!lookupValue) return ''
+  
+  // If it's already a name, return it
+  if (!lookupValue.includes('@')) {
+    return lookupValue
+  }
+  
+  // If it's an email, look up the name
+  const user = allUsers.value.find(u => u.email === lookupValue)
+  return user && user.name ? user.name : lookupValue
+}
 
 /**
  * Get color for task status
@@ -862,7 +902,7 @@ defineExpose({
                   </div>
                   <div v-if="task.assignedTo" class="meta-item">
                     <v-icon size="small">mdi-account</v-icon>
-                    <span>{{ task.assignedTo }}</span>
+                    <span>{{ getDisplayName(task.assignedTo) }}</span>
                   </div>
                   <div v-if="task.priority" class="meta-item">
                     <v-icon size="small">mdi-flag</v-icon>
@@ -988,7 +1028,7 @@ defineExpose({
                       <v-icon size="small" class="detail-icon">mdi-account</v-icon>
                       <h4>Assigned To</h4>
                     </div>
-                    <p>{{ selectedTask.assignedTo || 'Unassigned' }}</p>
+                    <p>{{ getDisplayName(selectedTask.assignedTo) || 'Unassigned' }}</p>
                   </div>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -1092,7 +1132,7 @@ defineExpose({
                     <div class="subtask-meta">
                       <span v-if="subtask.assignedTo" class="subtask-assignee">
                         <v-icon size="x-small">mdi-account</v-icon>
-                        {{ subtask.assignedTo }}
+                        {{ getDisplayName(subtask.assignedTo) }}
                       </span>
                       <span v-if="subtask.dueDate" class="subtask-date">
                         <v-icon size="x-small">mdi-calendar</v-icon>

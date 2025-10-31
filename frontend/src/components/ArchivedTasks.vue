@@ -33,7 +33,7 @@
                 <div><strong>Status:</strong> {{ task.status }}</div>
                 <div><strong>Priority:</strong> {{ task.priority }}</div>
                 <div v-if="task.dueDate"><strong>Due:</strong> {{ formatDate(task.dueDate) }}</div>
-                <div v-if="task.assigneeId"><strong>Assignee:</strong> {{ task.assigneeId }}</div>
+                <div v-if="task.assigneeId"><strong>Assignee:</strong> {{ getDisplayName(task.assigneeId) }}</div>
                 <div v-if="task.recurrence && task.recurrence.enabled">
                   <strong>Recurrence:</strong>
                   {{ formatRecurrence(task.recurrence) }}
@@ -51,8 +51,10 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/config/firebase'
 
 const props = defineProps({
   show: Boolean
@@ -64,6 +66,43 @@ watch(() => props.show, v => dialog.value = v)
 watch(dialog, v => { if (!v) emit('close') })
 
 const archivedTasks = ref([])
+const allUsers = ref([])
+
+// Load users for email to name conversion
+onMounted(async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id
+    }))
+  } catch (e) {
+    allUsers.value = []
+  }
+})
+
+// Helper to convert assignedTo to display name
+const getDisplayName = (assignedValue) => {
+  if (!assignedValue) return ''
+  
+  let lookupValue
+  if (typeof assignedValue === 'object') {
+    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
+  } else {
+    lookupValue = assignedValue
+  }
+  
+  if (!lookupValue) return ''
+  
+  // If it's already a name, return it
+  if (!lookupValue.includes('@')) {
+    return lookupValue
+  }
+  
+  // If it's an email, look up the name
+  const user = allUsers.value.find(u => u.email === lookupValue)
+  return user && user.name ? user.name : lookupValue
+}
 
 const fetchArchivedTasks = async () => {
   const res = await axios.get('http://localhost:3000/tasks?archived=true')

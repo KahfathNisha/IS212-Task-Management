@@ -71,7 +71,7 @@
               <div class="detail-item" v-if="task.assignedTo">
                 <v-icon size="16" class="detail-icon">mdi-account</v-icon>
                 <span class="detail-label">Assigned to:</span>
-                <span class="detail-value">{{ task.assignedTo }}</span>
+                <span class="detail-value">{{ getDisplayName(task.assignedTo) }}</span>
               </div>
               
               <div class="detail-item" v-if="task.priority">
@@ -147,9 +147,11 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import EditRecurrenceDialog from './EditRecurrenceDialog.vue'
 import axios from 'axios'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/config/firebase'
 
 const props = defineProps({
   show: { type: Boolean, default: false }
@@ -162,6 +164,43 @@ const dialog = ref(props.show)
 const recurringTasks = ref([])
 const editingId = ref(null)
 const loading = ref(false)
+const allUsers = ref([])
+
+// Load users for email to name conversion
+onMounted(async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id
+    }))
+  } catch (e) {
+    allUsers.value = []
+  }
+})
+
+// Helper to convert assignedTo to display name
+const getDisplayName = (assignedValue) => {
+  if (!assignedValue) return ''
+  
+  let lookupValue
+  if (typeof assignedValue === 'object') {
+    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
+  } else {
+    lookupValue = assignedValue
+  }
+  
+  if (!lookupValue) return ''
+  
+  // If it's already a name, return it
+  if (!lookupValue.includes('@')) {
+    return lookupValue
+  }
+  
+  // If it's an email, look up the name
+  const user = allUsers.value.find(u => u.email === lookupValue)
+  return user && user.name ? user.name : lookupValue
+}
 
 // Computed
 const editingTask = computed(() =>

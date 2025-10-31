@@ -13,7 +13,7 @@
           </div>
           <div v-if="task.assignedTo" class="task-detail-item">
             <v-icon size="16" class="detail-icon">mdi-account</v-icon>
-            <span>Assigned to: {{ task.assignedTo }}</span>
+            <span>Assigned to: {{ displayAssignedTo }}</span>
           </div>
         </div>
       </div>
@@ -51,11 +51,56 @@
 </template>
 
 <script setup>
+import { ref, onMounted, computed } from 'vue'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/config/firebase'
+
 const props = defineProps({
   task: { type: Object, required: true }
 })
 
 const emit = defineEmits(['view-task'])
+
+// Load users for email to name conversion
+const allUsers = ref([])
+
+onMounted(async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id
+    }))
+  } catch (e) {
+    allUsers.value = []
+  }
+})
+
+// Convert assignedTo to display name
+const displayAssignedTo = computed(() => {
+  if (!props.task?.assignedTo) return ''
+  
+  const assignedValue = props.task.assignedTo
+  
+  // Handle if it's an object
+  let lookupValue
+  if (typeof assignedValue === 'object') {
+    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
+  } else {
+    lookupValue = assignedValue
+  }
+  
+  if (!lookupValue) return ''
+  
+  // If it's already a name, return it
+  if (!lookupValue.includes('@')) {
+    return lookupValue
+  }
+  
+  // If it's an email, look up the name
+  const user = allUsers.value.find(u => u.email === lookupValue)
+  return user && user.name ? user.name : lookupValue
+})
 
 // Methods
 const getStatusColor = (status) => {

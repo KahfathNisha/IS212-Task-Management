@@ -68,7 +68,7 @@
                 <v-icon size="small" class="detail-icon">mdi-account</v-icon>
                 <h4>Assigned To</h4>
               </div>
-              <p>{{ task.assignedTo || 'Unassigned' }}</p>
+              <p>{{ getDisplayName(task.assignedTo) || 'Unassigned' }}</p>
             </div>
           </v-col>
         </v-row>
@@ -226,7 +226,7 @@
                   <v-col cols="6">
                     <div class="detail-row" v-if="subtask.assignedTo">
                       <v-icon size="small" class="detail-icon">mdi-account</v-icon>
-                      <p>{{ subtask.assignedTo }}</p>
+                      <p>{{ getDisplayName(subtask.assignedTo) }}</p>
                     </div>
                   </v-col>
                   <v-col cols="6">
@@ -297,8 +297,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import '../assets/styles.css';
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/config/firebase'
 
 const props = defineProps({
   model: { type: Object, default: null },
@@ -308,6 +310,44 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:show', 'edit', 'change-status', 'view-parent', 'open-attachment', 'archive'])
+
+// Load users for email to name conversion
+const allUsers = ref([])
+
+onMounted(async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'))
+    allUsers.value = usersSnapshot.docs.map(doc => ({
+      email: doc.id,
+      name: doc.data().name || doc.id
+    }))
+  } catch (e) {
+    allUsers.value = []
+  }
+})
+
+// Helper to convert assignedTo to display name
+const getDisplayName = (assignedValue) => {
+  if (!assignedValue) return ''
+  
+  let lookupValue
+  if (typeof assignedValue === 'object') {
+    lookupValue = assignedValue.name || assignedValue.email || assignedValue.value
+  } else {
+    lookupValue = assignedValue
+  }
+  
+  if (!lookupValue) return ''
+  
+  // If it's already a name, return it
+  if (!lookupValue.includes('@')) {
+    return lookupValue
+  }
+  
+  // If it's an email, look up the name
+  const user = allUsers.value.find(u => u.email === lookupValue)
+  return user && user.name ? user.name : lookupValue
+}
 
 const task = computed(() => props.model)
 const parentProgress = computed(() => props.parentTaskProgress || 0)

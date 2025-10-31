@@ -273,24 +273,20 @@
               <p class="project-description">{{ project.description }}</p>
               
               <!-- Categories -->
-              <div class="project-categories" v-if="project.categories?.length">
-                <v-chip 
-                  v-for="category in project.categories" 
-                  :key="category"
-                  size="small"
-                  class="category-chip"
-                  :color="getCategoryColor(category)"
-                >
-                  <v-icon size="14" start>mdi-tag</v-icon>
-                  {{ category }}
-                </v-chip>
-              </div>
+          <div class="project-categories" v-if="getProjectTaskCategories(project).length">
+            <v-chip 
+              v-for="category in getProjectTaskCategories(project)" 
+              :key="category"
+              size="small"
+              class="category-chip"
+              :color="getCategoryColor(category)"
+            >
+              <v-icon size="14" start>mdi-tag</v-icon>
+              {{ category }}
+            </v-chip>
+          </div>
 
               <div class="project-meta">
-                <div class="meta-item">
-                  <v-icon size="18" class="meta-icon">mdi-account-multiple</v-icon>
-                  <span>{{ project.members?.length || 0 }} members</span>
-                </div>
                 <div class="meta-item">
                   <v-icon size="18" class="meta-icon">mdi-checkbox-marked-circle-outline</v-icon>
                   <span>{{ project.completedTasks || 0 }}/{{ project.totalTasks || 0 }} tasks</span>
@@ -309,26 +305,6 @@
                   <span class="progress-text">{{ project.progress || 0 }}%</span>
                 </div>
               </div>
-              <div class="avatars" v-if="project.members?.length">
-                <v-tooltip
-                  v-for="(member, idx) in project.members.slice(0, 5)" 
-                  :key="idx"
-                  :text="member.name || member"
-                >
-                  <template v-slot:activator="{ props }">
-                    <div 
-                      v-bind="props"
-                      class="avatar"
-                      :style="{ background: getAvatarColor(idx) }"
-                    >
-                      {{ getInitials(member) }}
-                    </div>
-                  </template>
-                </v-tooltip>
-                <div v-if="project.members.length > 5" class="avatar avatar-more">
-                  +{{ project.members.length - 5 }}
-                </div>
-              </div>
             </div>
 
             <!-- Expanded Details -->
@@ -340,83 +316,12 @@
                   @view-task="viewTask"
                   @task-updated="refreshProject"
               />
-              <!-- Tasks by Category -->
-              <div class="details-section">
-                <div class="section-header">
-                  <h4>Tasks by Category</h4>
-                  <v-btn 
-                    size="small" 
-                    variant="text" 
-                    prepend-icon="mdi-tag-plus"
-                    @click="manageCategoriesForProject(project)"
-                  >
-                    Manage Categories
-                  </v-btn>
-                </div>
-
-                <div v-if="project.categories?.length" class="categories-section">
-                  <div 
-                    v-for="category in project.categories" 
-                    :key="category"
-                    class="category-group"
-                  >
-                    <div class="category-header">
-                      <v-chip 
-                        size="small"
-                        :color="getCategoryColor(category)"
-                      >
-                        <v-icon size="14" start>mdi-tag</v-icon>
-                        {{ category }}
-                      </v-chip>
-                      <span class="task-count">{{ getTasksByCategory(project, category).length }} tasks</span>
-                    </div>
-
-                    <div class="category-tasks">
-                      <div 
-                        v-for="task in getTasksByCategory(project, category)" 
-                        :key="task.id"
-                        class="task-item"
-                      >
-                        <v-icon size="20" class="task-icon">mdi-checkbox-blank-circle-outline</v-icon>
-                        <div class="task-content">
-                          <div class="task-title">{{ task.title }}</div>
-                          <div class="task-meta">
-                            <span>{{ task.assignedTo }}</span>
-                            <span>•</span>
-                            <span>Due: {{ formatDate(task.dueDate) }}</span>
-                          </div>
-                        </div>
-                        <v-chip 
-                          :color="getStatusColor(task.status)" 
-                          size="small"
-                        >
-                          {{ task.status }}
-                        </v-chip>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else class="no-categories">
-                  <v-icon size="48" color="grey-lighten-1">mdi-tag-outline</v-icon>
-                  <p>No categories assigned</p>
-                  <v-btn 
-                    size="small" 
-                    variant="text" 
-                    prepend-icon="mdi-tag-plus"
-                    @click="manageCategoriesForProject(project)"
-                  >
-                    Add Categories
-                  </v-btn>
-                </div>
-              </div>
-
               <!-- Team Members Section -->
-              <div class="details-section" v-if="project.members?.length">
+              <div class="details-section" v-if="getProjectTeamMembers(project).length > 0">
                 <h4>Team Members</h4>
                 <div class="team-members">
                   <div 
-                    v-for="(member, idx) in project.members" 
+                    v-for="(member, idx) in getProjectTeamMembers(project)" 
                     :key="idx" 
                     class="team-member"
                   >
@@ -427,9 +332,10 @@
                       {{ getInitials(member) }}
                     </div>
                     <div class="member-info">
-                      <div class="member-name">{{ typeof member === 'string' ? member : member.name }}</div>
+                      <div class="member-name">{{ member.name }}</div>
+                      <div class="member-email" v-if="member.name !== member.email">{{ member.email }}</div>
                       <div class="member-role" v-if="member.role">{{ member.role }}</div>
-                      <div class="member-tasks">{{ getMemberTaskCount(project, typeof member === 'string' ? member : member.name) }} tasks</div>
+                      <div class="member-tasks">{{ getMemberTaskCountForEmail(project, member.email) }} tasks</div>
                     </div>
                   </div>
                 </div>
@@ -574,45 +480,7 @@
             class="mt-2"
           />
 
-          <div class="mt-4">
-            <div class="text-subtitle-2 mb-2">Categories</div>
-            <div v-if="newProject.categories?.length" class="d-flex flex-wrap ga-2 mb-2">
-              <v-chip 
-                v-for="category in newProject.categories" 
-                :key="category"
-                closable
-                @click:close="removeCategory(category)"
-                :color="getCategoryColor(category)"
-                size="small"
-              >
-                <v-icon start size="14">mdi-tag</v-icon>
-                {{ category }}
-              </v-chip>
-            </div>
-            <v-row dense>
-              <v-col cols="9">
-                <v-select
-                  v-model="newCategoryInput"
-                  :items="allCategories"
-                  label="Add Category"
-                  variant="outlined"
-                  density="comfortable"
-                  clearable
-                />
-              </v-col>
-              <v-col cols="3">
-                <v-btn 
-                  color="primary" 
-                  block
-                  @click="addCategory"
-                  :disabled="!newCategoryInput"
-                  height="40"
-                >
-                  Add
-                </v-btn>
-              </v-col>
-            </v-row>
-          </div>
+          
         </v-card-text>
 
         <v-card-actions>
@@ -786,8 +654,7 @@ const newProject = ref({
   description: '',
   status: 'Ongoing',
   department: 'Engineering',
-  dueDate: '',
-  categories: []
+  dueDate: ''
 })
 
 // Real Firebase data
@@ -837,28 +704,14 @@ const loadCategories = async () => {
 onMounted(async () => {
   await loadCategories()  // Load global categories first
   await loadProjects()     // Then load projects
-  fetchAllUsers();
+  await fetchAllUsers();
 })
 
 
 // Computed
 const allCategories = computed(() => {
-  // Get categories from global collection
-  const categories = new Set()
-  
-  // Add global categories
-  globalCategories.value.forEach(cat => {
-    categories.add(cat.name)
-  })
-  
-  // Also add categories from projects (in case some aren't in global yet)
-  projects.value.forEach(project => {
-    if (project.categories) {
-      project.categories.forEach(cat => categories.add(cat))
-    }
-  })
-  
-  return Array.from(categories).sort()
+  // Only use global categories. Projects no longer carry categories.
+  return globalCategories.value.map(cat => cat.name).sort()
 })
 
 const categoryFilterOptions = computed(() => {
@@ -877,8 +730,18 @@ const filteredStatusOptions = computed(() => {
   )
 })
 
+// Compute actual department list (from projects)
+const realDepartments = computed(() => {
+  return Array.from(new Set(projects.value.filter(p => p.department).map(p => p.department))).sort();
+});
+
+// Options for department filter dropdown
+const departmentFilterOptions = computed(() => {
+  return realDepartments.value.map(dep => ({ title: dep, value: dep }))
+});
+
 const filteredDepartmentOptions = computed(() => {
-  return departmentFilterOptions.filter(opt => 
+  return (departmentFilterOptions.value || []).filter(opt => 
     opt.title.toLowerCase().includes(searchDepartment.value.toLowerCase())
   )
 })
@@ -922,9 +785,11 @@ const filteredProjects = computed(() => {
   }
 
   if (selectedCategories.value.length > 0) {
-    filtered = filtered.filter(project => 
-      project.categories?.some(cat => selectedCategories.value.includes(cat))
-    )
+    filtered = filtered.filter(project => {
+      const taskCats = new Set()
+      ;(project.tasks || []).forEach(t => (t.categories || []).forEach(c => taskCats.add(c)))
+      return selectedCategories.value.some(c => taskCats.has(c))
+    })
   }
 
   return filtered
@@ -1014,25 +879,145 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const getTasksByCategory = (project, category) => {
-  if (!project.tasks) return []
-  return project.tasks.filter(task => task.categories?.includes(category))
+// Get unique categories present in a project's tasks
+const getProjectTaskCategories = (project) => {
+  const set = new Set()
+  if (project && project.tasks) {
+    project.tasks.forEach(t => (t.categories || []).forEach(c => set.add(c)))
+  }
+  return Array.from(set).sort()
 }
 
 const getMemberTaskCount = (project, memberName) => {
   if (!project.tasks) return 0
-  return project.tasks.filter(task => task.assignedTo === memberName).length
+  return project.tasks.filter(task => 
+    task.assignedTo === memberName || 
+    task.assigneeId === memberName ||
+    task.taskOwner === memberName ||
+    (task.collaborators && task.collaborators.includes(memberName))
+  ).length
+}
+
+// Helper function to extract string value from field (handles objects)
+const extractFieldValue = (field) => {
+  if (!field) return null
+  if (typeof field === 'string') return field
+  if (typeof field === 'object') {
+    return field.name || field.email || field.value || null
+  }
+  return String(field)
+}
+
+// Get task count for a member by email (checks all possible fields)
+const getMemberTaskCountForEmail = (project, memberEmail) => {
+  if (!project.tasks) return 0
+  return project.tasks.filter(task => {
+    // Check all fields that might contain this user's email or name
+    const assignedTo = extractFieldValue(task.assignedTo)
+    const assigneeId = extractFieldValue(task.assigneeId)
+    const taskOwner = extractFieldValue(task.taskOwner)
+    const collaborators = (task.collaborators || []).map(extractFieldValue)
+    
+    // Check if any field matches the email
+    const matchesEmail = [assignedTo, assigneeId, taskOwner].some(field => 
+      field === memberEmail
+    ) || collaborators.includes(memberEmail)
+    
+    // Also check if any field matches a name that corresponds to this email
+    const user = allUsers.value.find(u => u.email === memberEmail)
+    if (user && user.name) {
+      const matchesName = [assignedTo, assigneeId, taskOwner].some(field => 
+        field === user.name || field === user.name.toLowerCase()
+      ) || collaborators.some(collab => collab === user.name || collab === user.name.toLowerCase())
+      
+      return matchesEmail || matchesName
+    }
+    
+    return matchesEmail
+  }).length
+}
+
+// Get all team members involved in project tasks (assignedTo, assigneeId, taskOwner, collaborators)
+const getProjectTeamMembers = (project) => {
+  if (!project.tasks || project.tasks.length === 0) return []
+  
+  const membersMap = new Map() // Map email -> display info
+  
+  project.tasks.forEach(task => {
+    // Helper function to add member with deduplication
+    const addMember = (memberValue) => {
+      if (!memberValue) return
+      
+      // Use the helper function to extract the string value
+      const memberStr = extractFieldValue(memberValue)
+      if (!memberStr || memberStr === '[object Object]') return
+      const trimmed = memberStr.trim()
+      if (!trimmed) return
+      
+      // Check if this value is an email or a name
+      const isEmail = trimmed.includes('@')
+      
+      let userEmail = trimmed
+      let displayName = trimmed
+      
+      // Try to find the user in allUsers
+      let user = null
+      if (isEmail) {
+        // Lookup by email
+        user = allUsers.value.find(u => u.email === trimmed)
+      } else {
+        // Lookup by name (case-insensitive)
+        user = allUsers.value.find(u => 
+          (u.name && u.name.toLowerCase().trim() === trimmed.toLowerCase()) ||
+          (u.email && u.email.toLowerCase().trim() === trimmed.toLowerCase())
+        )
+      }
+      
+      // Only add if we found the user in allUsers - this ensures proper deduplication
+      if (user && user.email) {
+        userEmail = user.email
+        displayName = user.name || user.email
+        
+        // Use email as the unique key to prevent duplicates
+        if (!membersMap.has(userEmail)) {
+          membersMap.set(userEmail, {
+            email: userEmail,
+            name: displayName,
+            displayText: displayName === userEmail ? displayName : `${displayName} (${userEmail})`
+          })
+        }
+      }
+      // Skip entries that aren't found in allUsers to prevent duplicates
+    }
+    
+    // Add assignedTo if it exists
+    if (task.assignedTo) addMember(task.assignedTo)
+    
+    // Add assigneeId if it exists
+    if (task.assigneeId) addMember(task.assigneeId)
+    
+    // Add taskOwner if it exists
+    if (task.taskOwner) addMember(task.taskOwner)
+    
+    // Add all collaborators if they exist
+    if (task.collaborators && Array.isArray(task.collaborators)) {
+      task.collaborators.forEach(collab => addMember(collab))
+    }
+  })
+  
+  // Return unique members as an array
+  return Array.from(membersMap.values())
 }
 
 const getProjectsByCategory = (category) => {
-  return projects.value.filter(project => project.categories?.includes(category))
+  return projects.value.filter(project => (project.tasks || []).some(t => (t.categories || []).includes(category)))
 }
 
 const getTasksCountByCategory = (category) => {
   let count = 0
   projects.value.forEach(project => {
-    if (project.categories?.includes(category) && project.tasks) {
-      count += project.tasks.filter(task => task.categories?.includes(category)).length
+    if (project.tasks) {
+      count += project.tasks.filter(task => (task.categories || []).includes(category)).length
     }
   })
   return count
@@ -1042,8 +1027,8 @@ const getCompletionRateByCategory = (category) => {
   let total = 0
   let completed = 0
   projects.value.forEach(project => {
-    if (project.categories?.includes(category) && project.tasks) {
-      const categoryTasks = project.tasks.filter(task => task.categories?.includes(category))
+    if (project.tasks) {
+      const categoryTasks = project.tasks.filter(task => (task.categories || []).includes(category))
       total += categoryTasks.length
       completed += categoryTasks.filter(task => task.status === 'Completed').length
     }
@@ -1110,10 +1095,31 @@ const editProject = (project) => {
   isEditing.value = true
   showCreateDialog.value = true
 }
-const manageCategoriesForProject = (project) => {
-  // This would open a dialog to manage categories for a specific project
-  // For now, you can edit the project to change categories
-  editProject(project)
+// Category management is global only; no per-project management
+const manageCategoriesForProject = () => {}
+
+const createGlobalCategory = async () => {
+  const categoryName = newGlobalCategory.value.trim()
+  if (!categoryName) return
+
+  try {
+    // Call the API to create the category
+    const response = await axiosClient.post('/categories', {
+      name: categoryName
+    })
+    
+    // Close dialog and reset
+    showAddCategoryDialog.value = false
+    newGlobalCategory.value = ''
+    
+    // Reload categories and projects
+    await loadCategories()
+    await loadProjects()
+    showMessage(`Category "${categoryName}" added successfully`, 'success')
+  } catch (error) {
+    console.error('Error creating category:', error)
+    showMessage(error.response?.data?.error || 'Failed to create category', 'error')
+  }
 }
 
 const addGlobalCategory = async (category) => {
@@ -1180,22 +1186,12 @@ const resetForm = () => {
     description: '',
     status: 'Ongoing',
     department: 'Engineering',
-    dueDate: '',
-    categories: []
+    dueDate: ''
   }
   isEditing.value = false
   newCategoryInput.value = ''
 }
-const addCategory = () => {
-  if (newCategoryInput.value && !newProject.value.categories.includes(newCategoryInput.value)) {
-    newProject.value.categories.push(newCategoryInput.value)
-    newCategoryInput.value = ''
-  }
-}
-
-const removeCategory = (category) => {
-  newProject.value.categories = newProject.value.categories.filter(c => c !== category)
-}
+// Removed project-level category add/remove
 
 
 const showMessage = (message, color = 'success') => {
@@ -1466,11 +1462,6 @@ async function fetchAllUsers() {
   }
 }
 
-// Compute actual department list (from projects)
-const realDepartments = computed(() => {
-  return Array.from(new Set(projects.value.filter(p => p.department).map(p => p.department))).sort();
-});
-
 // Department create method
 async function createDepartment() {
   departmentWriteLoading.value = true;
@@ -1492,22 +1483,7 @@ async function createDepartment() {
   }
 }
 
-// Fix the watchers - this should be at the bottom of your script
-watch(() => props.show, (newValue) => {
-  console.log('👀 ProjectTasks show prop changed:', newValue, 'for project:', props.projectId)
-  if (newValue && props.projectId) {
-    loadTasks()
-  }
-}, { immediate: true })
-
-watch(() => props.projectId, (newValue, oldValue) => {
-  console.log('🔄 ProjectTasks projectId changed from', oldValue, 'to', newValue)
-  if (newValue && props.show) {
-    loadTasks()
-  }
-})
-
-// Remove any onMounted hook - the watcher handles it
+// Removed stray watchers referencing undefined props
 </script>
 
 
@@ -2157,6 +2133,15 @@ watch(() => props.projectId, (newValue, oldValue) => {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.member-email {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .member-email {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .member-role {

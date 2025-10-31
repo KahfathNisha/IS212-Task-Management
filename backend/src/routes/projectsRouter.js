@@ -8,8 +8,4 @@ router.get('/:id', verifyToken, projectsController.getProject);
 router.post('/', verifyToken, projectsController.createProject);
 router.put('/:id', verifyToken, projectsController.updateProject);
 
-// Category management routes
-router.post('/:id/categories', verifyToken, projectsController.addCategory);
-router.delete('/:id/categories/:category', verifyToken, projectsController.removeCategory);
-
 module.exports = router;
