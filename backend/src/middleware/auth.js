@@ -100,7 +100,31 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
+/**
+ * Check if user has required role
+ */
+const checkRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(403).json({
+        success: false,
+        message: 'User role not found'
+      });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions'
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   loginRateLimiter,
-  verifyToken
+  verifyToken,
+  checkRole
 };

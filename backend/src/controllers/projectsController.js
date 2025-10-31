@@ -107,20 +107,32 @@ exports.getProject = async (req, res) => {
 exports.createProject = async (req, res) => {
   try {
     const { email, role, department } = req.user;
-    const { name, description, status, department: projectDept, dueDate } = req.body;
+    const { name, description, status, department: projectDept, dueDate, owners } = req.body;
+    
+    // RBAC: Only director, manager, and staff can create projects
+    if (role !== 'director' && role !== 'manager' && role !== 'staff') {
+      return res.status(403).json({ message: 'Insufficient permissions to create projects' });
+    }
     
     if (!name || !name.trim()) {
       return res.status(400).json({ message: 'Project name is required' });
+    }
+    
+    // Manager can only create projects in their department
+    let finalDepartment = projectDept || department;
+    if (role === 'manager' && projectDept && projectDept !== department) {
+      return res.status(403).json({ message: 'Insufficient permissions: You can only create projects in your department' });
     }
     
     const projectData = {
       name: name.trim(),
       description: description || '',
       status: status || 'Ongoing',
-      department: projectDept || department,
+      department: finalDepartment,
       dueDate: dueDate || null,
       members: [email],
       createdBy: email,
+      owners: owners || [email],
       createdAt: new Date(),
       updatedAt: new Date(),
       isDeleted: false,
@@ -147,13 +159,31 @@ exports.createProject = async (req, res) => {
 exports.updateProject = async (req, res) => {
   try {
     const projectId = req.params.id;
-    const { name, description, status, department, dueDate } = req.body;
+    const { name, description, status, department, dueDate, owners } = req.body;
+    const { email, role, department: userDept } = req.user;
     
     const projectRef = db.collection('projects').doc(projectId);
     const projectDoc = await projectRef.get();
     
     if (!projectDoc.exists) {
       return res.status(404).json({ message: 'Project not found' });
+    }
+    
+    const projectData = projectDoc.data();
+    
+    // RBAC: Only director, manager, and staff can update projects
+    if (role !== 'director' && role !== 'manager' && role !== 'staff') {
+      return res.status(403).json({ message: 'Insufficient permissions to update projects' });
+    }
+    
+    // Manager can only update projects in their department
+    if (role === 'manager' && projectData.department !== userDept) {
+      return res.status(403).json({ message: 'Insufficient permissions: You can only update projects in your department' });
+    }
+    
+    // Prevent managers from changing department
+    if (role === 'manager' && department !== undefined && department !== projectData.department) {
+      return res.status(403).json({ message: 'Insufficient permissions: Managers cannot change project department' });
     }
     
     const updateData = {
@@ -165,6 +195,7 @@ exports.updateProject = async (req, res) => {
     if (status !== undefined) updateData.status = status;
     if (department !== undefined) updateData.department = department;
     if (dueDate !== undefined) updateData.dueDate = dueDate;
+    if (owners !== undefined) updateData.owners = owners;
     // categories are no longer stored on projects
     
     await projectRef.update(updateData);
@@ -172,7 +203,7 @@ exports.updateProject = async (req, res) => {
     console.log('✅ Updated project:', projectId);
     res.status(200).json({ 
       id: projectId,
-      ...projectDoc.data(),
+      ...projectData,
       ...updateData
     });
     

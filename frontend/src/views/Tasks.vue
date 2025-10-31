@@ -593,13 +593,10 @@ const userEmail = computed(() => authStore.userEmail);
 const isHR = computed(() => userRole.value === 'hr');
 const isDirector = computed(() => userRole.value === 'director'); 
 
-// General permission to create/edit: true for HR, Director, and standard roles (e.g., engineering). 
-// Assuming a standard user should also be able to create tasks.
-// If Sally Loh is HR, this should be TRUE so she can click 'Add Task'.
+// General permission to create/edit: true for all roles EXCEPT HR
 const canCreateEdit = computed(() => {
     const role = userRole.value;
-    return role === 'hr' || role === 'director' || role === 'engineering' || role === 'marketing'; 
-    // Add all roles that should generally have write permission to general buttons
+    return role !== 'hr';
 });
 
 

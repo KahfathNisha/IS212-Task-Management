@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/taskController');
 // 1. Import the middleware
-const { verifyToken } = require('../middleware/auth.js');
+const { verifyToken, checkRole } = require('../middleware/auth.js');
 
-// Create a new task
-router.post('/', verifyToken, taskController.createTask);
+// Create a new task (HR cannot create tasks)
+router.post('/', verifyToken, (req, res, next) => {
+  if (req.user?.role === 'hr') {
+    return res.status(403).json({ message: 'HR cannot create tasks' });
+  }
+  next();
+}, taskController.createTask);
 
 // Get all tasks
 router.get('/', verifyToken, taskController.getAllTasks);

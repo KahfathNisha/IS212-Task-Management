@@ -480,6 +480,36 @@
             class="mt-2"
           />
 
+          <v-autocomplete
+            v-model="newProject.owners"
+            label="Owners"
+            :items="allUsers"
+            item-title="name"
+            item-value="email"
+            multiple
+            chips
+            variant="outlined"
+            density="comfortable"
+            class="mt-2"
+            prepend-inner-icon="mdi-account-multiple"
+          >
+            <template v-slot:item="{ props: itemProps, item }">
+              <v-list-item v-bind="itemProps">
+                <template v-slot:prepend>
+                  <v-avatar size="32">
+                    {{ getInitials(item.raw.name) }}
+                  </v-avatar>
+                </template>
+                <v-list-item-title>{{ item.raw.name }}</v-list-item-title>
+                <v-list-item-subtitle>{{ item.raw.department }}</v-list-item-subtitle>
+                <template v-slot:append>
+                  <v-chip size="small" color="primary" variant="flat">
+                    {{ item.raw.department }}
+                  </v-chip>
+                </template>
+              </v-list-item>
+            </template>
+          </v-autocomplete>
           
         </v-card-text>
 
@@ -534,19 +564,62 @@
     </v-snackbar>
 
     <!-- Add Department Dialog -->
-    <v-dialog v-model="showAddDepartmentDialog" max-width="500px">
+    <v-dialog v-model="showAddDepartmentDialog" max-width="600px">
       <v-card>
-        <v-card-title class="d-flex justify-space-between align-center">Add New Department
-          <v-btn icon size="small" @click="showAddDepartmentDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+        <v-card-title class="d-flex justify-space-between align-center">
+          <span>Add New Department</span>
+          <v-btn icon size="small" @click="showAddDepartmentDialog = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
         </v-card-title>
         <v-card-text>
-          <v-text-field v-model="newDepartmentTitle" label="Department Title" :rules="[v => !!v || 'Department title is required']"/>
-          <v-autocomplete v-model="newDepartmentMembers" :items="allUsers" item-title="name" item-value="email" label="Add Members" multiple chips/>
+          <v-text-field 
+            v-model="newDepartmentTitle" 
+            label="Department Title" 
+            :rules="[v => !!v || 'Department title is required']"
+            variant="outlined"
+            class="mb-4"
+          />
+          <v-autocomplete 
+            v-model="newDepartmentMembers" 
+            :items="allUsers" 
+            item-title="name" 
+            item-value="email" 
+            label="Add Members" 
+            multiple 
+            chips
+            variant="outlined"
+            prepend-inner-icon="mdi-account-multiple"
+          >
+            <template v-slot:item="{ props: itemProps, item }">
+              <v-list-item v-bind="itemProps">
+                <template v-slot:prepend>
+                  <v-avatar size="32">
+                    {{ getInitials(item.raw.name) }}
+                  </v-avatar>
+                </template>
+                <v-list-item-title>{{ item.raw.name }}</v-list-item-title>
+                <v-list-item-subtitle>{{ item.raw.email }}</v-list-item-subtitle>
+                <template v-slot:append>
+                  <v-chip size="small" color="primary" variant="flat">
+                    {{ item.raw.department }}
+                  </v-chip>
+                </template>
+              </v-list-item>
+            </template>
+          </v-autocomplete>
         </v-card-text>
         <v-card-actions>
           <v-spacer/>
           <v-btn @click="showAddDepartmentDialog = false">Cancel</v-btn>
-          <v-btn color="primary" :loading="departmentWriteLoading" :disabled="!newDepartmentTitle || newDepartmentMembers.length == 0" @click="createDepartment">Create</v-btn>
+          <v-btn 
+            color="primary" 
+            :loading="departmentWriteLoading" 
+            :disabled="!newDepartmentTitle || newDepartmentMembers.length == 0" 
+            @click="createDepartment"
+          >
+            Create
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -654,7 +727,8 @@ const newProject = ref({
   description: '',
   status: 'Ongoing',
   department: 'Engineering',
-  dueDate: ''
+  dueDate: '',
+  owners: []
 })
 
 // Real Firebase data
@@ -1186,7 +1260,8 @@ const resetForm = () => {
     description: '',
     status: 'Ongoing',
     department: 'Engineering',
-    dueDate: ''
+    dueDate: '',
+    owners: []
   }
   isEditing.value = false
   newCategoryInput.value = ''
@@ -1464,6 +1539,12 @@ async function fetchAllUsers() {
 
 // Department create method
 async function createDepartment() {
+  // RBAC: Only directors and HR can create departments
+  if (authStore.userRole !== 'director' && authStore.userRole !== 'hr') {
+    showMessage('Only directors and HR can create departments', 'error')
+    return
+  }
+  
   departmentWriteLoading.value = true;
   try {
     // Write to 'departments' collection
@@ -1472,12 +1553,13 @@ async function createDepartment() {
       members: newDepartmentMembers.value, // array of user emails
       createdAt: new Date().toISOString()
     });
-    // Optionally, reload/filter projects after department creation (or reload departments if used elsewhere)
+    showMessage(`Department "${newDepartmentTitle.value}" created successfully`, 'success')
     showAddDepartmentDialog.value = false;
     newDepartmentTitle.value = '';
     newDepartmentMembers.value = [];
   } catch (error) {
-    // handle error
+    console.error('Error creating department:', error)
+    showMessage('Failed to create department: ' + error.message, 'error')
   } finally {
     departmentWriteLoading.value = false;
   }

@@ -584,11 +584,15 @@ axiosClient.interceptors.request.use(config => {
 // Load global categories from API
 const loadCategories = async () => {
   try {
+    console.log('🔄 Fetching categories from /categories...')
     const response = await axiosClient.get('/categories')
+    console.log('📥 Categories API response:', response.data)
     availableCategories.value = response.data.map(cat => cat.name)
     console.log('✅ Loaded categories for task:', availableCategories.value)
   } catch (error) {
     console.error('❌ Error loading categories:', error)
+    console.error('❌ Error details:', error.response?.data)
+    console.error('❌ Error status:', error.response?.status)
     availableCategories.value = []
   }
 }
