@@ -1,5 +1,10 @@
 <template>
-  <v-dialog v-model="dialog" max-width="800px" persistent>
+  <v-dialog 
+    v-model="dialog" 
+    :max-width="$vuetify.display.mobile ? '95%' : '800px'"
+    :fullscreen="$vuetify.display.mobile"
+    persistent
+  >
     <v-card class="recurring-tasks-card">
       <v-card-title class="recurring-tasks-header">
         <div class="header-content">
@@ -59,7 +64,7 @@
                 class="edit-btn"
               >
                 <v-icon start size="16">mdi-pencil</v-icon>
-                Edit
+                <span class="d-none d-sm-inline">Edit</span>
               </v-btn>
             </div>
             
@@ -454,6 +459,7 @@ const getNextOccurrence = (recurrence) => {
   font-weight: 600;
   color: #2c3e50;
   line-height: 1.4;
+  word-break: break-word;
 }
 
 .task-badges {
@@ -468,6 +474,7 @@ const getNextOccurrence = (recurrence) => {
   font-size: 14px;
   line-height: 1.5;
   font-style: italic;
+  word-break: break-word;
 }
 
 .task-details-grid {
@@ -485,6 +492,7 @@ const getNextOccurrence = (recurrence) => {
   padding: 8px 12px;
   background: #f8f9fa;
   border-radius: 8px;
+  word-break: break-word;
 }
 
 .detail-icon {
@@ -501,6 +509,7 @@ const getNextOccurrence = (recurrence) => {
 .detail-value {
   color: #2c3e50;
   font-weight: 500;
+  word-break: break-word;
 }
 
 .categories-chips {
@@ -529,7 +538,7 @@ const getNextOccurrence = (recurrence) => {
 .edit-btn {
   flex-shrink: 0;
   height: 36px;
-  min-width: 80px;
+  min-width: 40px;
 }
 
 .empty-state {
@@ -560,20 +569,29 @@ const getNextOccurrence = (recurrence) => {
   color: #adb5bd !important;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* Mobile Responsive Design */
+@media (max-width: 600px) {
+  .recurring-tasks-card {
+    border-radius: 0 !important;
+    height: 100vh;
+  }
+  
   .recurring-tasks-header {
-    padding: 20px 24px;
+    padding: 16px 20px;
   }
   
   .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .header-content h3 {
+    font-size: 18px;
   }
   
   .tasks-list {
-    padding: 16px;
+    padding: 12px;
+    gap: 12px;
   }
   
   .task-card {
@@ -586,8 +604,13 @@ const getNextOccurrence = (recurrence) => {
     gap: 12px;
   }
   
+  .task-title {
+    font-size: 16px;
+  }
+  
   .edit-btn {
     width: 100%;
+    min-width: auto;
   }
   
   .task-details-grid {
@@ -596,7 +619,15 @@ const getNextOccurrence = (recurrence) => {
   }
   
   .empty-state {
-    padding: 60px 20px;
+    padding: 40px 20px;
+  }
+  
+  .empty-state h4 {
+    font-size: 18px;
+  }
+  
+  .recurring-tasks-content {
+    max-height: calc(100vh - 80px);
   }
 }
 
