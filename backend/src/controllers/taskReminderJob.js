@@ -3,91 +3,118 @@ const { db, admin } = require('../config/firebase');
 const NotificationService = require('../services/notificationService');
 
 async function processDeadlineReminders(now) {
-    // Get all users with notifications enabled
-    const usersSnapshot = await db.collection("Users")
-        .where("notificationSettings.emailEnabled", "==", true)
-        .get();
-
-    for (const userDoc of usersSnapshot.docs) {
-        const userData = userDoc.data();
-        const userId = userDoc.id;
-        const settings = userData.notificationSettings;
-        
-        // Get tasks assigned to this user
-        const tasksSnapshot = await db.collection("tasks")
-            .where("assigneeId", "==", userId)
-            .where("archived", "==", false)
+    try {
+        // Get all users with notifications enabled
+        const usersSnapshot = await db.collection("Users")
+            .where("notificationSettings.emailEnabled", "==", true)
             .get();
 
-        for (const taskDoc of tasksSnapshot.docs) {
-            const taskData = taskDoc.data();
-            const dueDate = taskData.dueDate.toDate();
-            const timeDiff = dueDate - now;
-            const hoursUntilDue = timeDiff / (1000 * 60 * 60);
-            const daysUntilDue = hoursUntilDue / 24;
+        if (usersSnapshot.empty) {
+            console.log('No users with email notifications enabled');
+            return;
+        }
 
-            // Get reminder intervals based on user settings
-            let reminderIntervals = [];
-            if (settings.emailReminderType === 'custom' && settings.emailCustomReminders && settings.emailCustomReminders.length > 0) {
-                // Custom reminders are in hours
-                reminderIntervals = settings.emailCustomReminders.map(hours => hours / 24); // Convert to days
-            } else {
-                // Default preset: 1, 3, 7 days
-                reminderIntervals = settings.emailPresetReminders || [1, 3, 7];
+        for (const userDoc of usersSnapshot.docs) {
+            const userData = userDoc.data();
+            const userId = userDoc.id;
+            const settings = userData.notificationSettings || {};
+
+            // Get tasks assigned to this user (only active, non-archived tasks)
+            const tasksSnapshot = await db.collection("tasks")
+                .where("assigneeId", "==", userId)
+                .where("archived", "==", false)
+                .get();
+
+            if (tasksSnapshot.empty) {
+                continue; // No tasks for this user
             }
 
-            // Check if we should send reminder at any of the configured intervals
-            const shouldSendReminder = reminderIntervals.some(interval => Math.abs(daysUntilDue - interval) < 0.1); // Allow small tolerance for timing
+            for (const taskDoc of tasksSnapshot.docs) {
+                const taskData = taskDoc.data();
+                const dueDate = taskData.dueDate.toDate();
+                const timeDiff = dueDate - now;
+                const hoursUntilDue = timeDiff / (1000 * 60 * 60);
+                const daysUntilDue = hoursUntilDue / 24;
 
-            if (shouldSendReminder && hoursUntilDue > 0) {
-                // Check if we already sent a reminder for this specific interval
-                const lastReminderQuery = await db.collection("emailReminders")
-                    .where("userId", "==", userId)
-                    .where("taskId", "==", taskDoc.id)
-                    .where("daysLeft", "==", Math.round(daysUntilDue))
-                    .orderBy("sentAt", "desc")
-                    .limit(1)
-                    .get();
+                // Get reminder intervals based on user settings
+                let reminderIntervals = [];
+                if (settings.emailReminderType === 'custom' && settings.emailCustomReminders && settings.emailCustomReminders.length > 0) {
+                    // Custom reminders are in hours
+                    reminderIntervals = settings.emailCustomReminders.map(hours => hours / 24); // Convert to days
+                } else {
+                    // Default preset: 1, 3, 7 days
+                    reminderIntervals = settings.emailPresetReminders || [1, 3, 7];
+                }
 
-                if (lastReminderQuery.empty) {
-                    const hoursLeft = Math.floor(hoursUntilDue);
-                    const minutesLeft = Math.floor((hoursUntilDue - hoursLeft) * 60);
-                    const daysLeft = Math.round(daysUntilDue);
+                // Check if we should send reminder at any of the configured intervals
+                // OR if task is due within 24 hours (lead time processing)
+                const shouldSendReminder = reminderIntervals.some(interval => Math.abs(daysUntilDue - interval) < 0.5) // Allow tolerance for timing (0.5 days = 12 hours)
+                    || (hoursUntilDue <= 24 && hoursUntilDue > 0); // Lead time: send for tasks due within 24 hours
 
-                    try {
-                        // Create unified notification (database + push + email)
-                        const notificationData = {
-                            title: `Task Deadline Reminder`,
-                            body: `Your task "${taskData.title}" is due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}!`,
-                            taskId: taskDoc.id,
-                            type: 'warning'
-                        };
+                if (shouldSendReminder && hoursUntilDue > 0) {
+                    // Check if we already sent a reminder for this specific interval
+                    // For deadline adjustments, we need to check if a reminder was sent for the SAME interval
+                    // to prevent duplicates but allow different intervals
+                    const lastReminderQuery = await db.collection("emailReminders")
+                        .where("userId", "==", userId)
+                        .where("taskId", "==", taskDoc.id)
+                        .where("daysLeft", "==", Math.round(daysUntilDue))
+                        .orderBy("sentAt", "desc")
+                        .limit(1)
+                        .get();
 
-                        await NotificationService.sendNotification(userId, notificationData, {
-                            sendPush: settings.pushEnabled !== false, // Default to true
-                            sendEmail: true,
-                            taskData: { ...taskData, id: taskDoc.id },
-                            hoursLeft,
-                            minutesLeft,
-                            userTimezone: userData.timezone || 'UTC'
-                        });
+                    // Only send if no reminder exists for this specific task/user/daysLeft combination
+                    // This prevents duplicates for the same interval but allows reminders for different intervals
+                    if (lastReminderQuery.empty) {
+                        const hoursLeft = Math.floor(hoursUntilDue);
+                        const minutesLeft = Math.floor((hoursUntilDue - hoursLeft) * 60);
+                        const daysLeft = Math.round(daysUntilDue);
 
-                        // Record the reminder for duplicate prevention
-                        await db.collection("emailReminders").add({
-                            userId,
-                            taskId: taskDoc.id,
-                            sentAt: admin.firestore.Timestamp.now(),
-                            hoursLeft,
-                            minutesLeft,
-                            daysLeft
-                        });
+                        try {
+                            // Create unified notification (database + push + email)
+                            const notificationData = {
+                                title: `Task Deadline Reminder`,
+                                body: `Your task "${taskData.title}" is due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}!`,
+                                taskId: taskDoc.id,
+                                type: 'warning'
+                            };
 
-                    } catch (error) {
-                        console.error(`Failed to send deadline reminder for task ${taskDoc.id}:`, error);
+                            // For tasks due in less than 1 day, show hours instead
+                            if (daysLeft === 0) {
+                                const hoursLeft = Math.floor(hoursUntilDue);
+                                const minutesLeft = Math.floor((hoursUntilDue - hoursLeft) * 60);
+                                notificationData.body = `Your task "${taskData.title}" is due in ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'} and ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}!`;
+                            }
+
+                            await NotificationService.sendNotification(userId, notificationData, {
+                                sendPush: settings.pushEnabled !== false, // Default to true
+                                sendEmail: true,
+                                taskData: { ...taskData, id: taskDoc.id },
+                                hoursLeft,
+                                minutesLeft,
+                                userTimezone: userData.timezone || 'UTC'
+                            });
+
+                            // Record the reminder for duplicate prevention
+                            await db.collection("emailReminders").add({
+                                userId,
+                                taskId: taskDoc.id,
+                                sentAt: admin.firestore.Timestamp.now(),
+                                hoursLeft,
+                                minutesLeft,
+                                daysLeft
+                            });
+
+                        } catch (error) {
+                            console.error(`Failed to send deadline reminder for task ${taskDoc.id}:`, error);
+                        }
                     }
                 }
             }
         }
+    } catch (error) {
+        console.error('Error in processDeadlineReminders:', error);
+        // Don't rethrow - let the cron job continue
     }
 }
 
@@ -221,7 +248,7 @@ if (!global.reminderJobStarted) {
 //                     const dayText = diffDays === 1 ? '1 day' : `${diffDays} days`;
 //                     const messageBody = `Your task "${reminder.taskTitle}" is due in ${dayText}!`;
 
-//                     // Send Firebase Cloud Messaging (FCM) notification --> recommended if you want reminders even when the user isn’t on your page
+//                     // Send Firebase Cloud Messaging (FCM) notification --> recommended if you want reminders even when the user isn't on your page
                     
 //                     await admin.messaging().sendMulticast({
 //                         tokens: [token1, token2],
@@ -247,4 +274,9 @@ if (!global.reminderJobStarted) {
 //             console.error("[ReminderJob] Error:", err.message);
 //         }
 //     });
+
+// Export for testing purposes
+module.exports = {
+    processDeadlineReminders
+};
 // }
