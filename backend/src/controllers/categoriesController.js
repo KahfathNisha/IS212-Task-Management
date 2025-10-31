@@ -3,17 +3,22 @@ const { db } = require('../config/firebase');
 // Get all global categories
 const getAllCategories = async (req, res) => {
   try {
+    console.log('📦 [getAllCategories] Fetching all categories');
     const categoriesRef = db.collection('categories');
-    const snapshot = await categoriesRef.orderBy('name').get();
+    const snapshot = await categoriesRef.get();
     
     const categories = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     
+    // Sort alphabetically by name
+    categories.sort((a, b) => a.name.localeCompare(b.name));
+    
+    console.log(`✅ [getAllCategories] Returning ${categories.length} categories`);
     res.json(categories);
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    console.error('❌ [getAllCategories] Error fetching categories:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -22,6 +27,8 @@ const getAllCategories = async (req, res) => {
 const createCategory = async (req, res) => {
   try {
     const { name } = req.body;
+    
+    console.log('📝 [createCategory] Creating category:', { name, user: req.user.email });
     
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Category name is required' });
@@ -35,6 +42,7 @@ const createCategory = async (req, res) => {
       .get();
     
     if (!existingCategory.empty) {
+      console.log('⚠️ [createCategory] Category already exists:', categoryName);
       return res.status(400).json({ error: 'Category already exists' });
     }
     
@@ -52,9 +60,10 @@ const createCategory = async (req, res) => {
       createdBy: req.user.email
     };
     
+    console.log('✅ [createCategory] Created successfully:', category);
     res.status(201).json(category);
   } catch (error) {
-    console.error('Error creating category:', error);
+    console.error('❌ [createCategory] Error creating category:', error);
     res.status(500).json({ error: error.message });
   }
 };

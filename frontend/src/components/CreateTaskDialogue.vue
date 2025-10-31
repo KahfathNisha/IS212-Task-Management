@@ -341,7 +341,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, watchEffect } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import '../assets/styles.css';
 import RecurrenceOptions from './RecurrenceOptions.vue'
 import axios from 'axios'
@@ -596,6 +596,12 @@ const loadCategories = async () => {
     availableCategories.value = []
   }
 }
+
+// Load categories when component mounts AND when dialog opens
+onMounted(() => {
+  console.log('🔧 [CreateTaskDialogue] Component mounted, loading categories...')
+  loadCategories()
+})
 
 // Load categories when dialog opens
 watch(() => props.show, (isOpen) => {
