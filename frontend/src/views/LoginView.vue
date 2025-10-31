@@ -176,7 +176,7 @@ const handleLogin = async () => {
 
   try {
     await authStore.login(email.value, password.value);
-    const redirectTo = route.query.redirect || '/dashboard';
+    const redirectTo = route.query.redirect || '/home';
     router.push(redirectTo);
   } catch (error) {
     console.error('LoginView.vue: Login failed:', error);

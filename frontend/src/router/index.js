@@ -1,13 +1,12 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth';
 
 // Import views
 import LoginView from '@/views/LoginView.vue';
 import PasswordResetView from '@/views/PasswordResetView.vue';
-import DashboardView from '@/views/DashboardView.vue';
+import Home from '@/views/Home.vue';
 import TasksView from '@/views/Tasks.vue';
-import ProjectsView from '@/views/Projects.vue'; 
+import ProjectsView from '@/views/Projects.vue';
 import ReportsView from '@/views/Reports.vue';
 import ProfileView from '@/views/Profile.vue';
 import SettingsView from '@/views/Settings.vue';
@@ -31,9 +30,9 @@ const routes = [
     meta: { public: true }
   },
   {
-    path: '/dashboard',
-    name: 'Dashboard',
-    component: DashboardView,
+    path: '/home',
+    name: 'Home',
+    component: Home,
     meta: { requiresAuth: true }
   },
 
@@ -105,7 +104,7 @@ router.beforeEach(async (to, from, next) => {
   if (requiresAuth && !isAuthenticated) {
     next({ name: 'Login', query: { redirect: to.fullPath } });
   } else if (isAuthenticated && to.name === 'Login') {
-    next({ name: 'Dashboard' });
+    next({ name: 'Home' });
   } else {
     next();
   }

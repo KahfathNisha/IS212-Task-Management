@@ -175,20 +175,6 @@ button:focus-visible {
   color: var(--text-primary) !important;
 }
 
-/* Dashboard specific styling */
-.dashboard-card {
-  background-color: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  transition: all 0.3s ease;
-  padding: 1.5rem;
-}
-
-.dashboard-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-color: var(--primary);
-}
-
 /* Success message styling */
 .success-message {
   background-color: #d1fae5;
@@ -203,14 +189,6 @@ button:focus-visible {
 
 [data-theme="dark"] .card {
   border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .dashboard-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .dashboard-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] .success-message {

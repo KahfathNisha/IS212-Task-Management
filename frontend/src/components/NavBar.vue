@@ -34,7 +34,7 @@ const colorOptions = [
 
 // Updated menu items with Projects
 const menuItems = [
-  { title: 'Home', path: '/', icon: 'mdi-home' },
+  { title: 'Home', path: '/home', icon: 'mdi-home' },
   { title: 'Projects', path: '/projects', icon: 'mdi-folder-multiple' },
   { title: 'Tasks', path: '/tasks', icon: 'mdi-clipboard-list' },
   { title: 'Reports', path: '/reports', icon: 'mdi-file-document' },
@@ -43,7 +43,7 @@ const menuItems = [
 
 const pageTitle = computed(() => {
   const titles = {
-    '/': 'Home',
+    '/home': 'Home',
     '/projects': 'Projects Board',
     '/tasks': 'Tasks Board',
     '/reports': 'Reports',
