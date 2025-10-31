@@ -62,7 +62,7 @@ const verifyToken = async (req, res, next) => {
     const decodedToken = await admin.auth().verifyIdToken(token);
     
     // Look up the user's profile in Firestore
-    const userDoc = await db.collection('users').doc(decodedToken.email).get();
+    const userDoc = await db.collection('Users').doc(decodedToken.email).get();
 
     if (!userDoc.exists) {
       return res.status(404).json({ 

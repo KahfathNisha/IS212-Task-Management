@@ -36,7 +36,7 @@ exports.login = async (req, res) => {
     }
 
     // Fetch the user's profile from your Firestore database
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
