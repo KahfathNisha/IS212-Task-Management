@@ -602,3 +602,57 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/auth/users
+ * Get list of users (for managers/HR to select employees for individual reports)
+ */
+exports.getUsers = async (req, res) => {
+  try {
+    const { db } = require('../config/firebase');
+    const requesterEmail = req.user.email;
+    const requesterRole = req.user.role?.toLowerCase();
+    const requesterDept = req.user.department;
+
+    // Only managers, HR, and directors can access this endpoint
+    if (!['manager', 'hr', 'director'].includes(requesterRole)) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to view users.' });
+    }
+
+    const usersSnapshot = await db.collection('Users').get();
+    const users = [];
+
+    usersSnapshot.docs.forEach(doc => {
+      const userData = doc.data();
+      const userRole = userData.role?.toLowerCase();
+      
+      // Filter based on requester role
+      if (requesterRole === 'hr' || requesterRole === 'manager') {
+        // HR and managers can only see users in their department
+        if (userData.department === requesterDept && userRole !== 'director') {
+          users.push({
+            email: doc.id,
+            name: userData.name || doc.id.split('@')[0],
+            role: userData.role || 'staff',
+            department: userData.department || 'Unassigned'
+          });
+        }
+      } else if (requesterRole === 'director') {
+        // Directors can see all users except other directors
+        if (userRole !== 'director') {
+          users.push({
+            email: doc.id,
+            name: userData.name || doc.id.split('@')[0],
+            role: userData.role || 'staff',
+            department: userData.department || 'Unassigned'
+          });
+        }
+      }
+    });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};
+

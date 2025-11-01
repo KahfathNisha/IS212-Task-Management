@@ -6,5 +6,7 @@ const reportsController = require('../controllers/reportsController');
 // Example: GET /api/reports/project/abc-123-xyz
 router.get('/project/:projectId', reportsController.generateProjectReport);
 router.get('/department', reportsController.generateDepartmentReport);
+router.get('/company', reportsController.generateCompanyReport);
+router.get('/individual', reportsController.generateIndividualReport);
 
 module.exports = router;

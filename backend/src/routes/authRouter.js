@@ -58,4 +58,10 @@ router.get('/me', verifyToken, (req, res) => {
   return res.status(200).json({ success: true, user: req.user });
 });
 
+/**
+ * GET /api/auth/users
+ * Get list of users (filtered by role/department permissions)
+ */
+router.get('/users', verifyToken, authController.getUsers);
+
 module.exports = router;
