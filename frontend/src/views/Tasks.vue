@@ -761,7 +761,7 @@ const assigneeFilteredTaskCount = computed(() => {
 const assigneeFilterOptions = computed(() => {
     // 🌟 MODIFIED: Return all team members for the filter list, 
     // allowing the search input to handle large lists.
-    return teamMembers.map(member => ({ 
+    return teamMembers.value.map(member => ({ 
         title: member.text, 
         value: member.value,
         department: member.department 
@@ -875,15 +875,10 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const teamMembers = [
-    // Ensure all departments are capitalized or consistently formatted (e.g., 'HR' not 'hr')
-    { text: 'John Doe', value: 'john.doe@company.com', department: 'Engineering' },
-    { text: 'Michael Brown', value: 'michael.brown@company.com', department: 'Engineering' },
-    { text: 'Sally Loh', value: 'sally.loh@company.com', department: 'HR' },
-    { text: 'Alice Johnson', value: 'alice.johnson@company.com', department: 'Engineering' },
-    { text: 'Jack Sim', value: 'jack.sim@company.com', department: 'Management' },
-    { text: 'Jane Smith', value: 'jane.smith@company.com', department: 'Marketing' }
-];
+
+// Team members - populated from database via backend API
+const teamMembers = ref([]);
+const allUsers = ref([]); // Raw user data from API
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
 const departmentFilterOptions = departments.map(dept => ({ title: dept, value: dept }))
@@ -927,6 +922,7 @@ const subtasks = ref([])
 onMounted(async () => {
   // Load projects first
   await loadProjects()
+  await fetchAllUsers()
   
   // Try to load tasks from backend
   try {
@@ -960,6 +956,81 @@ onMounted(async () => {
     }
   }
 });
+
+// Helper function to clean user names (remove prefixes, duplicates, emails)
+const cleanUserName = (name) => {
+  if (!name) return '';
+  
+  // Remove any prefix like "AL ", "AM ", "DA " etc (2-3 uppercase letters followed by space)
+  let cleaned = name.replace(/^[A-Z]{2,3}\s+/, '').trim();
+  
+  // Remove email addresses if present in the name
+  cleaned = cleaned.replace(/\s+[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, '').trim();
+  
+  // If it still contains @, split and use the part before @
+  if (cleaned.includes('@')) {
+    cleaned = cleaned.split('@')[0].trim();
+  }
+  
+  // Remove duplicate names (if name appears twice like "Alex Ng Alex Ng")
+  const parts = cleaned.split(/\s+/);
+  const uniqueParts = [];
+  const seen = new Set();
+  for (const part of parts) {
+    const normalized = part.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueParts.push(part);
+    }
+  }
+  cleaned = uniqueParts.join(' ');
+  
+  return cleaned.trim() || '';
+};
+
+// Fetch all users for Task Owner, Assignee, and Collaborators dropdowns (via backend API)
+// NOTE: Using /auth/users/all endpoint which returns ALL users without RBAC filtering
+// This is intentional - RBAC can be added later if needed
+async function fetchAllUsers() {
+  try {
+    // Use backend API endpoint that returns ALL users (no RBAC filtering)
+    // axiosClient automatically adds the auth token via interceptor
+    const response = await axiosClient.get('/auth/users/all');
+
+    if (response.status === 200 && Array.isArray(response.data)) {
+      const users = response.data.map(user => {
+        const rawName = user.name || user.email.split('@')[0];
+        const cleanedName = cleanUserName(rawName) || user.email.split('@')[0];
+        return {
+          email: user.email,
+          name: cleanedName,
+          department: user.department || '',
+          role: user.role || ''
+        };
+      });
+      
+      allUsers.value = users;
+      
+      // Populate teamMembers for the dropdowns (format: { text, value, department })
+      teamMembers.value = users.map(user => ({
+        text: user.name,
+        value: user.email,
+        department: user.department || ''
+      }));
+      
+      console.log(`[fetchAllUsers] Loaded ${teamMembers.value.length} users for task dropdowns (ALL users, no RBAC):`, 
+        teamMembers.value.map(u => `${u.text} (${u.value})`).join(', '));
+    } else {
+      throw new Error('Invalid response format from API');
+    }
+  } catch (e) {
+    console.error('[fetchAllUsers] Error loading users:', e);
+    allUsers.value = [];
+    teamMembers.value = [];
+    
+    showMessage('Failed to load users: ' + (e.response?.data?.message || e.message), 'error');
+  }
+}
 
 // Load projects from backend API (avoid client Firestore permissions)
 const loadProjects = async () => {

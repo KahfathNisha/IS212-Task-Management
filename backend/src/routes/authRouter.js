@@ -64,4 +64,10 @@ router.get('/me', verifyToken, (req, res) => {
  */
 router.get('/users', verifyToken, authController.getUsers);
 
+/**
+ * GET /api/auth/users/all
+ * Get ALL users from database (no RBAC filtering) - for task assignment dropdowns
+ */
+router.get('/users/all', verifyToken, authController.getAllUsers);
+
 module.exports = router;

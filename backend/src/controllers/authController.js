@@ -696,3 +696,34 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/auth/users/all
+ * Get ALL users from database (no RBAC filtering) - for task assignment dropdowns
+ * TODO: Add RBAC filtering later if needed
+ */
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { db } = require('../config/firebase');
+
+    // Fetch all users without any role-based filtering
+    const usersSnapshot = await db.collection('Users').get();
+    const users = [];
+
+    usersSnapshot.docs.forEach(doc => {
+      const userData = doc.data();
+      users.push({
+        email: doc.id,
+        name: userData.name || doc.id.split('@')[0],
+        role: userData.role || 'staff',
+        department: userData.department || 'Unassigned'
+      });
+    });
+
+    console.log(`[getAllUsers] Returning ${users.length} users (no RBAC filtering)`);
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};
+
