@@ -35,7 +35,7 @@
           <div class="view-toggle-left">
             <div class="view-tabs">
               <button 
-                v-for="tab in viewTabs" 
+                v-for="tab in visibleViewTabs" 
                 :key="tab.value"
                 @click="currentView = tab.value"
                 :class="['view-tab', { 'active': currentView === tab.value }]"
@@ -363,7 +363,14 @@
 
       <!-- WORKLOAD VIEW -->
       <div v-else-if="currentView === 'workload'" class="workload-view">
-        <div class="workload-grid">
+        <div v-if="visibleDepartments.length === 0" class="empty-state">
+          <v-icon size="64" color="grey-lighten-1">mdi-office-building-outline</v-icon>
+          <h3 v-if="authStore.userRole === 'staff'">Access Restricted</h3>
+          <h3 v-else>No Departments Found</h3>
+          <p v-if="authStore.userRole === 'staff'">Staff members cannot view department workload</p>
+          <p v-else>No departments are available to display</p>
+        </div>
+        <div v-else class="workload-grid">
           <div 
             v-for="dept in visibleDepartments" 
             :key="dept"
@@ -371,7 +378,7 @@
           >
             <div class="dept-header">
               <div>
-                <h3>{{ dept }}</h3>
+                <h3>{{ capitalizeDepartment(dept) }}</h3>
                 <v-chip size="small">
                   {{ getProjectsByDepartment(dept).length }} projects
                 </v-chip>
@@ -513,7 +520,7 @@
                 <v-list-item-subtitle>{{ item.raw.department }}</v-list-item-subtitle>
                 <template v-slot:append>
                   <v-chip size="small" color="primary" variant="flat">
-                    {{ item.raw.department }}
+                    {{ capitalizeDepartment(item.raw.department) }}
                   </v-chip>
                 </template>
               </v-list-item>
@@ -573,11 +580,16 @@
     </v-snackbar>
 
     <!-- Add/Edit Department Dialog -->
-    <v-dialog v-model="showAddDepartmentDialog" max-width="600px">
-      <v-card>
+    <v-dialog 
+      v-model="showAddDepartmentDialog" 
+      max-width="600px"
+      persistent
+      class="department-dialog"
+    >
+      <v-card class="department-dialog-card">
         <v-card-title class="d-flex justify-space-between align-center">
           <span>{{ isEditingDepartment ? 'Edit Department' : 'Add New Department' }}</span>
-          <v-btn icon size="small" @click="showAddDepartmentDialog = false">
+          <v-btn icon size="small" variant="text" @click="cancelDepartmentEdit">
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-card-title>
@@ -591,7 +603,7 @@
           />
           <v-autocomplete 
             v-model="newDepartmentMembers" 
-            :items="allUsers" 
+            :items="uniqueUsers" 
             item-title="name" 
             item-value="email" 
             label="Add Members" 
@@ -601,7 +613,11 @@
             prepend-inner-icon="mdi-account-multiple"
           >
             <template v-slot:item="{ props: itemProps, item }">
-              <v-list-item v-bind="itemProps">
+              <v-list-item 
+                :value="itemProps.value"
+                :key="item.raw.email"
+                @click="itemProps.onClick"
+              >
                 <template v-slot:prepend>
                   <v-avatar size="32">
                     {{ getInitials(item.raw.name) }}
@@ -611,10 +627,13 @@
                 <v-list-item-subtitle>{{ item.raw.email }}</v-list-item-subtitle>
                 <template v-slot:append>
                   <v-chip size="small" color="primary" variant="flat">
-                    {{ item.raw.department }}
+                    {{ capitalizeDepartment(item.raw.department) }}
                   </v-chip>
                 </template>
               </v-list-item>
+            </template>
+            <template v-slot:chip="{ props, item }">
+              <v-chip v-bind="props" :text="item.raw.name"></v-chip>
             </template>
           </v-autocomplete>
         </v-card-text>
@@ -696,7 +715,7 @@ const allDepartments = ref([]);
 const viewTabs = [
   { label: 'Projects', value: 'projects' },
   { label: 'Categories', value: 'categories' },
-  { label: 'Department', value: 'workload' }
+  { label: 'Workload', value: 'workload' }
 ]
 
 // Filter states
@@ -806,6 +825,18 @@ onMounted(async () => {
   await loadProjects()     // Then load projects
   await fetchAllUsers();
   await loadDepartments();
+  
+  // Redirect staff away from workload view
+  if (authStore.userRole === 'staff' && currentView.value === 'workload') {
+    currentView.value = 'projects';
+  }
+})
+
+// Watch for role changes and redirect staff from workload view
+watch(() => authStore.userRole, (newRole) => {
+  if (newRole === 'staff' && currentView.value === 'workload') {
+    currentView.value = 'projects';
+  }
 })
 
 
@@ -833,7 +864,9 @@ const filteredStatusOptions = computed(() => {
 
 // Compute actual department list (from projects)
 const realDepartments = computed(() => {
-  return Array.from(new Set(projects.value.filter(p => p.department).map(p => p.department))).sort();
+  const depts = Array.from(new Set(projects.value.filter(p => p.department).map(p => p.department)));
+  // Filter out "All" department - it's a special department for director only
+  return depts.filter(dept => dept.toLowerCase() !== 'all').sort();
 });
 
 // Options for department filter dropdown
@@ -1138,15 +1171,19 @@ const getCompletionRateByCategory = (category) => {
 }
 
 const getProjectsByDepartment = (department) => {
-  return projects.value.filter(project => project.department === department)
+  // Match departments case-insensitively
+  return projects.value.filter(project => 
+    project.department && 
+    project.department.toLowerCase() === department.toLowerCase()
+  )
 }
 
 const getTotalTasksByDepartment = (department) => {
-  return getProjectsByDepartment(department).reduce((sum, project) => sum + project.totalTasks, 0)
+  return getProjectsByDepartment(department).reduce((sum, project) => sum + (project.totalTasks || 0), 0)
 }
 
 const getCompletedTasksByDepartment = (department) => {
-  return getProjectsByDepartment(department).reduce((sum, project) => sum + project.completedTasks, 0)
+  return getProjectsByDepartment(department).reduce((sum, project) => sum + (project.completedTasks || 0), 0)
 }
 
 const getOngoingTasksByDepartment = (department) => {
@@ -1160,11 +1197,12 @@ const getOngoingTasksByDepartment = (department) => {
 }
 
 const getTeamMembersByDepartment = (department) => {
-  const members = new Set()
-  getProjectsByDepartment(department).forEach(project => {
-    project.members.forEach(member => members.add(member.name))
-  })
-  return members.size
+  // Count users from database who belong to this department (case-insensitive)
+  const usersInDept = allUsers.value.filter(user => 
+    user.department && 
+    user.department.trim().toLowerCase() === department.toLowerCase()
+  );
+  return usersInDept.length;
 }
 
 const getDepartmentProgress = (department) => {
@@ -1534,20 +1572,145 @@ const loadProjectTasks = async (projectId) => {
 // Computed for visible departments by role
 defineProps(); // To support script setup even if not used for now
 
-const visibleDepartments = computed(() => {
-  if (authStore.userRole === 'director' || authStore.userRole === 'hr') {
-    return realDepartments.value;
-  } else if (authStore.userRole === 'manager' || authStore.userRole === 'staff') {
-    if (authStore.userData?.department && realDepartments.value.includes(authStore.userData.department)) {
-      return [authStore.userData.department];
-    } else {
-      return [];
+// Helper function to clean user names (remove prefixes, duplicates, emails)
+const cleanUserName = (name) => {
+  if (!name) return '';
+  
+  // Remove any prefix like "AL ", "AM ", "DA " etc (2-3 uppercase letters followed by space)
+  let cleaned = name.replace(/^[A-Z]{2,3}\s+/, '').trim();
+  
+  // Remove email addresses if present in the name
+  cleaned = cleaned.replace(/\s+[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, '').trim();
+  
+  // If it still contains @, split and use the part before @
+  if (cleaned.includes('@')) {
+    cleaned = cleaned.split('@')[0].trim();
+  }
+  
+  // Remove duplicate names (if name appears twice like "Alex Ng Alex Ng")
+  const parts = cleaned.split(/\s+/);
+  const uniqueParts = [];
+  const seen = new Set();
+  for (const part of parts) {
+    const normalized = part.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueParts.push(part);
     }
   }
+  cleaned = uniqueParts.join(' ');
+  
+  return cleaned.trim() || '';
+};
+
+// Get unique users (deduplicated by email)
+const uniqueUsers = computed(() => {
+  const userMap = new Map();
+  allUsers.value.forEach(user => {
+    if (!userMap.has(user.email)) {
+      const cleanName = cleanUserName(user.name);
+      
+      userMap.set(user.email, {
+        ...user,
+        name: cleanName || user.email.split('@')[0],
+        displayName: cleanName || user.email.split('@')[0]
+      });
+    }
+  });
+  return Array.from(userMap.values());
+});
+
+// Capitalize department name (first letter of each word, with special handling for acronyms)
+const capitalizeDepartment = (deptName) => {
+  if (!deptName) return '';
+  
+  // Common acronyms that should be fully uppercase
+  const acronyms = ['it', 'hr', 'ui', 'ux', 'api', 'id', 'qa', 'rd'];
+  
+  return deptName
+    .split(' ')
+    .map(word => {
+      const wordLower = word.toLowerCase().trim();
+      // If it's a known acronym (1-3 letters), make it fully uppercase
+      if (acronyms.includes(wordLower) && word.length <= 3) {
+        return word.toUpperCase();
+      }
+      // Otherwise, capitalize first letter
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+};
+
+// Get departments from Users collection (organized by department field)
+const departmentsFromUsers = computed(() => {
+  const deptMap = new Map();
+  allUsers.value.forEach(user => {
+    if (user.department && user.department.trim()) {
+      const deptName = user.department.trim();
+      // Filter out "All" department - it's a special department for director only
+      if (deptName.toLowerCase() === 'all') {
+        return;
+      }
+      // Use lowercase for consistent grouping, but we'll capitalize when displaying
+      const deptKey = deptName.toLowerCase();
+      if (!deptMap.has(deptKey)) {
+        deptMap.set(deptKey, {
+          name: deptName, // Keep original for reference
+          users: []
+        });
+      }
+      deptMap.get(deptKey).users.push(user);
+    }
+  });
+  // Return unique department names, preserving original casing for sorting but we'll capitalize in display
+  const uniqueDepts = Array.from(deptMap.values()).map(dept => dept.name);
+  // Remove duplicates by converting to lowercase set, then return original names sorted
+  const seen = new Set();
+  return uniqueDepts
+    .filter(dept => {
+      const key = dept.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort();
+});
+
+const visibleDepartments = computed(() => {
+  // Staff cannot see workload view
+  if (authStore.userRole === 'staff') {
+    return [];
+  }
+  
+  // Director and HR see all departments
+  if (authStore.userRole === 'director' || authStore.userRole === 'hr') {
+    return departmentsFromUsers.value.length > 0 ? departmentsFromUsers.value : realDepartments.value;
+  }
+  
+  // Manager sees only their department
+  if (authStore.userRole === 'manager') {
+    const userDept = authStore.userData?.department;
+    if (userDept) {
+      const allDepts = departmentsFromUsers.value.length > 0 ? departmentsFromUsers.value : realDepartments.value;
+      if (allDepts.includes(userDept)) {
+        return [userDept];
+      }
+    }
+    return [];
+  }
+  
   return [];
 });
 
 const isStaff = computed(() => authStore.userRole === 'staff');
+
+// Filter view tabs based on role (staff cannot see Workload)
+const visibleViewTabs = computed(() => {
+  if (authStore.userRole === 'staff') {
+    return viewTabs.filter(tab => tab.value !== 'workload');
+  }
+  return viewTabs;
+});
 
 // Fetch all users for member dropdown
 async function fetchAllUsers() {
@@ -1566,12 +1729,24 @@ async function fetchAllUsers() {
 
 // Edit department function
 function editDepartment(deptName) {
+  // Try to find in departments collection first
   const dept = allDepartments.value.find(d => d.title === deptName);
   if (dept) {
     editingDepartmentId.value = dept.id;
     newDepartmentTitle.value = dept.title;
     newDepartmentMembers.value = dept.members || [];
     isEditingDepartment.value = true;
+    showAddDepartmentDialog.value = true;
+  } else {
+    // If not in departments collection, create/edit using dept name from Users
+    editingDepartmentId.value = null;
+    newDepartmentTitle.value = deptName;
+    // Pre-populate members from Users collection who belong to this department
+    const usersInDept = allUsers.value.filter(user => 
+      user.department && user.department.trim().toLowerCase() === deptName.toLowerCase()
+    );
+    newDepartmentMembers.value = usersInDept.map(user => user.email);
+    isEditingDepartment.value = false; // Create new if not exists
     showAddDepartmentDialog.value = true;
   }
 }
@@ -2821,5 +2996,37 @@ async function createDepartment() {
 
 [data-theme="dark"] :deep(.v-card.project-dialog-card) {
   background: #2c2c2c !important;
+}
+
+/* ===========================
+   Department Dialog Styles - Opaque Modal
+   =========================== */
+.department-dialog {
+  z-index: 2000 !important;
+}
+
+:deep(.department-dialog .v-overlay__scrim) {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  opacity: 1 !important;
+}
+
+.department-dialog-card {
+  background: white !important;
+  opacity: 1 !important;
+}
+
+[data-theme="dark"] .department-dialog-card {
+  background: #2c2c2c !important;
+  opacity: 1 !important;
+}
+
+:deep(.department-dialog .v-card) {
+  background: white !important;
+  opacity: 1 !important;
+}
+
+[data-theme="dark"] :deep(.department-dialog .v-card) {
+  background: #2c2c2c !important;
+  opacity: 1 !important;
 }
 </style>
