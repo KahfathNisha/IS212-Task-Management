@@ -87,7 +87,9 @@
               v-model="localTask.taskOwner"
               label="Task Owner *"
               :items="teamMembers"
-              item-title="text"  :rules="[v => !!v || 'Task Owner is required']"
+              item-title="text"
+              item-value="value"
+              :rules="[v => !!v || 'Task Owner is required']"
               required
               placeholder="Search and select task owner"
               variant="outlined"
@@ -107,16 +109,20 @@
             <v-autocomplete
               v-model="localTask.assignedTo"
               label="Assignee"
-              :items="teamMembers.filter(member => !localTask.collaborators.includes(member))"
-              item-title="text"  placeholder="Search and select assignee"
+              :items="teamMembers.filter(member => !localTask.collaborators || !localTask.collaborators.includes(member.value))"
+              item-title="text"
+              item-value="value"
+              placeholder="Search and select assignee"
               variant="outlined"
               class="flex-1"
             />
             <v-autocomplete
               v-model="localTask.collaborators"
               label="Collaborators"
-              :items="teamMembers.filter(member => member !== localTask.assignedTo)"
-              item-title="text"  placeholder="Search and select collaborators"
+              :items="teamMembers.filter(member => member.value !== localTask.assignedTo)"
+              item-title="text"
+              item-value="value"
+              placeholder="Search and select collaborators"
               variant="outlined"
               multiple
               chips
@@ -237,16 +243,20 @@
               <v-autocomplete
                 v-model="subtask.assignedTo"
                 label="Assignee"
-                :items="teamMembers.filter(member => !subtask.collaborators.includes(member))"
-                item-title="text"  placeholder="Search and select assignee"
+                :items="teamMembers.filter(member => !subtask.collaborators || !subtask.collaborators.includes(member.value))"
+                item-title="text"
+                item-value="value"
+                placeholder="Search and select assignee"
                 variant="outlined"
                 class="flex-1"
               />
               <v-autocomplete
                 v-model="subtask.collaborators"
                 label="Collaborators"
-                :items="teamMembers.filter(member => member !== subtask.assignedTo)"
-                item-title="text"  placeholder="Search and select collaborators"
+                :items="teamMembers.filter(member => member.value !== subtask.assignedTo)"
+                item-title="text"
+                item-value="value"
+                placeholder="Search and select collaborators"
                 variant="outlined"
                 multiple
                 chips

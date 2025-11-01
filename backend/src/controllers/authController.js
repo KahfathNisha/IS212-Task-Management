@@ -28,7 +28,35 @@ exports.login = async (req, res) => {
     }
 
     // Verify the ID token with Firebase Admin SDK. This is a secure check.
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    } catch (verifyErr) {
+      // If running against the Auth emulator, the ID token's 'aud' may not match
+      // a local service account project id; allow a fallback that decodes the token
+      // WITHOUT verification when emulator is present so integration tests can run.
+      if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+        // Non-verified decode (emulator only)
+        // eslint-disable-next-line global-require
+        const jwt = require('jsonwebtoken');
+  decodedToken = jwt.decode(idToken) || {};
+  console.warn('⚠️ verifyIdToken failed; falling back to jwt.decode because Auth emulator is in use.');
+  console.warn('DEBUG decodedToken (emulator fallback):', decodedToken);
+        // If the decoded token lacks email but has uid (or user_id/sub), try to
+        // resolve the user's email using the Admin SDK (works with the Auth emulator).
+        const tokenUid = decodedToken.uid || decodedToken.user_id || decodedToken.sub;
+        if (!decodedToken.email && tokenUid && admin && typeof admin.auth === 'function') {
+          try {
+            const userRec = await admin.auth().getUser(tokenUid);
+            decodedToken.email = userRec.email;
+          } catch (getErr) {
+            // ignore - we'll fall through and report missing email later
+          }
+        }
+      } else {
+        throw verifyErr;
+      }
+    }
     const email = decodedToken.email;
 
     if (!email) {
@@ -152,9 +180,14 @@ exports.checkLockout = async (req, res) => {
     const userData = userDoc.data();
     const now = Date.now();
     
+    // Normalize lockedUntil to milliseconds whether it's a number or Firestore Timestamp
+    const lockedUntilMillis = userData.lockedUntil && (typeof userData.lockedUntil.toMillis === 'function'
+      ? userData.lockedUntil.toMillis()
+      : userData.lockedUntil);
+
     // Check if account is locked
-    if (userData.lockedUntil && userData.lockedUntil > now) {
-      const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
+    if (lockedUntilMillis && lockedUntilMillis > now) {
+      const unlockTime = new Date(lockedUntilMillis).toLocaleTimeString('en-SG', {
         hour: 'numeric',
         minute: 'numeric',
         hour12: true,
@@ -169,7 +202,7 @@ exports.checkLockout = async (req, res) => {
     }
     
     // Reset lock if expired
-    if (userData.lockedUntil && userData.lockedUntil <= now) {
+    if (lockedUntilMillis && lockedUntilMillis <= now) {
       await userRef.update({
         failedAttempts: 0,
         lockedUntil: null
@@ -255,21 +288,26 @@ exports.recordFailedAttempt = async (req, res) => {
     const userData = userDoc.data();
     const now = Date.now();
 
-    // Check if already locked
-    if (userData.lockedUntil && userData.lockedUntil > now) {
-        const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true,
-            timeZone: 'Asia/Singapore'
-        });
-        // --- FIX: Always respond 200 OK ---
-        return res.status(200).json({
-            success: false,
-            isLocked: true,
-            message: `Account is locked. Please try again after ${unlockTime}.`
-        });
-    }
+  // Normalize lockedUntil to milliseconds whether it's a number or Firestore Timestamp
+  const lockedUntilMillis = userData.lockedUntil && (typeof userData.lockedUntil.toMillis === 'function'
+    ? userData.lockedUntil.toMillis()
+    : userData.lockedUntil);
+
+  // Check if already locked
+  if (lockedUntilMillis && lockedUntilMillis > now) {
+    const unlockTime = new Date(lockedUntilMillis).toLocaleTimeString('en-SG', {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+      timeZone: 'Asia/Singapore'
+    });
+    // --- FIX: Always respond 200 OK ---
+    return res.status(200).json({
+      success: false,
+      isLocked: true,
+      message: `Account is locked. Please try again after ${unlockTime}.`
+    });
+  }
     
     // Increment failed attempts
     const failedAttempts = (userData.failedAttempts || 0) + 1;
@@ -280,11 +318,13 @@ exports.recordFailedAttempt = async (req, res) => {
     
     // Lock account if max attempts reached
     if (failedAttempts >= MAX_LOGIN_ATTEMPTS) {
-      updateData.lockedUntil = now + LOCKOUT_DURATION;
+      // Store as Firestore Timestamp so callers can use toMillis()
+      const lockUntilTimestamp = admin.firestore.Timestamp.fromMillis(now + LOCKOUT_DURATION);
+      updateData.lockedUntil = lockUntilTimestamp;
       
       await userRef.update(updateData);
       
-      const unlockTime = new Date(updateData.lockedUntil).toLocaleTimeString('en-SG', {
+      const unlockTime = new Date(lockUntilTimestamp.toMillis()).toLocaleTimeString('en-SG', {
           hour: 'numeric',
           minute: 'numeric',
           hour12: true,
@@ -652,6 +692,37 @@ exports.getUsers = async (req, res) => {
     res.status(200).json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};
+
+/**
+ * GET /api/auth/users/all
+ * Get ALL users from database (no RBAC filtering) - for task assignment dropdowns
+ * TODO: Add RBAC filtering later if needed
+ */
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { db } = require('../config/firebase');
+
+    // Fetch all users without any role-based filtering
+    const usersSnapshot = await db.collection('Users').get();
+    const users = [];
+
+    usersSnapshot.docs.forEach(doc => {
+      const userData = doc.data();
+      users.push({
+        email: doc.id,
+        name: userData.name || doc.id.split('@')[0],
+        role: userData.role || 'staff',
+        department: userData.department || 'Unassigned'
+      });
+    });
+
+    console.log(`[getAllUsers] Returning ${users.length} users (no RBAC filtering)`);
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching all users:', error);
     res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
 };
