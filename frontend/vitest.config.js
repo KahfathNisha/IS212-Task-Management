@@ -9,7 +9,7 @@ export default defineConfig({
     setupFiles: './src/tests/setup.js',
     globals: true,
     passWithNoTests: false,
-    
+
     // --- CSS FIX ---
     // Tell Vitest what to do with .css imports
     transformMode: {
@@ -20,7 +20,7 @@ export default defineConfig({
       '^.+\\.css$': (code) => ({ code: '', map: null }),
     },
     // --- END CSS FIX ---
-    
+
     // Explicitly tell Vitest to process Vuetify components
     deps: {
       optimizer: {
@@ -29,6 +29,28 @@ export default defineConfig({
         },
       },
     },
+
+    coverage: {
+      provider: 'v8', // or 'c8', 'native'
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/tests/',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/coverage/**',
+        'dist/',
+        'public/'
+      ],
+      thresholds: {
+        global: {
+          branches: 70,
+          functions: 80,
+          lines: 80,
+          statements: 80
+        }
+      }
+    }
   },
   resolve: {
     alias: {
@@ -36,4 +58,3 @@ export default defineConfig({
     }
   },
 });
-

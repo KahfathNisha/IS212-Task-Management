@@ -139,7 +139,9 @@ service cloud.firestore {
       allow update: if isTaskMember(resource.data) && !isHR() &&
                     (request.resource.data.dueDate == resource.data.dueDate ||
                      request.auth.token.email == resource.data.createdBy ||
-                     request.auth.token.email == resource.data.taskOwner);
+                     request.auth.token.email == resource.data.taskOwner ||
+                     request.resource.data.status != resource.data.status ||
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusHistory', 'updatedAt']));
       
       allow update: if isTaskMember(resource.data) && 
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt', 'deletedBy']);

@@ -270,7 +270,7 @@ const selectTask = (task) => {
  */
 const handleStatusChange = (newStatus) => {
   if (selectedTask.value) {
-    emit('change-status', { task: selectedTask.value, status: newStatus })
+    emit('change-status', { taskId: selectedTask.value.id, status: newStatus })
   }
 }
 
@@ -1048,18 +1048,18 @@ defineExpose({
                   <div class="detail-section">
                     <div class="detail-section-icon-row">
                       <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
-                      <h4>Collaborators</h4>
+                      <h4>COLLABORATORS ({{ selectedTask.collaborators?.length || 0 }})</h4>
                     </div>
-                    <div class="collaborators-list">
-                      <v-chip
-                        v-for="collaborator in selectedTask.collaborators"
-                        :key="collaborator"
-                        size="small"
-                        class="mr-2"
-                        variant="tonal"
-                      >
-                        {{ collaborator }}
-                      </v-chip>
+                    <div v-if="!selectedTask.collaborators || selectedTask.collaborators.length === 0" class="empty-state">
+                      No collaborators
+                    </div>
+                    <div v-else class="collaborators-list">
+                      <div v-for="collaborator in selectedTask.collaborators" :key="collaborator.name || collaborator" class="collaborator-item">
+                        <span class="collaborator-name">{{ collaborator.name || collaborator }}</span>
+                        <v-chip size="small" color="#3B5998" variant="outlined" class="permission-badge">
+                          {{ collaborator.permission || 'View' }}
+                        </v-chip>
+                      </div>
                     </div>
                   </div>
                 </v-col>
@@ -1094,14 +1094,14 @@ defineExpose({
               </div>
 
               <!-- Status History -->
-              <div class="detail-section" v-if="selectedTask.statusHistory && selectedTask.statusHistory.length > 0">
+              <div class="detail-section" v-if="selectedTask && selectedTask.statusHistory && selectedTask.statusHistory.length > 0">
                 <h4>Status History</h4>
                 <div class="status-updates">
                   <div v-for="(entry, idx) in selectedTask.statusHistory" :key="idx" class="status-entry">
                     <div class="status-dot" :style="{ backgroundColor: getStatusColor(entry.newStatus) }"></div>
                     <div class="status-info">
                       <div class="status-description">
-                        Status changed 
+                        Status changed
                         <span v-if="entry.oldStatus">from <strong>{{ entry.oldStatus }}</strong></span>
                         to <v-chip size="x-small" :color="getStatusColor(entry.newStatus)" variant="flat">{{ entry.newStatus }}</v-chip>
                       </div>
@@ -1783,9 +1783,54 @@ defineExpose({
 /* Collaborators List */
 .collaborators-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 10px;
+}
+
+.collaborator-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.collaborator-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.permission-badge {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empty-state {
+  font-size: 14px;
+  color: #64748b;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Dark mode support for collaborators */
+[data-theme="dark"] .collaborator-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .collaborator-name {
+  color: #f1f5f9;
 }
 
 /* Progress Bar */

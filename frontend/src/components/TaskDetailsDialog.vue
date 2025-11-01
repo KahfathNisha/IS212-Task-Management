@@ -186,8 +186,9 @@
               <div class="status-dot" :style="{ backgroundColor: getStatusColor(entry.newStatus) }"></div>
               <div class="status-info">
                 <div class="status-description">
-                  Status changed to
-                  <v-chip size="x-small" :color="getStatusColor(entry.newStatus)">{{ entry.newStatus }}</v-chip>
+                  Status changed
+                  <span v-if="entry.oldStatus">from <strong>{{ entry.oldStatus }}</strong></span>
+                  to <v-chip size="x-small" :color="getStatusColor(entry.newStatus)" variant="flat">{{ entry.newStatus }}</v-chip>
                 </div>
                 <div class="status-timestamp">{{ formatDateTime(entry.timestamp) }}</div>
               </div>
@@ -319,7 +320,7 @@ import { db } from '@/config/firebase'
 const props = defineProps({
   model: { type: Object, default: null },
   show: { type: Boolean, default: false },
-  taskStatuses: { type: Array, default: () => ['To Do', 'In Progress', 'Done'] },
+  taskStatuses: { type: Array, default: () => ['Ongoing', 'Completed', 'Pending Review', 'Unassigned'] },
   parentTaskProgress: { type: Number, default: 0 },
   // 🟢 NEW PROP: Accept the read-only status
   isReadOnly: { type: Boolean, default: false }
@@ -371,7 +372,13 @@ const parentProgress = computed(() => props.parentTaskProgress || 0)
 const showArchiveConfirm = ref(false)
 
 const getStatusColor = (status) => {
-  return status === 'To Do' ? 'orange' : status === 'In Progress' ? 'blue' : 'green'
+  const colors = {
+    'Ongoing': 'blue',
+    'Completed': 'green',
+    'Pending Review': 'orange',
+    'Unassigned': 'grey'
+  }
+  return colors[status] || 'grey'
 }
 
 const getPermissionColor = (permission) => {
@@ -379,7 +386,21 @@ const getPermissionColor = (permission) => {
 }
 
 const formatDate = (s) => s ? new Date(s).toLocaleDateString() : ''
-const formatDateTime = (s) => s ? new Date(s).toLocaleString() : ''
+const formatDateTime = (s) => {
+  if (!s) return ''
+  try {
+    const date = new Date(s)
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (error) {
+    return s
+  }
+}
 
 // 🟢 RESTRICTED: Add check to onEdit
 const onEdit = () => {
@@ -392,7 +413,7 @@ const onEdit = () => {
 const onChangeStatus = (newStatus) => {
   if (props.isReadOnly) return; // Prevent action
   if (!task.value || !task.value.id) return;
-  emit('change-status', { taskId: task.value.id, status: newStatus }) 
+  emit('change-status', { taskId: task.value.id, status: newStatus })
 }
 
 const onViewParent = () => {

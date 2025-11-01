@@ -16,6 +16,7 @@ const taskModel = {
   archived: false,
   createdAt: null,
   updatedAt: null,
+  statusHistory: [], // Array of { timestamp, oldStatus, newStatus }
   recurrence: {
     enabled: false,
     type: '',      // 'daily', 'weekly', 'monthly', 'custom'

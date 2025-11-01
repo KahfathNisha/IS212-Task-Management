@@ -116,7 +116,13 @@ exports.createTask = async (req, res) => {
             status: req.body.status || 'Unassigned',
             projectId: req.body.projectId || null,
             categories: req.body.categories || [],
-            archived: false
+            archived: false,
+            // Initialize status history with the initial status
+            statusHistory: [{
+                timestamp: admin.firestore.Timestamp.now(),
+                oldStatus: null,
+                newStatus: req.body.status || 'Unassigned'
+            }]
             // taskOwnerDepartment is included via the spread of req.body
         };
 
@@ -215,13 +221,22 @@ exports.createTask = async (req, res) => {
 
 // Get Task
 exports.getTask = async (req, res) => {
-// No changes needed here, it returns all stored data.
     try {
         const doc = await db.collection('tasks').doc(req.params.id).get();
         if (!doc.exists) return res.status(404).json({ message: 'Task not found' });
         let taskData = doc.data();
         taskData.dueDate = formatTimestampToISO(taskData.dueDate);
         taskData.createdAt = formatTimestampToISO(taskData.createdAt);
+        taskData.updatedAt = formatTimestampToISO(taskData.updatedAt);
+        
+        // Format status history timestamps
+        if (taskData.statusHistory && Array.isArray(taskData.statusHistory)) {
+            taskData.statusHistory = taskData.statusHistory.map(entry => ({
+                ...entry,
+                timestamp: formatTimestampToISO(entry.timestamp)
+            }));
+        }
+        
         res.status(200).json(taskData);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -230,7 +245,6 @@ exports.getTask = async (req, res) => {
 
 // Get All Tasks
 exports.getAllTasks = async (req, res) => {
-// No changes needed here, it returns all stored data.
     try {
         const { email, role, department } = req.user;
         console.log('📋 [getAllTasks] Fetching tasks for:', { email, role, department });
@@ -238,12 +252,23 @@ exports.getAllTasks = async (req, res) => {
         const snapshot = await db.collection('tasks').get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
+            
+            // Format status history timestamps
+            let statusHistory = [];
+            if (data.statusHistory && Array.isArray(data.statusHistory)) {
+                statusHistory = data.statusHistory.map(entry => ({
+                    ...entry,
+                    timestamp: formatTimestampToISO(entry.timestamp)
+                }));
+            }
+            
             return {
                 id: doc.id,
                 ...data,
                 dueDate: formatTimestampToISO(data.dueDate),
                 createdAt: formatTimestampToISO(data.createdAt),
-                updatedAt: formatTimestampToISO(data.updatedAt)
+                updatedAt: formatTimestampToISO(data.updatedAt),
+                statusHistory: statusHistory
             };
         });
         console.log('✅ [getAllTasks] Returning', tasks.length, 'tasks');
@@ -256,7 +281,7 @@ exports.getAllTasks = async (req, res) => {
 // Get Tasks by Project ID
 exports.getTasksByProject = async (req, res) => {
     try {
-        const { projectId } = req.params; // Get projectId from URL params
+        const { projectId } = req.params;
         
         if (!projectId) {
             return res.status(400).json({ error: 'Project ID is required' });
@@ -269,12 +294,23 @@ exports.getTasksByProject = async (req, res) => {
         const snapshot = await tasksQuery.get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
+            
+            // Format status history timestamps
+            let statusHistory = [];
+            if (data.statusHistory && Array.isArray(data.statusHistory)) {
+                statusHistory = data.statusHistory.map(entry => ({
+                    ...entry,
+                    timestamp: formatTimestampToISO(entry.timestamp)
+                }));
+            }
+            
             return {
                 id: doc.id,
                 ...data,
                 dueDate: formatTimestampToISO(data.dueDate),
                 createdAt: formatTimestampToISO(data.createdAt),
-                updatedAt: formatTimestampToISO(data.updatedAt)
+                updatedAt: formatTimestampToISO(data.updatedAt),
+                statusHistory: statusHistory
             };
         });
 
@@ -355,6 +391,10 @@ exports.updateTask = async (req, res) => {
         // Check for assignee changes to trigger email notifications
         const oldAssigneeId = originalTask.assigneeId;
         const newAssigneeId = otherFields.assigneeId;
+        
+        // Check for status changes to track status history
+        const oldStatus = originalTask.status;
+        const newStatus = otherFields.status;
 
         // VALIDATION: Prevent same-tier assignment and transfer ownership when assigned
         if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId) {
@@ -387,6 +427,22 @@ exports.updateTask = async (req, res) => {
             }
             
             console.log(`✅ [updateTask] Transferring ownership to: ${newAssigneeId} (${newAssigneeData.role})`);
+        }
+
+        // Add status history entry if status changed
+        if (newStatus !== undefined && newStatus !== oldStatus) {
+            const statusHistoryEntry = {
+                timestamp: admin.firestore.Timestamp.now(),
+                oldStatus: oldStatus,
+                newStatus: newStatus
+            };
+            
+            const existingStatusHistory = originalTask.statusHistory || [];
+            await docRef.update({
+                statusHistory: [...existingStatusHistory, statusHistoryEntry]
+            });
+            
+            console.log(`✅ [updateTask] Added status history for task ${req.params.id}: ${oldStatus} → ${newStatus}`);
         }
 
         const { id, createdAt, ...finalUpdateData } = updateData;
@@ -507,41 +563,133 @@ exports.updateTask = async (req, res) => {
 // Update task status
 exports.updateTaskStatus = async (req, res) => {
     try {
+        console.log(`🔥 [updateTaskStatus] =============================================`);
+        console.log(`🔥 [updateTaskStatus] FUNCTION CALLED!`);
+        console.log(`🔥 [updateTaskStatus] Method: ${req.method}`);
+        console.log(`🔥 [updateTaskStatus] URL: ${req.url}`);
+        console.log(`🔥 [updateTaskStatus] Task ID: ${req.params.id}`);
+        console.log(`🔥 [updateTaskStatus] Request body:`, JSON.stringify(req.body, null, 2));
+        console.log(`🔥 [updateTaskStatus] Headers:`, req.headers);
+        console.log(`🔥 [updateTaskStatus] =============================================`);
+
         const { status } = req.body;
-        const taskDoc = await db.collection('tasks').doc(req.params.id).get();
-        const task = taskDoc.data();
         
-        await db.collection('tasks').doc(req.params.id).update({
-            status,
+        if (!status) {
+            console.log(`❌ [updateTaskStatus] ERROR: No status provided in request body`);
+            return res.status(400).json({ message: 'Status is required' });
+        }
+
+        // console.log(`📝 [updateTaskStatus] Starting update process for task ${req.params.id} to status: ${status}`);
+        
+        const taskDocRef = db.collection('tasks').doc(req.params.id);
+        const taskDoc = await taskDocRef.get();
+        
+        if (!taskDoc.exists) {
+            console.log(`❌ [updateTaskStatus] ERROR: Task ${req.params.id} not found in database`);
+            return res.status(404).json({ message: 'Task not found' });
+        }
+        
+        const task = taskDoc.data();
+        const oldStatus = task.status;
+        const newStatus = status;
+        
+        // console.log(`📋 [updateTaskStatus] Task found:`);
+        // console.log(`   Title: ${task.title}`);
+        // console.log(`   Old Status: ${oldStatus}`);
+        // console.log(`   New Status: ${newStatus}`);
+        // console.log(`   Has existing statusHistory: ${task.hasOwnProperty('statusHistory')}`);
+        // console.log(`   Existing statusHistory length: ${(task.statusHistory || []).length}`);
+        // console.log(`   Existing statusHistory:`, task.statusHistory || []);
+        // console.log(`   Task ID: ${req.params.id}`);
+        // console.log(`   Task object keys:`, Object.keys(task));
+        // console.log(`   Full task object:`, JSON.stringify(task, null, 2));
+        
+        // Only update if status actually changed
+        if (oldStatus === newStatus) {
+            console.log(`⚠️ [updateTaskStatus] Status unchanged, skipping update`);
+            return res.status(200).json({ message: 'Task status unchanged' });
+        }
+        
+        // Create status history entry
+        const statusHistoryEntry = {
+            timestamp: admin.firestore.Timestamp.now(),
+            oldStatus: oldStatus,
+            newStatus: newStatus
+        };
+        
+        // Get existing status history or create new array
+        const existingStatusHistory = task.statusHistory || [];
+        const updatedStatusHistory = [...existingStatusHistory, statusHistoryEntry];
+        
+        // console.log(`💾 [updateTaskStatus] Preparing Firebase update:`);
+        // console.log(`   New status: ${newStatus}`);
+        // console.log(`   History entry:`, statusHistoryEntry);
+        // console.log(`   Existing history length: ${existingStatusHistory.length}`);
+        // console.log(`   Updated history length: ${updatedStatusHistory.length}`);
+        // console.log(`   Updated history:`, updatedStatusHistory);
+        
+        // Update task with new status and status history
+        console.log(`🔥 [updateTaskStatus] About to call Firebase update...`);
+
+        // Separate the statusHistory update to avoid Firestore rules issues
+        console.log(`🔥 [updateTaskStatus] First updating status and updatedAt...`);
+        await taskDocRef.update({
+            status: newStatus,
             updatedAt: admin.firestore.Timestamp.now()
         });
+        console.log(`✅ [updateTaskStatus] Status update completed!`);
+
+        console.log(`🔥 [updateTaskStatus] Now updating statusHistory separately...`);
+        await taskDocRef.update({
+            statusHistory: updatedStatusHistory
+        });
+        console.log(`✅ [updateTaskStatus] StatusHistory update completed!`);
+        
+        // Verify the update worked
+        // console.log(`🔍 [updateTaskStatus] Verifying the update...`);
+        // const verifyDoc = await taskDocRef.get();
+        // const verifyData = verifyDoc.data();
+        // console.log(`✅ [updateTaskStatus] Verification:`);
+        // console.log(`   Current status in DB: ${verifyData.status}`);
+        // console.log(`   Status history length in DB: ${(verifyData.statusHistory || []).length}`);
+        // console.log(`   Status history in DB:`, verifyData.statusHistory || []);
+        // console.log(`   Full verified task data:`, JSON.stringify(verifyData, null, 2));
         
         // Update project progress if status changed to/from Completed
-        if (task.projectId && (status === 'Completed' || task.status === 'Completed')) {
+        if (task.projectId && (newStatus === 'Completed' || oldStatus === 'Completed')) {
+            console.log(`📊 [updateTaskStatus] Updating project progress for project ${task.projectId}`);
             await updateProjectStats(task.projectId);
         }
         
         // Send notification about status change
-        if (task.assigneeId && status !== task.status) {
+        if (task.assigneeId) {
             try {
+                console.log(`📢 [updateTaskStatus] Sending notification to ${task.assigneeId}`);
                 const statusNotificationData = {
                     title: `Task Status Updated`,
-                    body: `Task "${task.title}" status changed to "${status}"`,
+                    body: `Task "${task.title}" status changed to "${newStatus}"`,
                     taskId: req.params.id,
-                    type: status === 'Completed' ? 'success' : 'info'
+                    type: newStatus === 'Completed' ? 'success' : 'info'
                 };
 
                 await NotificationService.sendNotification(task.assigneeId, statusNotificationData, {
                     sendEmail: false
                 });
+                console.log(`✅ [updateTaskStatus] Notification sent successfully`);
             } catch (error) {
-                console.error('Failed to send status change notification:', error);
+                console.error('❌ [updateTaskStatus] Failed to send status change notification:', error);
                 // Don't fail the status update if notification fails
             }
         }
         
+        console.log(`🎉 [updateTaskStatus] SUCCESS: Task ${req.params.id} status updated: ${oldStatus} → ${newStatus}`);
+        console.log(`🎉 [updateTaskStatus] Status history now has ${updatedStatusHistory.length} entries`);
+        console.log(`🔥 [updateTaskStatus] =============================================`);
+        
         res.status(200).json({ message: 'Task status updated' });
     } catch (err) {
+        console.error(`❌ [updateTaskStatus] ERROR:`, err);
+        console.error(`❌ [updateTaskStatus] Stack:`, err.stack);
         res.status(500).json({ error: err.message });
     }
 };

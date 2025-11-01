@@ -487,7 +487,7 @@
         @change-view="currentView = $event"
         @select-task="handleSelectTask"
         @edit-task="handleEditTask"
-        @change-status="isTaskEditable(selectedListTask) ? handleListStatusChange : handleReadonlyAction"
+        @change-status="handleListStatusChange"
         @view-parent="viewTaskDetails"
         @open-attachment="openAttachment"
         @add-task="showCreateDialog = true"
@@ -504,11 +504,11 @@
       :taskStatuses="taskStatuses"
       :parentTaskProgress="parentTaskProgress"
       @edit="handleEditTask"
-      @change-status="isTaskEditable(selectedTask) ? changeTaskStatus : handleReadonlyAction"
+      @change-status="changeTaskStatus"
       @view-parent="viewTaskDetails"
-      @open-attachment="openAttachment" 
+      @open-attachment="openAttachment"
       @archive="isTaskEditable(selectedTask) ? archiveTask : handleReadonlyAction"
-      :is-read-only="!isTaskEditable(selectedTask)" 
+      :is-read-only="!isTaskEditable(selectedTask)"
     />
 
     <ArchivedTasks :show="showArchived" @close="showArchived = false" />
@@ -1148,12 +1148,14 @@ const handleCreateSave = async (taskData) => {
     console.log('✅ [Tasks.vue] Create task response:', response.status, response.data);
 
     const newTaskId = response.data.id;
+    
+    // Add the task to local state - statusHistory will come from backend via reload
     const newTaskWithId = {
       ...payload,
       id: newTaskId,
-      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: payload.status || 'Ongoing' }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: payload.status || 'Ongoing' }]
     };
     tasks.value = tasks.value.filter(t => t.id !== newTaskId);
     tasks.value.push(newTaskWithId);
@@ -1253,14 +1255,14 @@ const createTask = async () => {
 const changeTaskStatus = async (payload) => {
     const taskId = payload.taskId;
     const taskToUpdate = tasks.value.find(t => t.id === taskId);
-    
+
     // Granular check applied before execution
     if (!isTaskEditable(taskToUpdate)) {
         handleReadonlyAction();
         return;
     }
-    
-    const newStatus = payload.status; 
+
+    const newStatus = payload.status;
     if (!taskId || typeof taskId !== 'string' || taskId.includes('subtask')) {
         showMessage('Failed to update: Task ID is invalid or missing.', 'error');
         return;
@@ -1277,17 +1279,39 @@ const changeTaskStatus = async (payload) => {
         return;
     }
     try {
-        await axiosClient.put(`/tasks/${taskId}/status`, { status: newStatus }); 
-        const taskIndex = tasks.value.findIndex(t => t.id === taskId);
-        if (taskIndex !== -1) {
-          const taskData = tasks.value[taskIndex];
-          const statusHistory = [...(taskData.statusHistory || []), { timestamp: new Date().toISOString(), oldStatus: oldStatus, newStatus: newStatus }];
-          tasks.value[taskIndex] = { ...taskData, status: newStatus, statusHistory, updatedAt: new Date().toISOString() };
-          selectedTask.value = tasks.value[taskIndex];
-          selectedListTask.value = tasks.value[taskIndex];
+        // 🔥 FIX: Call backend API to update status
+        await axiosClient.put(`/tasks/${taskId}/status`, { status: newStatus });
+
+        // 🔥 FIX: Reload the specific task from backend to get complete updated data
+        const response = await axiosClient.get('/tasks');
+        const updatedTask = response.data.find(t => t.id === taskId);
+
+        if (updatedTask) {
+            // Update the task in local state with complete backend data
+            const taskIndex = tasks.value.findIndex(t => t.id === taskId);
+            if (taskIndex !== -1) {
+                tasks.value[taskIndex] = updatedTask;
+                selectedTask.value = updatedTask;
+                selectedListTask.value = updatedTask;
+            }
+        } else {
+            // Fallback: update local state with minimal data
+            const taskIndex = tasks.value.findIndex(t => t.id === taskId);
+            if (taskIndex !== -1) {
+                const taskData = tasks.value[taskIndex];
+                tasks.value[taskIndex] = {
+                    ...taskData,
+                    status: newStatus,
+                    updatedAt: new Date().toISOString()
+                };
+                selectedTask.value = tasks.value[taskIndex];
+                selectedListTask.value = tasks.value[taskIndex];
+            }
         }
+
         showMessage('Task status updated!', 'success');
     } catch (error) {
+        console.error('❌ [changeTaskStatus] Error:', error);
         showMessage(error.response?.data?.message || 'Failed to update task status on server.', 'error');
     }
 };
