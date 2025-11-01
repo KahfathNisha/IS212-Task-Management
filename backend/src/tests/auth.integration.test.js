@@ -26,18 +26,37 @@ const axios = require('axios');
 describe('Auth integration tests (emulator)', () => {
   const email = `e2e.user+${Date.now()}@example.com`;
   const password = 'ValidPass123!';
+  // Increase Jest timeout slightly for emulator setup
+  jest.setTimeout(30000);
+
+  // small helper to add a timeout to potentially-hanging promises
+  const withTimeout = (p, ms = 5000) => Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('operation timed out')), ms))
+  ]);
 
   beforeAll(async () => {
-    // Clean collections used by tests
-    try {
-      // delete any existing docs in Users and passwordResets collections (best-effort)
-      const users = await db.collection('Users').get();
-      for (const doc of users.docs) await db.collection('Users').doc(doc.id).set(null);
-    } catch (err) {
-      // if emulator isn't running this may fail - tests will surface that
-      // swallow here to let tests show clearer failure later
+    // Clean collections used by tests (best-effort). Use timeouts so tests don't hang
+    if (!db) {
+      console.warn('⚠️ Firestore `db` is not available in test environment; skipping cleanup.');
+      return;
     }
-  });
+    try {
+      const usersSnap = await withTimeout(db.collection('Users').get(), 5000);
+      for (const doc of usersSnap.docs) {
+        // set to null to mimic delete without depending on delete permissions
+        await withTimeout(db.collection('Users').doc(doc.id).set(null), 5000).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('⚠️ Skipping Users cleanup (emulator may be offline):', err.message);
+    }
+    try {
+      const prsSnap = await withTimeout(db.collection('passwordResets').get(), 5000);
+      for (const d of prsSnap.docs) await withTimeout(db.collection('passwordResets').doc(d.id).set(null), 5000).catch(() => {});
+    } catch (err) {
+      // ignore
+    }
+  }, 20000);
 
   test('Register -> record failed attempts -> lockout -> check lockout', async () => {
     // 1) Register
@@ -151,5 +170,14 @@ describe('Auth integration tests (emulator)', () => {
     } catch (err) {
       // ignore
     }
+    // give background SDK tasks a moment to finish and allow Jest to exit cleanly
+    try {
+      if (db && typeof db.terminate === 'function') {
+        await db.terminate();
+      }
+    } catch (err) {
+      // ignore termination errors
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
   });
 });
