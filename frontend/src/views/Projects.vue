@@ -499,7 +499,7 @@
           <v-autocomplete
             v-model="newProject.owners"
             label="Owners"
-            :items="allUsers"
+            :items="availableUsersForOwners"
             item-title="name"
             item-value="email"
             multiple
@@ -508,19 +508,32 @@
             density="comfortable"
             class="mt-2"
             prepend-inner-icon="mdi-account-multiple"
+            :disabled="!canEditOwners"
+            :readonly="!canEditOwners"
+            :hint="!canEditOwners && isEditing ? 'Only the project creator can edit owners' : ''"
+            persistent-hint
+            :no-data-text="availableUsersForOwners.length === 0 ? (allUsers.length === 0 ? 'Loading users...' : 'No users available') : 'Type to search users'"
           >
             <template v-slot:item="{ props: itemProps, item }">
-              <v-list-item v-bind="itemProps">
+              <v-list-item 
+                :value="itemProps.value"
+                :key="item.raw?.email || item.email"
+                @click="itemProps.onClick"
+              >
                 <template v-slot:prepend>
                   <v-avatar size="32">
-                    {{ getInitials(item.raw.name) }}
+                    {{ getInitials(item.raw?.name || item.name) }}
                   </v-avatar>
                 </template>
-                <v-list-item-title>{{ item.raw.name }}</v-list-item-title>
-                <v-list-item-subtitle>{{ item.raw.department }}</v-list-item-subtitle>
+                <template v-slot:title>
+                  <span>{{ item.raw?.name || item.name }}</span>
+                </template>
+                <template v-slot:subtitle>
+                  <span>{{ item.raw?.email || item.email }}</span>
+                </template>
                 <template v-slot:append>
                   <v-chip size="small" color="primary" variant="flat">
-                    {{ capitalizeDepartment(item.raw.department) }}
+                    {{ capitalizeDepartment(item.raw?.department || item.department) }}
                   </v-chip>
                 </template>
               </v-list-item>
@@ -685,6 +698,17 @@ axiosClient.interceptors.request.use(config => {
 
 // Auth store
 const authStore = useAuthStore()
+
+// Computed: Check if current user can edit owners field
+// Only the original creator (createdBy) can edit owners
+const canEditOwners = computed(() => {
+  if (!isEditing.value || !newProject.value.createdBy) {
+    // When creating, user can always edit owners (will be set to creator)
+    return true;
+  }
+  // When editing, only the creator can edit owners
+  return newProject.value.createdBy === authStore.userEmail;
+})
 
 // State
 const expandedProjects = ref([])
@@ -1230,9 +1254,36 @@ const scrollToProject = (projectId) => {
 }
 
 const editProject = (project) => {
-  newProject.value = { ...project }
-  isEditing.value = true
-  showCreateDialog.value = true
+  // Populate owners with createdBy if owners is empty or doesn't exist
+  // Also ensure createdBy is included in owners
+  const projectOwners = project.owners || [];
+  const createdBy = project.createdBy || project.members?.[0] || authStore.userEmail;
+  
+  // If no owners exist, use createdBy as the owner
+  // If owners exist but createdBy is not included, add it to the beginning
+  let finalOwners = projectOwners;
+  if (projectOwners.length === 0 && createdBy) {
+    // No owners found, use creator
+    finalOwners = [createdBy];
+  } else if (createdBy && !projectOwners.includes(createdBy)) {
+    // Owners exist but creator not in list - add creator to the beginning
+    finalOwners = [createdBy, ...projectOwners.filter(o => o !== createdBy)];
+  }
+  
+  newProject.value = { 
+    ...project,
+    owners: finalOwners.length > 0 ? finalOwners : [createdBy], // Ensure at least creator is owner
+    createdBy: createdBy // Preserve createdBy field for permission check
+  };
+  isEditing.value = true;
+  showCreateDialog.value = true;
+  
+  console.log('[editProject] Loaded project:', {
+    id: project.id,
+    createdBy: createdBy,
+    owners: finalOwners,
+    canEditOwners: canEditOwners.value
+  });
 }
 // Category management is global only; no per-project management
 const manageCategoriesForProject = () => {}
@@ -1296,11 +1347,34 @@ const saveProject = async () => {
   try {
     if (isEditing.value) {
       // Update existing project
-      await axiosClient.put(`/projects/${newProject.value.id}`, newProject.value)
+      // Ensure createdBy is preserved and owners are valid
+      const updateData = {
+        ...newProject.value,
+        createdBy: newProject.value.createdBy || authStore.userEmail
+      };
+      
+      // Only update owners if current user is the creator
+      if (canEditOwners.value) {
+        updateData.owners = newProject.value.owners || [updateData.createdBy];
+      } else {
+        // Don't update owners if user is not the creator
+        delete updateData.owners;
+      }
+      
+      await axiosClient.put(`/projects/${newProject.value.id}`, updateData)
       showMessage('Project updated successfully', 'success')
     } else {
       // Create new project
-      await axiosClient.post('/projects', newProject.value)
+      // Ensure creator is set as owner if not already specified
+      const createData = {
+        ...newProject.value,
+        owners: newProject.value.owners && newProject.value.owners.length > 0 
+          ? newProject.value.owners 
+          : [authStore.userEmail],
+        createdBy: authStore.userEmail
+      };
+      
+      await axiosClient.post('/projects', createData)
       showMessage('Project created successfully', 'success')
     }
 
@@ -1326,7 +1400,8 @@ const resetForm = () => {
     status: 'Ongoing',
     department: 'Engineering',
     dueDate: '',
-    owners: []
+    owners: [],
+    createdBy: null // Reset createdBy when resetting form
   }
   isEditing.value = false
   newCategoryInput.value = ''
@@ -1572,52 +1647,45 @@ const loadProjectTasks = async (projectId) => {
 // Computed for visible departments by role
 defineProps(); // To support script setup even if not used for now
 
-// Helper function to clean user names (remove prefixes, duplicates, emails)
-const cleanUserName = (name) => {
-  if (!name) return '';
-  
-  // Remove any prefix like "AL ", "AM ", "DA " etc (2-3 uppercase letters followed by space)
-  let cleaned = name.replace(/^[A-Z]{2,3}\s+/, '').trim();
-  
-  // Remove email addresses if present in the name
-  cleaned = cleaned.replace(/\s+[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, '').trim();
-  
-  // If it still contains @, split and use the part before @
-  if (cleaned.includes('@')) {
-    cleaned = cleaned.split('@')[0].trim();
-  }
-  
-  // Remove duplicate names (if name appears twice like "Alex Ng Alex Ng")
-  const parts = cleaned.split(/\s+/);
-  const uniqueParts = [];
-  const seen = new Set();
-  for (const part of parts) {
-    const normalized = part.toLowerCase();
-    if (!seen.has(normalized)) {
-      seen.add(normalized);
-      uniqueParts.push(part);
-    }
-  }
-  cleaned = uniqueParts.join(' ');
-  
-  return cleaned.trim() || '';
-};
-
 // Get unique users (deduplicated by email)
 const uniqueUsers = computed(() => {
   const userMap = new Map();
   allUsers.value.forEach(user => {
     if (!userMap.has(user.email)) {
-      const cleanName = cleanUserName(user.name);
-      
+      // Name is already cleaned in fetchAllUsers
       userMap.set(user.email, {
         ...user,
-        name: cleanName || user.email.split('@')[0],
-        displayName: cleanName || user.email.split('@')[0]
+        displayName: user.name || user.email.split('@')[0]
       });
     }
   });
   return Array.from(userMap.values());
+});
+
+// Available users for owners field (cleaned and ready for autocomplete)
+const availableUsersForOwners = computed(() => {
+  if (!allUsers.value || allUsers.value.length === 0) {
+    console.log('[availableUsersForOwners] No users available yet');
+    return [];
+  }
+  
+  // Use allUsers but ensure proper structure for Vuetify autocomplete
+  const userMap = new Map();
+  allUsers.value.forEach(user => {
+    if (user && user.email && !userMap.has(user.email)) {
+      const cleanName = user.name || user.email.split('@')[0];
+      userMap.set(user.email, {
+        email: user.email,
+        name: cleanName,
+        department: user.department || '',
+        role: user.role || ''
+      });
+    }
+  });
+  
+  const usersList = Array.from(userMap.values());
+  console.log(`[availableUsersForOwners] Returning ${usersList.length} users for owners field`);
+  return usersList;
 });
 
 // Capitalize department name (first letter of each word, with special handling for acronyms)
@@ -1690,13 +1758,64 @@ const visibleDepartments = computed(() => {
   // Manager sees only their department
   if (authStore.userRole === 'manager') {
     const userDept = authStore.userData?.department;
-    if (userDept) {
+    if (!userDept) {
+      console.warn('[visibleDepartments] Manager has no department assigned');
+      return [];
+    }
+    
+    // Normalize manager's department (trim and lowercase for comparison)
+    const managerDeptNormalized = userDept.trim().toLowerCase();
+    
+    // First, check if manager exists in allUsers with this department
+    // This is the most reliable check - if the manager is in the system with a department, show it
+    const managerInUsers = allUsers.value.find(user => {
+      const userEmail = user.email || '';
+      const userDeptNormalized = (user.department || '').trim().toLowerCase();
+      // Match by email (most reliable) and department
+      return (userEmail.toLowerCase() === authStore.userEmail?.toLowerCase() || 
+              userEmail === authStore.userEmail) &&
+             userDeptNormalized === managerDeptNormalized;
+    });
+    
+    // If manager is found in users, find the department name as stored in the system
+    // This ensures we get the exact casing used in the database
+    if (managerInUsers && managerInUsers.department) {
+      const systemDeptName = managerInUsers.department.trim();
+      
+      // Check if this department exists in departmentsFromUsers (for consistency)
       const allDepts = departmentsFromUsers.value.length > 0 ? departmentsFromUsers.value : realDepartments.value;
-      if (allDepts.includes(userDept)) {
-        return [userDept];
+      const matchingDept = allDepts.find(dept => {
+        return dept.trim().toLowerCase() === systemDeptName.toLowerCase();
+      });
+      
+      // Return the department - prefer the one from departmentsFromUsers if available, otherwise use system name
+      if (matchingDept) {
+        console.log('[visibleDepartments] Manager department found:', matchingDept);
+        return [matchingDept];
+      } else {
+        // Department exists for this manager but not in the aggregated list yet
+        // Return the system department name (will be capitalized in display)
+        console.log('[visibleDepartments] Manager department found in user data:', systemDeptName);
+        return [systemDeptName];
       }
     }
-    return [];
+    
+    // Fallback: Try to match from departmentsFromUsers or realDepartments by name only
+    // This handles cases where manager might not be in allUsers yet (edge case)
+    const allDepts = departmentsFromUsers.value.length > 0 ? departmentsFromUsers.value : realDepartments.value;
+    const matchingDept = allDepts.find(dept => {
+      return dept.trim().toLowerCase() === managerDeptNormalized;
+    });
+    
+    if (matchingDept) {
+      console.log('[visibleDepartments] Manager department matched from dept list:', matchingDept);
+      return [matchingDept];
+    }
+    
+    // Last resort: If manager has a department in userData, show it even if not found elsewhere
+    // This ensures managers can always see their assigned department
+    console.log('[visibleDepartments] Using manager department from userData as fallback:', userDept.trim());
+    return [userDept.trim()];
   }
   
   return [];
@@ -1712,18 +1831,72 @@ const visibleViewTabs = computed(() => {
   return viewTabs;
 });
 
-// Fetch all users for member dropdown
+// Helper function to clean user names (remove prefixes, duplicates, emails)
+const cleanUserName = (name) => {
+  if (!name) return '';
+  
+  // Remove any prefix like "AL ", "AM ", "DA " etc (2-3 uppercase letters followed by space)
+  let cleaned = name.replace(/^[A-Z]{2,3}\s+/, '').trim();
+  
+  // Remove email addresses if present in the name
+  cleaned = cleaned.replace(/\s+[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, '').trim();
+  
+  // If it still contains @, split and use the part before @
+  if (cleaned.includes('@')) {
+    cleaned = cleaned.split('@')[0].trim();
+  }
+  
+  // Remove duplicate names (if name appears twice like "Alex Ng Alex Ng")
+  const parts = cleaned.split(/\s+/);
+  const uniqueParts = [];
+  const seen = new Set();
+  for (const part of parts) {
+    const normalized = part.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueParts.push(part);
+    }
+  }
+  cleaned = uniqueParts.join(' ');
+  
+  return cleaned.trim() || '';
+};
+
+// Fetch all users for member dropdown (via backend API to avoid Firestore permission issues)
 async function fetchAllUsers() {
   try {
-    const usersSnapshot = await getDocs(collection(db, 'Users'));
-    allUsers.value = usersSnapshot.docs.map(doc => ({
-      email: doc.id,
-      name: doc.data().name || doc.id,
-      department: doc.data().department || '',
-      role: doc.data().role || ''
-    }));
+    // Use backend API endpoint which handles authentication and role-based filtering
+    // axiosClient automatically adds the auth token via interceptor
+    const response = await axiosClient.get('/auth/users');
+
+    if (response.status === 200 && Array.isArray(response.data)) {
+      const users = response.data.map(user => {
+        const rawName = user.name || user.email.split('@')[0];
+        const cleanedName = cleanUserName(rawName) || user.email.split('@')[0];
+        return {
+          email: user.email,
+          name: cleanedName,
+          department: user.department || '',
+          role: user.role || ''
+        };
+      });
+      
+      allUsers.value = users;
+      console.log(`[fetchAllUsers] Loaded ${allUsers.value.length} users from API:`, 
+        allUsers.value.map(u => `${u.name} (${u.email})`).join(', '));
+    } else {
+      throw new Error('Invalid response format from API');
+    }
   } catch (e) {
+    console.error('[fetchAllUsers] Error loading users:', e);
     allUsers.value = [];
+    
+    // Only show error message if it's not a permission error (which might be expected for some roles)
+    if (e.response?.status !== 403) {
+      showMessage('Failed to load users: ' + (e.response?.data?.message || e.message), 'error');
+    } else {
+      console.warn('[fetchAllUsers] User does not have permission to view users list');
+    }
   }
 }
 

@@ -224,6 +224,14 @@ exports.updateProject = async (req, res) => {
       return res.status(403).json({ message: 'Insufficient permissions: Managers cannot change project department' });
     }
     
+    // Only the project creator can modify owners
+    if (owners !== undefined) {
+      const projectCreator = projectData.createdBy;
+      if (projectCreator && projectCreator !== email) {
+        return res.status(403).json({ message: 'Insufficient permissions: Only the project creator can modify owners' });
+      }
+    }
+    
     const updateData = {
       updatedAt: new Date()
     };
