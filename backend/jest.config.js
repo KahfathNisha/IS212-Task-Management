@@ -5,6 +5,12 @@ module.exports = {
     '**/tests/**/*.test.js',
     '**/__tests__/**/*.js'
   ],
+  // Exclude standalone test scripts (they're not Jest test suites)
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/integration\.test\.js$',
+    '/email\.test\.js$'
+  ],
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/server.js',

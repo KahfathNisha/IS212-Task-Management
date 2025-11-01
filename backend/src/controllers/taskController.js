@@ -1,6 +1,7 @@
 const { db, admin } = require('../config/firebase');
 const taskModel = require('../models/taskModel');
 const NotificationService = require('../services/notificationService');
+const EmailService = require('../services/emailService');
 
 // --- Helper function for Timestamp conversion ---
 const formatTimestampToISO = (timestamp) => {
@@ -195,7 +196,6 @@ exports.createTask = async (req, res) => {
                 };
 
                 await NotificationService.sendNotification(assigneeId, notificationData, {
-                    sendPush: false,
                     sendEmail: false
                 });
                 
@@ -432,7 +432,6 @@ exports.updateTask = async (req, res) => {
                     };
 
                     await NotificationService.sendNotification(originalTask.assigneeId, unassignNotificationData, {
-                        sendPush: false,
                         sendEmail: false
                     });
                     
@@ -453,7 +452,6 @@ exports.updateTask = async (req, res) => {
                         };
 
                         await NotificationService.sendNotification(req.body.assigneeId, assignNotificationData, {
-                            sendPush: false,
                             sendEmail: false
                         });
                         
@@ -476,7 +474,6 @@ exports.updateTask = async (req, res) => {
                     };
 
                     await NotificationService.sendNotification(originalTask.assigneeId, statusNotificationData, {
-                        sendPush: false,
                         sendEmail: false
                     });
                     
@@ -491,7 +488,6 @@ exports.updateTask = async (req, res) => {
                     };
 
                     await NotificationService.sendNotification(originalTask.assigneeId, notificationData, {
-                        sendPush: false,
                         sendEmail: false
                     });
                 }
@@ -536,7 +532,6 @@ exports.updateTaskStatus = async (req, res) => {
                 };
 
                 await NotificationService.sendNotification(task.assigneeId, statusNotificationData, {
-                    sendPush: false,
                     sendEmail: false
                 });
             } catch (error) {
@@ -667,7 +662,6 @@ exports.archiveTask = async (req, res) => {
                 };
 
                 await NotificationService.sendNotification(task.assigneeId, archiveNotificationData, {
-                    sendPush: false,
                     sendEmail: false
                 });
             } catch (error) {
@@ -709,7 +703,6 @@ exports.unarchiveTask = async (req, res) => {
                 };
 
                 await NotificationService.sendNotification(task.assigneeId, unarchiveNotificationData, {
-                    sendPush: false,
                     sendEmail: false
                 });
             } catch (error) {

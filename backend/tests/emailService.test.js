@@ -1,5 +1,5 @@
 const sgMail = require('@sendgrid/mail');
-const EmailService = require('../services/emailService');
+const EmailService = require('../src/services/emailService');
 
 // Mock @sendgrid/mail
 jest.mock('@sendgrid/mail', () => ({

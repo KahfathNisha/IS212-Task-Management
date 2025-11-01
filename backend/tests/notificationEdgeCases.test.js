@@ -31,10 +31,6 @@ const mockBatch = {
   commit: jest.fn()
 };
 
-const mockMessaging = {
-  send: jest.fn()
-};
-
 jest.mock('../src/config/firebase', () => ({
   db: {
     collection: jest.fn(() => mockCollection),
@@ -46,8 +42,7 @@ jest.mock('../src/config/firebase', () => ({
         now: jest.fn(() => ({ toDate: () => new Date() })),
         fromDate: jest.fn(() => ({ toDate: () => new Date() }))
       }
-    },
-    messaging: jest.fn(() => mockMessaging)
+    }
   }
 }));
 
@@ -64,7 +59,6 @@ describe('Notification Edge Cases', () => {
     // Setup default mock responses
     mockNotificationsCollection.add.mockResolvedValue({ id: 'notification-123' });
     mockBatch.commit.mockResolvedValue(true);
-    mockMessaging.send.mockResolvedValue({ success: true });
   });
 
   describe('Deadline Reminder Edge Cases', () => {
@@ -272,68 +266,12 @@ describe('Notification Edge Cases', () => {
         'test@example.com',
         { title: 'Test', body: 'Test message' },
         {
-          sendPush: true,
           sendEmail: true
         }
       );
 
-      // Should still create database notification even if push/email are disabled
+      // Should still create database notification even if email is disabled
       expect(result).toBe('notification-123');
-    });
-  });
-
-  describe('FCM Token Edge Cases', () => {
-    it('should handle array of FCM tokens', async () => {
-      const userData = {
-        email: 'test@example.com',
-        fcmToken: ['token1', 'token2', 'token3'],
-        notificationSettings: { pushEnabled: true }
-      };
-
-      const mockUserDoc = {
-        exists: true,
-        data: () => userData
-      };
-
-      mockDoc.get.mockResolvedValue(mockUserDoc);
-
-      // Mock FCM send to resolve successfully
-      mockMessaging.send.mockResolvedValue({ success: true });
-
-      const result = await NotificationService.sendPushNotification(
-        'test@example.com',
-        'Test Title',
-        'Test Body'
-      );
-
-      expect(mockMessaging.send).toHaveBeenCalledTimes(3);
-      expect(result).toBe(true);
-    });
-
-    it('should handle FCM send failures gracefully', async () => {
-      const userData = {
-        email: 'test@example.com',
-        fcmToken: 'mock-token',
-        notificationSettings: { pushEnabled: true }
-      };
-
-      const mockUserDoc = {
-        exists: true,
-        data: () => userData
-      };
-
-      mockDoc.get.mockResolvedValue(mockUserDoc);
-
-      // Mock FCM send to fail
-      mockMessaging.send.mockRejectedValue(new Error('FCM error'));
-
-      const result = await NotificationService.sendPushNotification(
-        'test@example.com',
-        'Test Title',
-        'Test Body'
-      );
-
-      expect(result).toBe(false);
     });
   });
 

@@ -19,7 +19,8 @@ const userModel = {
     securityAnswer: "",         // Answer to security question
     
     // Notification and communication fields
-    fcmToken: null,             // Firebase Cloud Messaging token for push notifications
+    // NOTE: fcmToken and pushEnabled fields are deprecated - push notifications removed in favor of in-app notifications
+    fcmToken: null,             // DEPRECATED: Firebase Cloud Messaging token for push notifications (not used)
     timezone: "UTC",            // User's timezone preference for email notifications
     
     // Notification settings object (includes both in-app and email preferences)
@@ -36,7 +37,7 @@ const userModel = {
         emailCustomReminders: [],             // Custom reminders: array of hours before deadline
         emailReassignmentAdd: true,           // Email notifications when assigned to tasks
         emailReassignmentRemove: true,        // Email notifications when removed from tasks
-        pushEnabled: true                     // Toggle for push notifications
+        pushEnabled: true                     // DEPRECATED: Toggle for push notifications (not used)
     },
     
     // Timestamps

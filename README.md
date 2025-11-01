@@ -63,7 +63,7 @@ Access the application at:
     Firebase Emulator UI: http://localhost:4000
 
 
-
+---
 ## 🚀 **Test Your Setup Now**
 
 Use Command Prompt (not PowerShell):
@@ -78,3 +78,14 @@ Should show: Server running on port 3000
 cd C:\Users\nisha\is212-task-management\frontend
 npm run dev
 Should show: Local: http://localhost:5173/
+---
+
+## Local CI pipeline testing
+# For macOS / Linux
+chmod +x run-ci-checks.sh
+
+# Run all CI checks
+./run-ci-checks.sh
+
+# For Windows
+run-ci-checks.bat

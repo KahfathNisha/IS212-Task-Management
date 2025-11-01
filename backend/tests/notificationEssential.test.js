@@ -24,10 +24,6 @@ const mockCollection = {
   }))
 };
 
-const mockMessaging = {
-  send: jest.fn()
-};
-
 jest.mock('../src/config/firebase', () => ({
   db: { collection: jest.fn(() => mockCollection) },
   admin: {
@@ -36,8 +32,7 @@ jest.mock('../src/config/firebase', () => ({
         now: jest.fn(() => ({ toDate: () => new Date() })),
         fromDate: jest.fn(() => ({ toDate: () => new Date() }))
       }
-    },
-    messaging: jest.fn(() => mockMessaging)
+    }
   }
 }));
 
@@ -51,7 +46,6 @@ describe('Essential Notification Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockNotificationsCollection.add.mockResolvedValue({ id: 'test-notification-id' });
-    mockMessaging.send.mockResolvedValue({ success: true });
   });
 
   describe('Core Functionality', () => {
@@ -76,7 +70,7 @@ describe('Essential Notification Tests', () => {
       expect(result).toBe('test-notification-id');
     });
 
-    it('should send unified notification (DB + Push + Email)', async () => {
+    it('should send unified notification (DB + Email)', async () => {
       const notificationData = {
         title: 'Deadline Reminder',
         body: 'Task due tomorrow',
@@ -86,17 +80,14 @@ describe('Essential Notification Tests', () => {
 
       const userData = {
         email: 'test@example.com',
-        fcmToken: 'mock-token',
         notificationSettings: {
-          emailEnabled: true,
-          pushEnabled: true
+          emailEnabled: true
         }
       };
 
       mockDoc.get.mockResolvedValue({ exists: true, data: () => userData });
 
       const result = await NotificationService.sendNotification('test@example.com', notificationData, {
-        sendPush: true,
         sendEmail: true,
         taskData: { title: 'Test Task', dueDate: { toDate: () => new Date() } },
         hoursLeft: 24,
@@ -105,31 +96,11 @@ describe('Essential Notification Tests', () => {
       });
 
       expect(mockNotificationsCollection.add).toHaveBeenCalled();
-      expect(mockMessaging.send).toHaveBeenCalled();
       expect(result).toBe('test-notification-id');
     });
   });
 
   describe('Critical Edge Cases', () => {
-    it('should handle missing FCM token gracefully', async () => {
-      const userData = {
-        email: 'test@example.com',
-        fcmToken: null,
-        notificationSettings: { pushEnabled: true }
-      };
-
-      mockDoc.get.mockResolvedValue({ exists: true, data: () => userData });
-
-      const result = await NotificationService.sendPushNotification(
-        'test@example.com',
-        'Test Title',
-        'Test Body'
-      );
-
-      expect(result).toBe(false);
-      expect(mockMessaging.send).not.toHaveBeenCalled();
-    });
-
     it('should handle email disabled in user settings', async () => {
       const userData = {
         email: 'test@example.com',
@@ -157,24 +128,6 @@ describe('Essential Notification Tests', () => {
       ).rejects.toThrow('Database error');
     });
 
-    it('should handle FCM send failures gracefully', async () => {
-      const userData = {
-        email: 'test@example.com',
-        fcmToken: 'mock-token',
-        notificationSettings: { pushEnabled: true }
-      };
-
-      mockDoc.get.mockResolvedValue({ exists: true, data: () => userData });
-      mockMessaging.send.mockRejectedValue(new Error('FCM error'));
-
-      const result = await NotificationService.sendPushNotification(
-        'test@example.com',
-        'Test Title',
-        'Test Body'
-      );
-
-      expect(result).toBe(false);
-    });
   });
 
   describe('Deadline Reminder Logic', () => {

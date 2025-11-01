@@ -1,4 +1,8 @@
 // Mock Firebase Firestore layer used by projectsController
+const mockTasksCollection = {
+  get: jest.fn(),
+};
+
 const mockProjectsCollection = {
   where: jest.fn().mockReturnThis(),
   get: jest.fn(),
@@ -13,7 +17,11 @@ const mockProjectDocRef = {
 
 jest.mock('../src/config/firebase', () => ({
   db: {
-    collection: jest.fn(() => mockProjectsCollection),
+    collection: jest.fn((name) => {
+      if (name === 'projects') return mockProjectsCollection;
+      if (name === 'tasks') return mockTasksCollection;
+      throw new Error(`Unknown collection: ${name}`);
+    }),
   },
 }));
 
@@ -103,11 +111,21 @@ describe('projectsController', () => {
     it('returns only member projects for staff', async () => {
       req.user = { email: 's@example.com', role: 'staff', department: 'Sales' };
 
-      const docs = [
-        buildDoc('m1', { name: 'M1', isDeleted: false, members: ['s@example.com'], createdAt: ts('2024-05-01'), updatedAt: ts('2024-05-02') }),
+      // const docs = [
+      //   buildDoc('m1', { name: 'M1', isDeleted: false, members: ['s@example.com'], createdAt: ts('2024-05-01'), updatedAt: ts('2024-05-02') }),
+      // ];
+      const tasksDocs = [
+        buildDoc('t1', { projectId: 'm1', taskOwner: 's@example.com' }),
       ];
+      mockTasksCollection.get.mockResolvedValueOnce({ docs: tasksDocs });
+    
+      // Mock the projects returned from Firestore
+      const projectDocs = [
+        buildDoc('m1', { name: 'M1', isDeleted: false, createdAt: ts('2024-05-01'), updatedAt: ts('2024-05-02') }),
+      ];
+      mockProjectsCollection.get.mockResolvedValueOnce({ docs: projectDocs });
 
-      mockProjectsCollection.get.mockResolvedValueOnce({ docs });
+      // mockProjectsCollection.get.mockResolvedValueOnce({ docs });
 
       await projectsController.getAllProjects(req, res);
 
@@ -232,7 +250,7 @@ describe('projectsController', () => {
         }),
       });
 
-      req.body = { name: '  New Name  ', description: 'new', categories: ['UX', 'API'] };
+      req.body = { name: '  New Name  ', description: 'new' };
 
       await projectsController.updateProject(req, res);
 
@@ -240,7 +258,7 @@ describe('projectsController', () => {
       const updateData = mockProjectDocRef.update.mock.calls[0][0];
       expect(updateData.name).toBe('New Name');
       expect(updateData.description).toBe('new');
-      expect(updateData.categories).toEqual(['UX', 'API']);
+      // Note: categories are no longer stored on projects (removed in implementation)
 
       expect(res.status).toHaveBeenCalledWith(200);
       const payload = res.json.mock.calls[0][0];
@@ -259,107 +277,7 @@ describe('projectsController', () => {
     });
   });
 
-  describe('addCategory', () => {
-    it('validates category name', async () => {
-      req.body = { category: '   ' };
-
-      await projectsController.addCategory(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Category name is required' });
-    });
-
-    it('404 when project missing', async () => {
-      mockProjectDocRef.get.mockResolvedValueOnce({ exists: false });
-
-      req.body = { category: 'UX' };
-      await projectsController.addCategory(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Project not found' });
-    });
-
-    it('400 when category already exists', async () => {
-      mockProjectDocRef.get.mockResolvedValueOnce({
-        exists: true,
-        data: () => ({ categories: ['UX'] }),
-      });
-
-      req.body = { category: 'UX' };
-      await projectsController.addCategory(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Category already exists in this project' });
-    });
-
-    it('adds category and returns updated list', async () => {
-      mockProjectDocRef.get.mockResolvedValueOnce({
-        exists: true,
-        data: () => ({ categories: ['UX'] }),
-      });
-
-      req.body = { category: 'API' };
-      await projectsController.addCategory(req, res);
-
-      expect(mockProjectDocRef.update).toHaveBeenCalled();
-      const update = mockProjectDocRef.update.mock.calls[0][0];
-      expect(update.categories).toEqual(['UX', 'API']);
-
-      expect(res.status).toHaveBeenCalledWith(200);
-      const payload = res.json.mock.calls[0][0];
-      expect(payload.message).toBe('Category added successfully');
-      expect(payload.categories).toEqual(['UX', 'API']);
-    });
-
-    it('handles errors', async () => {
-      mockProjectDocRef.get.mockRejectedValueOnce(new Error('err'));
-      req.body = { category: 'API' };
-
-      await projectsController.addCategory(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'err' });
-    });
-  });
-
-  describe('removeCategory', () => {
-    it('404 when project missing', async () => {
-      mockProjectDocRef.get.mockResolvedValueOnce({ exists: false });
-
-      await projectsController.removeCategory(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Project not found' });
-    });
-
-    it('removes category and returns updated list', async () => {
-      req.params.category = encodeURIComponent('UX');
-      mockProjectDocRef.get.mockResolvedValueOnce({
-        exists: true,
-        data: () => ({ categories: ['UX', 'API'] }),
-      });
-
-      await projectsController.removeCategory(req, res);
-
-      expect(mockProjectDocRef.update).toHaveBeenCalled();
-      const update = mockProjectDocRef.update.mock.calls[0][0];
-      expect(update.categories).toEqual(['API']);
-
-      expect(res.status).toHaveBeenCalledWith(200);
-      const payload = res.json.mock.calls[0][0];
-      expect(payload.message).toBe('Category removed successfully');
-      expect(payload.categories).toEqual(['API']);
-    });
-
-    it('handles errors', async () => {
-      mockProjectDocRef.get.mockRejectedValueOnce(new Error('boom'));
-
-      await projectsController.removeCategory(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'boom' });
-    });
-  });
+  // Note: addCategory and removeCategory functions were removed - tests removed
 });
 
 

@@ -30,57 +30,6 @@ class NotificationService {
     }
 
     /**
-     * Send push notification via FCM
-     */
-    static async sendPushNotification(userId, title, body, data = {}) {
-        try {
-            const userDoc = await db.collection('Users').doc(userId).get();
-            if (!userDoc.exists) {
-                console.log(`User ${userId} not found for push notification`);
-                return false;
-            }
-
-            const userData = userDoc.data();
-            const fcmToken = userData.fcmToken;
-            
-            if (!fcmToken) {
-                console.log(`User ${userId} has no FCM token`);
-                return false;
-            }
-
-            let tokens = Array.isArray(fcmToken) ? fcmToken : [fcmToken];
-            
-            // Send to all tokens
-            const chunkSize = 500;
-            let successCount = 0;
-            
-            for (let i = 0; i < tokens.length; i += chunkSize) {
-                const tokenChunk = tokens.slice(i, i + chunkSize);
-                
-                const sendPromises = tokenChunk.map(token => 
-                    admin.messaging().send({
-                        token: token,
-                        notification: { title, body },
-                        data: { ...data, timestamp: Date.now().toString() }
-                    }).catch(err => {
-                        console.error(`Failed to send push notification to token: ${err.message}`);
-                        return { success: false };
-                    })
-                );
-                
-                const results = await Promise.all(sendPromises);
-                successCount += results.filter(r => r.success !== false).length;
-            }
-
-            console.log(`✅ Sent push notification to ${successCount}/${tokens.length} tokens for user ${userId}`);
-            return successCount > 0;
-        } catch (error) {
-            console.error('Error sending push notification:', error);
-            return false;
-        }
-    }
-
-    /**
      * Send email notification
      */
     static async sendEmailNotification(userId, taskData, hoursLeft, minutesLeft, userTimezone) {
@@ -114,11 +63,10 @@ class NotificationService {
     }
 
     /**
-     * Unified notification method - creates DB notification, sends push, and optionally email
+     * Unified notification method - creates DB notification and optionally email
      */
     static async sendNotification(userId, notificationData, options = {}) {
         const {
-            sendPush = true,
             sendEmail = false,
             taskData = null,
             hoursLeft = 0,
@@ -130,17 +78,7 @@ class NotificationService {
             // 1. Create database notification for frontend
             const notificationId = await this.createNotification(userId, notificationData);
 
-            // 2. Send push notification if enabled
-            if (sendPush) {
-                await this.sendPushNotification(
-                    userId, 
-                    notificationData.title, 
-                    notificationData.body,
-                    { notificationId, taskId: notificationData.taskId }
-                );
-            }
-
-            // 3. Send email notification if enabled and task data provided
+            // 2. Send email notification if enabled and task data provided
             if (sendEmail && taskData) {
                 await this.sendEmailNotification(userId, taskData, hoursLeft, minutesLeft, userTimezone);
             }
@@ -241,6 +179,109 @@ class NotificationService {
             console.log(`✅ Cleaned up ${oldNotificationsSnapshot.size} old notifications for user ${userId}`);
         } catch (error) {
             console.error('Error cleaning up old notifications:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Process deadline reminders for all users (called by cron job)
+     * Queries tasks and sends reminders based on user settings
+     */
+    static async processDeadlineReminders(now) {
+        try {
+            // Get all users with email notifications enabled
+            const usersSnapshot = await db.collection("Users")
+                .where("notificationSettings.emailEnabled", "==", true)
+                .get();
+
+            console.log(`📅 [DeadlineReminders] Processing reminders for ${usersSnapshot.size} users`);
+
+            for (const userDoc of usersSnapshot.docs) {
+                const userData = userDoc.data();
+                const userId = userDoc.id;
+                const settings = userData.notificationSettings || {};
+                
+                // Get tasks assigned to this user that are not archived
+                const tasksSnapshot = await db.collection("tasks")
+                    .where("assigneeId", "==", userId)
+                    .where("archived", "==", false)
+                    .get();
+
+                for (const taskDoc of tasksSnapshot.docs) {
+                    const taskData = taskDoc.data();
+                    
+                    // Skip if no due date
+                    if (!taskData.dueDate) continue;
+                    
+                    const dueDate = taskData.dueDate.toDate();
+                    const timeDiff = dueDate - now;
+                    const hoursUntilDue = timeDiff / (1000 * 60 * 60);
+                    const daysUntilDue = hoursUntilDue / 24;
+
+                    // Get reminder intervals based on user settings
+                    let reminderIntervals = [];
+                    if (settings.emailReminderType === 'custom' && settings.emailCustomReminders && settings.emailCustomReminders.length > 0) {
+                        // Custom reminders are in hours - convert to days
+                        reminderIntervals = settings.emailCustomReminders.map(hours => hours / 24);
+                    } else {
+                        // Default preset: 1, 3, 7 days
+                        reminderIntervals = settings.emailPresetReminders || [1, 3, 7];
+                    }
+
+                    // Check if we should send reminder at any of the configured intervals
+                    // Allow small tolerance (0.1 days = ~2.4 hours) for timing
+                    const shouldSendReminder = reminderIntervals.some(interval => 
+                        Math.abs(daysUntilDue - interval) < 0.1 && daysUntilDue > 0
+                    );
+
+                    if (shouldSendReminder) {
+                        const daysLeft = Math.round(daysUntilDue);
+                        
+                        // Check if we already sent a reminder today for this task
+                        // Look for existing notifications with same taskId and similar message
+                        const today = new Date(now);
+                        today.setHours(0, 0, 0, 0);
+                        const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
+                        
+                        const existingReminders = await db.collection('Users').doc(userId)
+                            .collection('notifications')
+                            .where('taskId', '==', taskDoc.id)
+                            .where('createdAt', '>=', todayTimestamp)
+                            .where('title', '==', 'Task Deadline Reminder')
+                            .get();
+
+                        // Only send if we haven't sent one today for this task
+                        if (existingReminders.empty) {
+                            const hoursLeft = Math.floor(hoursUntilDue);
+                            const minutesLeft = Math.floor((hoursUntilDue - hoursLeft) * 60);
+
+                            try {
+                                // Create unified notification (database + email)
+                                const notificationData = {
+                                    title: `Task Deadline Reminder`,
+                                    body: `Your task "${taskData.title}" is due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}!`,
+                                    taskId: taskDoc.id,
+                                    type: 'warning'
+                                };
+
+                                await this.sendNotification(userId, notificationData, {
+                                    sendEmail: true,
+                                    taskData: { ...taskData, id: taskDoc.id },
+                                    hoursLeft,
+                                    minutesLeft,
+                                    userTimezone: userData.timezone || 'UTC'
+                                });
+
+                                console.log(`✅ [DeadlineReminders] Sent reminder for task "${taskData.title}" to user ${userId} (${daysLeft} days left)`);
+                            } catch (error) {
+                                console.error(`❌ [DeadlineReminders] Failed to send reminder for task ${taskDoc.id}:`, error);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ [DeadlineReminders] Error processing reminders:', error);
             throw error;
         }
     }

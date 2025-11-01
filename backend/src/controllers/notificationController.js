@@ -174,7 +174,6 @@ exports.createTestNotification = async (req, res) => {
         };
 
         const notificationId = await NotificationService.sendNotification(userId, notificationData, {
-            sendPush: false,
             sendEmail: false
         });
 

@@ -13,6 +13,7 @@ const mockProjectsCollection = {
 const mockRecurringTasksCollection = {
   get: jest.fn(),
   doc: jest.fn(),
+  where: jest.fn().mockReturnThis(),
 };
 
 const mockUsersCollection = {
@@ -36,35 +37,37 @@ const mockBatch = {
   commit: jest.fn(),
 };
 
-const nowDate = new Date('2024-06-01T10:00:00Z');
+jest.mock('../src/config/firebase', () => {
+  const nowDate = new Date('2024-06-01T10:00:00Z');
+  
+  const TimestampMock = {
+    now: jest.fn(() => ({ toDate: () => nowDate })),
+    fromDate: jest.fn((d) => ({ toDate: () => d })),
+  };
 
-const TimestampMock = {
-  now: jest.fn(() => ({ toDate: () => nowDate })),
-  fromDate: jest.fn((d) => ({ toDate: () => d })),
-};
+  const FieldValueMock = {
+    delete: jest.fn(() => '__DEL__'),
+  };
 
-const FieldValueMock = {
-  delete: jest.fn(() => '__DEL__'),
-};
-
-jest.mock('../src/config/firebase', () => ({
-  db: {
-    collection: jest.fn((name) => {
-      if (name === 'tasks') return mockTasksCollection;
-      if (name === 'projects') return mockProjectsCollection;
-      if (name === 'recurringTasks') return mockRecurringTasksCollection;
-      if (name === 'users') return mockUsersCollection;
-      return {};
-    }),
-    batch: jest.fn(() => mockBatch),
-  },
-  admin: {
-    firestore: {
-      Timestamp: TimestampMock,
-      FieldValue: FieldValueMock,
+  return {
+    db: {
+      collection: jest.fn((name) => {
+        if (name === 'tasks') return mockTasksCollection;
+        if (name === 'projects') return mockProjectsCollection;
+        if (name === 'recurringTasks') return mockRecurringTasksCollection;
+        if (name === 'users') return mockUsersCollection;
+        return {};
+      }),
+      batch: jest.fn(() => mockBatch),
     },
-  },
-}));
+    admin: {
+      firestore: {
+        Timestamp: TimestampMock,
+        FieldValue: FieldValueMock,
+      },
+    },
+  };
+});
 
 const taskController = require('../src/controllers/taskController');
 
@@ -245,14 +248,27 @@ describe('taskController', () => {
 
   describe('recurring tasks', () => {
     it('getAllRecurringTasks returns list with formatted timestamps', async () => {
+      // Setup the mock for where().get() chain
+      mockRecurringTasksCollection.where.mockReturnValue(mockRecurringTasksCollection);
       mockRecurringTasksCollection.get.mockResolvedValueOnce({
         docs: [
-          { id: 'r1', data: () => ({ createdAt: ts('2024-01-01'), updatedAt: ts('2024-01-02') }) },
+          { 
+            id: 'r1', 
+            data: () => ({ 
+              taskOwner: 'u@example.com',
+              createdAt: ts('2024-01-01'), 
+              updatedAt: ts('2024-01-02') 
+            }) 
+          },
         ],
       });
+      
       await taskController.getAllRecurringTasks(req, res);
+      
+      expect(mockRecurringTasksCollection.where).toHaveBeenCalledWith('taskOwner', '==', 'u@example.com');
       expect(res.status).toHaveBeenCalledWith(200);
       const payload = res.json.mock.calls[0][0];
+      expect(Array.isArray(payload)).toBe(true);
       expect(payload[0].id).toBe('r1');
       expect(typeof payload[0].createdAt).toBe('string');
     });

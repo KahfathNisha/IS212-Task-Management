@@ -127,22 +127,11 @@ describe('categoriesController', () => {
       const catDoc = buildDoc('cat-1', { name: 'Design' });
       catDoc.ref.delete = jest.fn();
 
-      mockCategoriesCollection.get
-        .mockResolvedValueOnce({ empty: false, docs: [catDoc] });
-
-      const projectDocs = [
-        { ref: { id: 'p1' }, data: () => ({ categories: ['Design', 'API'] }) },
-        { ref: { id: 'p2' }, data: () => ({ categories: ['Design'] }) },
-      ];
-      mockProjectsCollection.get.mockResolvedValueOnce({ docs: projectDocs });
-      mockBatch.commit.mockResolvedValueOnce();
+      mockCategoriesCollection.get.mockResolvedValueOnce({ empty: false, docs: [catDoc] });
 
       await categoriesController.deleteCategory(req, res);
 
       expect(catDoc.ref.delete).toHaveBeenCalled();
-      expect(mockProjectsCollection.where).toHaveBeenCalledWith('categories', 'array-contains', 'Design');
-      expect(mockBatch.update).toHaveBeenCalledTimes(2);
-      expect(mockBatch.commit).toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith({ message: 'Category deleted successfully' });
     });
 

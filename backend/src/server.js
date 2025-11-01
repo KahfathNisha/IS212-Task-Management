@@ -10,7 +10,6 @@ console.log('🔧 Environment variables loaded');
 console.log('🔧 Loading routes...');
 const taskRouter = require('./routes/taskRouter');
 const authRouter = require('./routes/authRouter');
-const fcmRouter = require('./routes/fcmRouter');
 const reportsRouter = require('./routes/reportsRouter');
 const projectsRouter = require('./routes/projectsRouter');
 const categoriesRouter = require('./routes/categoriesRouter');
@@ -69,7 +68,6 @@ app.use('/api/tasks', taskRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/fcm', fcmRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/notifications', notificationRouter);
 

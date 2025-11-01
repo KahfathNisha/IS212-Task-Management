@@ -3,7 +3,6 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,7 +19,6 @@ const isTest = Boolean(import.meta.env.VITEST); // Vite/Vitest set this when run
 const isBrowser = typeof window !== 'undefined';
 
 let app = null;
-let messaging = null;
 let auth = null;
 let db = null;
 let functions = null;
@@ -32,11 +30,6 @@ if (!isTest && hasApiKey && isBrowser) {
     authDomain: firebaseConfig.authDomain,
   });
   app = initializeApp(firebaseConfig);
-  try {
-    messaging = getMessaging(app);
-  } catch (err) {
-    console.warn('Firebase Messaging is not supported in this environment.', err);
-  }
   auth = getAuth(app);
   db = getFirestore(app);
   functions = getFunctions(app);
@@ -77,5 +70,5 @@ export const firestoreHelpers = {
 };
 
 // Exports: in tests these will be null / mocked by Vitest setup
-export { auth, db, functions, storage, messaging, getToken, onMessage };
+export { auth, db, functions, storage };
 export default app;

@@ -5,8 +5,11 @@ const getAllCategories = async (req, res) => {
   try {
     console.log('📦 [getAllCategories] Fetching all categories');
     const categoriesRef = db.collection('categories');
-    const snapshot = await categoriesRef.get();
-    
+    // const snapshot = await categoriesRef.get();
+    const snapshot = await db.collection('categories')
+      .orderBy('name')
+      .get();
+
     const categories = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
