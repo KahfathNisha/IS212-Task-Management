@@ -119,7 +119,11 @@ describe('Auth integration tests (emulator)', () => {
     expect(idToken).toBeDefined();
 
     // Call backend login endpoint with the ID token
-    const loginResp = await base.post('/api/auth/login').send({ idToken }).expect(200);
+    const loginResp = await base.post('/api/auth/login').send({ idToken });
+    if (loginResp.status !== 200) {
+      console.error('DEBUG - /api/auth/login failed', { status: loginResp.status, body: loginResp.body, text: loginResp.text });
+    }
+    expect(loginResp.status).toBe(200);
     expect(loginResp.body.success).toBe(true);
     expect(loginResp.body.user).toBeDefined();
   }, 20000);
