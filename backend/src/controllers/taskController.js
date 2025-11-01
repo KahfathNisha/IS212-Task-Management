@@ -235,6 +235,13 @@ exports.getTask = async (req, res) => {
                 ...entry,
                 timestamp: formatTimestampToISO(entry.timestamp)
             }));
+        } else {
+            // If no statusHistory exists (for tasks created before this feature), create initial entry
+            taskData.statusHistory = [{
+                timestamp: formatTimestampToISO(taskData.createdAt),
+                oldStatus: null,
+                newStatus: taskData.status
+            }];
         }
         
         res.status(200).json(taskData);
@@ -252,7 +259,7 @@ exports.getAllTasks = async (req, res) => {
         const snapshot = await db.collection('tasks').get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
-            
+
             // Format status history timestamps
             let statusHistory = [];
             if (data.statusHistory && Array.isArray(data.statusHistory)) {
@@ -260,8 +267,15 @@ exports.getAllTasks = async (req, res) => {
                     ...entry,
                     timestamp: formatTimestampToISO(entry.timestamp)
                 }));
+            } else {
+                // If no statusHistory exists (for tasks created before this feature), create initial entry
+                statusHistory = [{
+                    timestamp: formatTimestampToISO(data.createdAt),
+                    oldStatus: null,
+                    newStatus: data.status
+                }];
             }
-            
+
             return {
                 id: doc.id,
                 ...data,
@@ -294,7 +308,7 @@ exports.getTasksByProject = async (req, res) => {
         const snapshot = await tasksQuery.get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
-            
+
             // Format status history timestamps
             let statusHistory = [];
             if (data.statusHistory && Array.isArray(data.statusHistory)) {
@@ -302,8 +316,15 @@ exports.getTasksByProject = async (req, res) => {
                     ...entry,
                     timestamp: formatTimestampToISO(entry.timestamp)
                 }));
+            } else {
+                // If no statusHistory exists (for tasks created before this feature), create initial entry
+                statusHistory = [{
+                    timestamp: formatTimestampToISO(data.createdAt),
+                    oldStatus: null,
+                    newStatus: data.status
+                }];
             }
-            
+
             return {
                 id: doc.id,
                 ...data,
@@ -451,7 +472,7 @@ exports.updateTask = async (req, res) => {
 
         // Send reassignment emails if assignee changed
         if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId) {
-            sendReassignmentEmails(req.params.id, newAssigneeId, oldAssigneeId, loggedInUser.name);
+            await sendReassignmentEmails(req.params.id, newAssigneeId, oldAssigneeId, loggedInUser.name);
         }
 
         // Update project stats if projectId changed
@@ -619,7 +640,20 @@ exports.updateTaskStatus = async (req, res) => {
         
         // Get existing status history or create new array
         const existingStatusHistory = task.statusHistory || [];
-        const updatedStatusHistory = [...existingStatusHistory, statusHistoryEntry];
+        let updatedStatusHistory;
+        if (existingStatusHistory.length === 0) {
+            // If no statusHistory, add the initial entry and the change
+            updatedStatusHistory = [
+                {
+                    timestamp: admin.firestore.Timestamp.now(),
+                    oldStatus: null,
+                    newStatus: oldStatus
+                },
+                statusHistoryEntry
+            ];
+        } else {
+            updatedStatusHistory = [...existingStatusHistory, statusHistoryEntry];
+        }
         
         // console.log(`💾 [updateTaskStatus] Preparing Firebase update:`);
         // console.log(`   New status: ${newStatus}`);

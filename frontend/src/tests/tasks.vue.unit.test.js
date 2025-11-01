@@ -58,7 +58,35 @@ const filterTasks = (taskArray, priorities, assignees, departments) => {
         filtered = filtered.filter(task => departments.includes(task.taskOwnerDepartment));
     }
     return filtered;
-}
+};
+
+// 4. Status History Utilities
+const getLatestStatusFromHistory = (statusHistory) => {
+  if (!statusHistory || statusHistory.length === 0) return null;
+  return statusHistory[statusHistory.length - 1].newStatus;
+};
+
+const hasStatusChanged = (statusHistory, targetStatus) => {
+  if (!statusHistory || statusHistory.length === 0) return false;
+  return statusHistory.some(entry => entry.newStatus === targetStatus);
+};
+
+const getStatusChangeCount = (statusHistory) => {
+  if (!statusHistory) return 0;
+  return statusHistory.length;
+};
+
+const addStatusToHistory = (statusHistory, newStatus, oldStatus = null) => {
+  const history = statusHistory && Array.isArray(statusHistory) ? statusHistory : [];
+  return [
+    ...history,
+    {
+      timestamp: new Date().toISOString(),
+      oldStatus,
+      newStatus
+    }
+  ];
+};
 
 // --- Test Suites ---
 
@@ -218,6 +246,283 @@ describe('Tasks.vue Core Logic', () => {
     it('should return an empty array if user data is incomplete', () => {
         mockAuthStore.userData.value = null;
         expect(userVisibleTasks.value).toHaveLength(0);
+    });
+
+    it('should include tasks with statusHistory for visible users', () => {
+      const tasksWithHistory = [
+        { id: 10, title: 'Task with History', taskOwner: 'John Doe', assignedTo: 'Someone Else', taskOwnerDepartment: 'Engineering', collaborators: [], statusHistory: [{ timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }] },
+        { id: 20, title: 'Task with History', taskOwner: 'John Doe', assignedTo: 'Someone Else', taskOwnerDepartment: 'Engineering', collaborators: [], statusHistory: [{ timestamp: '2025-10-05T14:30:00.000Z', oldStatus: 'Ongoing', newStatus: 'Completed' }] }
+      ];
+      const visibleTasksWithHistory = ref(tasksWithHistory);
+      
+      const userVisibleTasksWithHistory = computed(() => {
+        const userName = mockAuthStore.userData.value?.name;
+        if (!userName) return [];
+        return visibleTasksWithHistory.value.filter(task => task.taskOwner === userName);
+      });
+
+      mockAuthStore.userData.value = { name: 'John Doe', department: 'Engineering' };
+      const result = userVisibleTasksWithHistory.value;
+      
+      expect(result).toHaveLength(2);
+      expect(result[0]).toHaveProperty('statusHistory');
+      expect(result[0].statusHistory.length).toBe(1);
+      expect(result[1]).toHaveProperty('statusHistory');
+      expect(result[1].statusHistory.length).toBe(1);
+    });
+  });
+
+  // --- 4. Test Status History Utilities ---
+  describe('Status History Utilities', () => {
+    
+    const mockStatusHistory = [
+      { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' },
+      { timestamp: '2025-10-05T14:30:00.000Z', oldStatus: 'Ongoing', newStatus: 'Pending Review' },
+      { timestamp: '2025-10-10T09:15:00.000Z', oldStatus: 'Pending Review', newStatus: 'Completed' }
+    ];
+
+    describe('getLatestStatusFromHistory', () => {
+      it('should return the latest status from status history', () => {
+        const latestStatus = getLatestStatusFromHistory(mockStatusHistory);
+        expect(latestStatus).toBe('Completed');
+      });
+
+      it('should return null for null status history', () => {
+        const latestStatus = getLatestStatusFromHistory(null);
+        expect(latestStatus).toBe(null);
+      });
+
+      it('should return null for undefined status history', () => {
+        const latestStatus = getLatestStatusFromHistory(undefined);
+        expect(latestStatus).toBe(null);
+      });
+
+      it('should handle single entry history', () => {
+        const singleEntryHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }
+        ];
+        const latestStatus = getLatestStatusFromHistory(singleEntryHistory);
+        expect(latestStatus).toBe('Ongoing');
+      });
+    });
+
+    describe('hasStatusChanged', () => {
+      it('should return true if target status exists in history', () => {
+        expect(hasStatusChanged(mockStatusHistory, 'Completed')).toBe(true);
+        expect(hasStatusChanged(mockStatusHistory, 'Pending Review')).toBe(true);
+        expect(hasStatusChanged(mockStatusHistory, 'Ongoing')).toBe(true);
+      });
+
+      it('should return false if target status does not exist in history', () => {
+        expect(hasStatusChanged(mockStatusHistory, 'Unassigned')).toBe(false);
+        expect(hasStatusChanged(mockStatusHistory, 'Cancelled')).toBe(false);
+      });
+
+      it('should return false for null or undefined status history', () => {
+        expect(hasStatusChanged(null, 'Completed')).toBe(false);
+        expect(hasStatusChanged(undefined, 'Completed')).toBe(false);
+      });
+
+      it('should handle case-sensitive status matching', () => {
+        expect(hasStatusChanged(mockStatusHistory, 'completed')).toBe(false); // Wrong case
+        expect(hasStatusChanged(mockStatusHistory, 'COMPLETED')).toBe(false); // Wrong case
+      });
+    });
+
+    describe('getStatusChangeCount', () => {
+      it('should return correct count of status changes', () => {
+        expect(getStatusChangeCount(mockStatusHistory)).toBe(3);
+      });
+
+      it('should return 0 for null status history', () => {
+        expect(getStatusChangeCount(null)).toBe(0);
+      });
+
+      it('should return 0 for undefined status history', () => {
+        expect(getStatusChangeCount(undefined)).toBe(0);
+      });
+
+      it('should return 1 for single entry history', () => {
+        const singleEntryHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }
+        ];
+        expect(getStatusChangeCount(singleEntryHistory)).toBe(1);
+      });
+    });
+
+    describe('addStatusToHistory', () => {
+      it('should add new status entry to existing history', () => {
+        const updatedHistory = addStatusToHistory(mockStatusHistory, 'Unassigned', 'Completed');
+        expect(updatedHistory).toHaveLength(4);
+        expect(updatedHistory[3].newStatus).toBe('Unassigned');
+        expect(updatedHistory[3].oldStatus).toBe('Completed');
+        expect(updatedHistory[3]).toHaveProperty('timestamp');
+      });
+
+      it('should handle null or undefined history', () => {
+        const updatedHistory1 = addStatusToHistory(null, 'Ongoing', null);
+        expect(updatedHistory1).toHaveLength(1);
+
+        const updatedHistory2 = addStatusToHistory(undefined, 'Ongoing', null);
+        expect(updatedHistory2).toHaveLength(1);
+      });
+
+      it('should create new history entry with valid existing history', () => {
+        const updatedHistory = addStatusToHistory(
+          [{ timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }],
+          'Completed',
+          'Ongoing'
+        );
+        expect(updatedHistory).toHaveLength(2);
+        expect(updatedHistory[1].oldStatus).toBe('Ongoing');
+        expect(updatedHistory[1].newStatus).toBe('Completed');
+        expect(updatedHistory[1]).toHaveProperty('timestamp');
+      });
+
+      it('should create new history entry with current timestamp', () => {
+        vi.setSystemTime(new Date('2025-11-01T12:00:00.000Z'));
+        const initialHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }
+        ];
+        const updatedHistory = addStatusToHistory(initialHistory, 'Completed', 'Ongoing');
+        expect(updatedHistory[1].timestamp).toBe('2025-11-01T12:00:00.000Z');
+        expect(updatedHistory[1].oldStatus).toBe('Ongoing');
+        expect(updatedHistory[1].newStatus).toBe('Completed');
+      });
+    });
+
+    describe('Status History Integration with Filter Tasks', () => {
+      const tasksWithHistory = [
+        { 
+          id: 1, 
+          priority: 1, 
+          assignedTo: 'A', 
+          taskOwnerDepartment: 'D1',
+          statusHistory: [
+            { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }
+          ]
+        },
+        { 
+          id: 2, 
+          priority: 5, 
+          assignedTo: 'A', 
+          taskOwnerDepartment: 'D2',
+          statusHistory: [
+            { timestamp: '2025-10-05T14:30:00.000Z', oldStatus: 'Ongoing', newStatus: 'Completed' }
+          ]
+        },
+        {
+          id: 3,
+          priority: 1,
+          assignedTo: 'B',
+          taskOwnerDepartment: 'D1',
+          statusHistory: [
+            { timestamp: '2025-10-15T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' }
+          ]
+        },
+      ];
+
+      it('should preserve statusHistory when filtering by priority', () => {
+        const result = filterTasks(tasksWithHistory, [1], [], []);
+        expect(result).toHaveLength(2);
+        result.forEach(task => {
+          expect(task).toHaveProperty('statusHistory');
+          expect(task.statusHistory.length).toBeGreaterThan(0);
+        });
+      });
+
+      it('should preserve statusHistory when filtering by assignee', () => {
+        const result = filterTasks(tasksWithHistory, [], ['A'], []);
+        expect(result).toHaveLength(2);
+        result.forEach(task => {
+          expect(task).toHaveProperty('statusHistory');
+          expect(task.statusHistory.length).toBeGreaterThan(0);
+        });
+      });
+
+      it('should preserve statusHistory when filtering by department', () => {
+        const result = filterTasks(tasksWithHistory, [], [], ['D1']);
+        expect(result).toHaveLength(2);
+        result.forEach(task => {
+          expect(task).toHaveProperty('statusHistory');
+          expect(task.statusHistory.length).toBeGreaterThan(0);
+        });
+      });
+
+      it('should maintain statusHistory integrity through combined filters', () => {
+        const result = filterTasks(tasksWithHistory, [1], ['B'], ['D1']);
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe(3);
+        expect(result[0].statusHistory.length).toBe(1);
+        expect(result[0].statusHistory[0].newStatus).toBe('Ongoing');
+      });
+    });
+
+    describe('Status History Data Validation', () => {
+      it('should validate proper status history entry structure', () => {
+        const validHistoryEntry = {
+          timestamp: '2025-10-01T10:00:00.000Z',
+          oldStatus: null,
+          newStatus: 'Ongoing'
+        };
+
+expect(validHistoryEntry).toHaveProperty('timestamp');
+        expect(validHistoryEntry).toHaveProperty('oldStatus');
+        expect(validHistoryEntry).toHaveProperty('newStatus');
+        expect(typeof validHistoryEntry.timestamp).toBe('string');
+        expect(['string', 'null', 'object']).toContain(typeof validHistoryEntry.oldStatus);
+        expect(typeof validHistoryEntry.newStatus).toBe('string');
+      });
+
+      it('should handle malformed status history entries gracefully', () => {
+        const malformedHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' },
+          { oldStatus: 'Ongoing', newStatus: 'Completed' }, // Missing timestamp
+          { timestamp: 'invalid-date', oldStatus: 'Completed', newStatus: 'Pending Review' }, // Invalid timestamp
+          null, // Null entry
+          { timestamp: '2025-10-10T09:15:00.000Z' } // Missing oldStatus and newStatus
+        ];
+
+        // Should not crash when processing malformed data
+        expect(() => getLatestStatusFromHistory(malformedHistory)).not.toThrow();
+        expect(() => hasStatusChanged(malformedHistory, 'Completed')).not.toThrow();
+        expect(() => getStatusChangeCount(malformedHistory)).not.toThrow();
+      });
+
+      it('should handle status history with invalid status values', () => {
+        const invalidStatusHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: '' },
+          { timestamp: '2025-10-02T10:00:00.000Z', oldStatus: '', newStatus: null },
+          { timestamp: '2025-10-03T10:00:00.000Z', oldStatus: undefined, newStatus: 'Ongoing' }
+        ];
+
+        expect(() => getLatestStatusFromHistory(invalidStatusHistory)).not.toThrow();
+        expect(() => hasStatusChanged(invalidStatusHistory, 'Ongoing')).not.toThrow();
+      });
+
+      it('should handle chronological status progression', () => {
+        const chronologicalHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' },
+          { timestamp: '2025-10-02T10:00:00.000Z', oldStatus: 'Ongoing', newStatus: 'Pending Review' },
+          { timestamp: '2025-10-03T10:00:00.000Z', oldStatus: 'Pending Review', newStatus: 'Completed' },
+        ];
+
+        const latestStatus = getLatestStatusFromHistory(chronologicalHistory);
+        expect(latestStatus).toBe('Completed');
+        expect(getStatusChangeCount(chronologicalHistory)).toBe(3);
+      });
+
+      it('should handle status changes with same status value', () => {
+        const sameStatusHistory = [
+          { timestamp: '2025-10-01T10:00:00.000Z', oldStatus: null, newStatus: 'Ongoing' },
+          { timestamp: '2025-10-02T10:00:00.000Z', oldStatus: 'Ongoing', newStatus: 'Ongoing' }, // Same status
+        ];
+
+        const latestStatus = getLatestStatusFromHistory(sameStatusHistory);
+        expect(latestStatus).toBe('Ongoing');
+        expect(hasStatusChanged(sameStatusHistory, 'Ongoing')).toBe(true);
+        expect(getStatusChangeCount(sameStatusHistory)).toBe(2);
+      });
     });
   });
 });

@@ -1155,7 +1155,7 @@ const handleCreateSave = async (taskData) => {
       id: newTaskId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: payload.status || 'Ongoing' }]
+      statusHistory: [{ timestamp: new Date().toISOString(), oldStatus: null, newStatus: payload.status || 'Unassigned' }]
     };
     tasks.value = tasks.value.filter(t => t.id !== newTaskId);
     tasks.value.push(newTaskWithId);
@@ -1168,13 +1168,13 @@ const handleCreateSave = async (taskData) => {
 
 const updateTask = async (taskId, updatedData) => {
   const taskToUpdate = tasks.value.find(t => t.id === taskId);
-  
+
   // Granular check applied before execution
   if (!isTaskEditable(taskToUpdate)) {
       handleReadonlyAction();
       return false;
   }
-  
+
   try {
     if (updatedData.dueDate && !validateDueDate(updatedData.dueDate)) {
       showMessage('Cannot set due date in the past', 'error');
@@ -1186,7 +1186,13 @@ const updateTask = async (taskId, updatedData) => {
     const backendData = JSON.parse(JSON.stringify({ ...updatedData, collaborators: updatedData.collaborators || [] }));
     await axiosClient.put(`/tasks/${taskId}`, backendData);
     tasks.value = tasks.value.filter(t => t.id !== taskId);
-    const updatedTask = { ...updatedData, id: taskId, updatedAt: new Date().toISOString() };
+    // Preserve existing statusHistory and other fields not in updatedData
+    const updatedTask = {
+      ...taskToUpdate,
+      ...updatedData,
+      id: taskId,
+      updatedAt: new Date().toISOString()
+    };
     tasks.value.push(updatedTask);
     if (selectedTask.value?.id === taskId) selectedTask.value = updatedTask;
     if (selectedListTask.value?.id === taskId) selectedListTask.value = updatedTask;
