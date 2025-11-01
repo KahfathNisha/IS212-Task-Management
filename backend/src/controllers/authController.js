@@ -152,9 +152,14 @@ exports.checkLockout = async (req, res) => {
     const userData = userDoc.data();
     const now = Date.now();
     
+    // Normalize lockedUntil to milliseconds whether it's a number or Firestore Timestamp
+    const lockedUntilMillis = userData.lockedUntil && (typeof userData.lockedUntil.toMillis === 'function'
+      ? userData.lockedUntil.toMillis()
+      : userData.lockedUntil);
+
     // Check if account is locked
-    if (userData.lockedUntil && userData.lockedUntil > now) {
-      const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
+    if (lockedUntilMillis && lockedUntilMillis > now) {
+      const unlockTime = new Date(lockedUntilMillis).toLocaleTimeString('en-SG', {
         hour: 'numeric',
         minute: 'numeric',
         hour12: true,
@@ -169,7 +174,7 @@ exports.checkLockout = async (req, res) => {
     }
     
     // Reset lock if expired
-    if (userData.lockedUntil && userData.lockedUntil <= now) {
+    if (lockedUntilMillis && lockedUntilMillis <= now) {
       await userRef.update({
         failedAttempts: 0,
         lockedUntil: null
@@ -255,21 +260,26 @@ exports.recordFailedAttempt = async (req, res) => {
     const userData = userDoc.data();
     const now = Date.now();
 
-    // Check if already locked
-    if (userData.lockedUntil && userData.lockedUntil > now) {
-        const unlockTime = new Date(userData.lockedUntil).toLocaleTimeString('en-SG', {
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true,
-            timeZone: 'Asia/Singapore'
-        });
-        // --- FIX: Always respond 200 OK ---
-        return res.status(200).json({
-            success: false,
-            isLocked: true,
-            message: `Account is locked. Please try again after ${unlockTime}.`
-        });
-    }
+  // Normalize lockedUntil to milliseconds whether it's a number or Firestore Timestamp
+  const lockedUntilMillis = userData.lockedUntil && (typeof userData.lockedUntil.toMillis === 'function'
+    ? userData.lockedUntil.toMillis()
+    : userData.lockedUntil);
+
+  // Check if already locked
+  if (lockedUntilMillis && lockedUntilMillis > now) {
+    const unlockTime = new Date(lockedUntilMillis).toLocaleTimeString('en-SG', {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+      timeZone: 'Asia/Singapore'
+    });
+    // --- FIX: Always respond 200 OK ---
+    return res.status(200).json({
+      success: false,
+      isLocked: true,
+      message: `Account is locked. Please try again after ${unlockTime}.`
+    });
+  }
     
     // Increment failed attempts
     const failedAttempts = (userData.failedAttempts || 0) + 1;
@@ -280,11 +290,13 @@ exports.recordFailedAttempt = async (req, res) => {
     
     // Lock account if max attempts reached
     if (failedAttempts >= MAX_LOGIN_ATTEMPTS) {
-      updateData.lockedUntil = now + LOCKOUT_DURATION;
+      // Store as Firestore Timestamp so callers can use toMillis()
+      const lockUntilTimestamp = admin.firestore.Timestamp.fromMillis(now + LOCKOUT_DURATION);
+      updateData.lockedUntil = lockUntilTimestamp;
       
       await userRef.update(updateData);
       
-      const unlockTime = new Date(updateData.lockedUntil).toLocaleTimeString('en-SG', {
+      const unlockTime = new Date(lockUntilTimestamp.toMillis()).toLocaleTimeString('en-SG', {
           hour: 'numeric',
           minute: 'numeric',
           hour12: true,
