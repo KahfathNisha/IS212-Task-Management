@@ -670,7 +670,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { projectService } from '@/services/projectService'
 import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
 import axios from 'axios'
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
