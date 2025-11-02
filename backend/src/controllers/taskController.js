@@ -834,6 +834,51 @@ exports.assignTask = async (req, res) => {
     }
 };
 
+// Get Archived Tasks
+exports.getArchivedTasks = async (req, res) => {
+    try {
+        console.log('📂 [getArchivedTasks] Fetching archived tasks');
+        
+        const snapshot = await db.collection('tasks')
+            .where('archived', '==', true)
+            .get();
+        
+        const archivedTasks = snapshot.docs.map(doc => {
+            const data = doc.data();
+
+            // Format status history timestamps
+            let statusHistory = [];
+            if (data.statusHistory && Array.isArray(data.statusHistory)) {
+                statusHistory = data.statusHistory.map(entry => ({
+                    ...entry,
+                    timestamp: formatTimestampToISO(entry.timestamp)
+                }));
+            } else {
+                statusHistory = [{
+                    timestamp: formatTimestampToISO(data.createdAt),
+                    oldStatus: null,
+                    newStatus: data.status
+                }];
+            }
+
+            return {
+                id: doc.id,
+                ...data,
+                dueDate: formatTimestampToISO(data.dueDate),
+                createdAt: formatTimestampToISO(data.createdAt),
+                updatedAt: formatTimestampToISO(data.updatedAt),
+                statusHistory: statusHistory
+            };
+        });
+        
+        console.log(`✅ [getArchivedTasks] Found ${archivedTasks.length} archived tasks`);
+        res.status(200).json(archivedTasks);
+    } catch (err) {
+        console.error('❌ [getArchivedTasks] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // Soft-delete / archive task
 exports.archiveTask = async (req, res) => {
     try {
@@ -1043,13 +1088,10 @@ async function handleRecurrenceRemoval(recurringTaskId, tasksSnapshot, now) {
     
     tasksSnapshot.forEach(doc => {
         const data = doc.data();
+
+        if (data.archived === true) return;
+
         const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
-        
-        // ✅ Skip archived tasks - don't modify them at all
-        if (data.archived === true) {
-            console.log(`Skipping archived task: ${data.title}`);
-            return; // Don't update archived tasks
-        }
         
         if (data.status !== 'Completed' && dueDate > now) {
             // Clean title by removing emoji
@@ -1082,6 +1124,9 @@ async function handleScheduleChange(recurringTaskId, originalData, newRecurrence
     const deleteBatch = db.batch();
     tasksSnapshot.forEach(doc => {
         const data = doc.data();
+
+        if (data.archived === true) return;
+
         const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
         
         if (data.status !== 'Completed' && dueDate > now) {
@@ -1105,11 +1150,7 @@ async function handleSimpleUpdate(tasksSnapshot, now, recurrence, taskOwner, tas
         const data = doc.data();
         const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
         
-        // ✅ Skip archived tasks
-        if (data.archived === true) {
-            console.log(`Skipping archived task: ${data.title}`);
-            return;
-        }
+        if (data.archived === true) return;
         
         if (data.status !== 'Completed' && dueDate > now) {
             const updateData = {

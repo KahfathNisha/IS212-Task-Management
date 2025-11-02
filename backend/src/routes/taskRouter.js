@@ -35,6 +35,9 @@ router.get('/', verifyToken, taskController.getAllTasks);
 // Get all recurring tasks
 router.get('/recurring', verifyToken, taskController.getAllRecurringTasks);
 
+// Get archived tasks
+router.get('/archived', taskController.getArchivedTasks);
+
 // Get tasks by project ID
 router.get('/project/:projectId', taskController.getTasksByProject);
 
