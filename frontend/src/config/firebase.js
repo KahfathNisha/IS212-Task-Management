@@ -57,7 +57,7 @@ if (!isTest && hasApiKey && isBrowser) {
 // Collection names
 export const collections = {
   projects: 'projects',
-  users: 'Users',
+  users: 'users',
   tasks: 'tasks',
   notifications: 'notifications'
 };
