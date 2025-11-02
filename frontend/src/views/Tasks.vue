@@ -521,8 +521,7 @@
       :taskStatuses="taskStatuses"
       :priorities="priorities"
       :projects="projects"
-      :teamMembers="teamMembers"
-      :todayDate="todayDate"
+      :teamMembers="dialogTeamMembers"  :todayDate="todayDate"
       :currentUser="currentUser"  
       @save="canCreateEdit ? (isEditing ? updateTask(newTask.id, $event) : handleCreateSave($event)) : handleReadonlyAction"
       @cancel="cancelCreate"
@@ -593,10 +592,12 @@ const userEmail = computed(() => authStore.userEmail);
 const isHR = computed(() => userRole.value === 'hr');
 const isDirector = computed(() => userRole.value === 'director'); 
 
-// General permission to create/edit: true for all roles EXCEPT HR
+// General permission to create/edit: 
+// HR is now allowed to access the creation buttons (Add Task, Archive, Recurring). 
+// The actual creation/edit logic is handled by granular checks in isTaskEditable and handleCreateSave.
 const canCreateEdit = computed(() => {
-    const role = userRole.value;
-    return role !== 'hr';
+    // All roles, including HR, can access the UI buttons for task creation/management.
+    return true; 
 });
 
 
@@ -879,6 +880,27 @@ const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 // Team members - populated from database via backend API
 const teamMembers = ref([]);
 const allUsers = ref([]); // Raw user data from API
+
+// 🟢 NEW COMPUTED PROPERTY: Filters team members for the Create/Edit Dialog
+const dialogTeamMembers = computed(() => {
+    // If user is not HR, return the full list
+    if (!isHR.value) {
+        return teamMembers.value; 
+    }
+    
+    // If user is HR, filter to only include members of their own department
+    const currentDept = userDepartment.value;
+    if (currentDept) {
+        return teamMembers.value.filter(member => 
+            // Include members of the HR's department OR the HR user themselves
+            member.department === currentDept || member.value === userEmail.value 
+        );
+    }
+
+    // Fallback: If HR user has no department set, only let them assign to themselves
+    return teamMembers.value.filter(member => member.value === userEmail.value);
+});
+
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']
 const departmentFilterOptions = departments.map(dept => ({ title: dept, value: dept }))
@@ -1185,25 +1207,39 @@ const validateDueDate = (dateString) => {
   return selectedDate >= today;
 }
 
+// 🌟 FIX 2: Relaxing the HR check on task creation to allow them to create their own tasks.
 const handleCreateSave = async (taskData) => {
-  if (!canCreateEdit.value) { // General creation check
+  // canCreateEdit is now TRUE for HR users. The actual check is now less restrictive for the creation path.
+  if (!canCreateEdit.value) { // General creation check (should always pass now)
       handleReadonlyAction();
       return;
   }
   
-  // HR specific check: must be involved in the task being created.
-  if (isHR.value && !isTaskEditable(taskData)) { 
-       showMessage('HR can only create tasks assigned to themselves or their own department.', 'error');
-       return;
+  // 🟢 NEW FRONTEND HR CREATION VALIDATION (from previous step)
+  const currentUserEmail = userEmail.value;
+  const taskOwnerInForm = taskData.taskOwner || currentUserEmail; 
+
+  if (isHR.value) {
+    // HR must be creating a task for themselves (as owner or assignee)
+    if (taskOwnerInForm !== currentUserEmail && taskData.assignedTo !== currentUserEmail) {
+        showMessage('HR users must set themselves as the task owner or assignee when creating a new task.', 'error');
+        return; // BLOCK THE API CALL
+    }
+    // Also, ensure their department is set if the backend requires it
+    if (!taskData.taskOwnerDepartment) {
+        taskData.taskOwnerDepartment = userDepartment.value;
+    }
   }
-  
+  // ⬆️ END NEW VALIDATION
+
   try {
     // Map UI payload to backend shape
     const payload = {
       ...taskData,
       assigneeId: taskData.assignedTo || null,
       // Preserve explicit taskOwner/taskOwnerDepartment if provided by dialog
-      taskOwner: taskData.taskOwner || currentUser.value?.email || authStore.userEmail,
+      // This is crucial: it should be set to the CURRENT USER for an HR user creating a task.
+      taskOwner: taskOwnerInForm, 
       taskOwnerDepartment: taskData.taskOwnerDepartment || undefined,
     };
 
@@ -1295,7 +1331,8 @@ const archiveTask = async (taskId) => {
 }
 
 const createTask = async () => {
-  if (!canCreateEdit.value) { // General check prevents non-write-enabled users
+  // General check now passes for HR (Fix 1).
+  if (!canCreateEdit.value) { 
       handleReadonlyAction();
       return;
   }
@@ -1321,7 +1358,7 @@ const createTask = async () => {
     return;
   }
   
-  // Creation logic relies on handleCreateSave which includes the HR check
+  // Creation logic relies on handleCreateSave (Fix 2 handles the HR rule here)
   await handleCreateSave(newTask.value);
   
   // If creation succeeded, close and reset. We rely on the backend to actually save.
