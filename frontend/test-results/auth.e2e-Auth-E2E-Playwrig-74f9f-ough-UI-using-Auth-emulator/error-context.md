@@ -1,0 +1,49 @@
+# Page snapshot
+
+```yaml
+- main [ref=e5]:
+  - generic [ref=e10]:
+    - generic [ref=e11]: Task Management System
+    - generic [ref=e12]: Sign in to your account
+    - generic [ref=e14]:
+      - generic [ref=e17]:
+        - generic [ref=e19]: 󰇮
+        - textbox "Email Email" [ref=e21]: pw.user+1762067272619@example.com
+        - generic:
+          - generic:
+            - generic: Email
+      - generic [ref=e24]:
+        - generic [ref=e26]: 󰌾
+        - textbox "Password Password" [ref=e28]: Playwright1!
+        - button "Password appended action" [ref=e30] [cursor=pointer]: 󰈉
+        - generic:
+          - generic:
+            - generic: Password
+      - alert [ref=e31]:
+        - generic [ref=e33]: 󰅙
+        - generic [ref=e34]: Network Error
+        - button "Close" [ref=e36] [cursor=pointer]:
+          - generic [ref=e38]: 󰅖
+      - link "Forgot Password?" [ref=e40] [cursor=pointer]:
+        - /url: /forgot-password
+      - button "Sign In" [ref=e41] [cursor=pointer]:
+        - generic [ref=e42]: Sign In
+      - button "Don't have an account? Register" [ref=e43] [cursor=pointer]:
+        - generic [ref=e44]: Don't have an account? Register
+    - generic [ref=e45]:
+      - separator [ref=e46]
+      - generic [ref=e47]:
+        - strong [ref=e48]: "Demo Credentials:"
+        - strong [ref=e49]: "Director:"
+        - text: jack.sim@company.com / Password123!
+        - strong [ref=e50]: "Manager:"
+        - text: michael.brown@company.com / Password123!
+        - strong [ref=e51]: "HR:"
+        - text: sally.loh@company.com / Password123!
+        - strong [ref=e52]: "Staff 1:"
+        - text: john.doe@company.com / TestPassword123!
+        - strong [ref=e53]: "Staff 2:"
+        - text: jane.smith@company.com / AdminPass456!
+        - strong [ref=e54]: "Staff 3:"
+        - text: alice.johnson@company.com / Password123!
+```
