@@ -818,4 +818,70 @@ const confirmArchive = () => {
   gap: 8px;
   margin-top: 8px;
 }
+
+/* ================================================================= */
+/* 🟢 MOBILE DIALOG HEADER FIX (Max-width 600px) */
+/* ================================================================= */
+@media (max-width: 600px) {
+  /* 1. Force the main header content to stack vertically */
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start; /* Stack elements to the left */
+    gap: 16px; /* Increase gap between title and actions */
+    padding: 16px 12px !important; /* Reduce horizontal padding */
+  }
+
+  /* 2. Title Section: Ensure it uses full width */
+  .details-title-section {
+    width: 100%;
+    order: 1; /* Keep title on top */
+    gap: 8px;
+  }
+  
+  .details-title-section h2 {
+    font-size: 20px; /* Slightly shrink title */
+  }
+
+  /* 3. Header Actions: Stack status dropdown and move the close button */
+  .header-actions {
+    flex-direction: row; /* Keep action row horizontal */
+    justify-content: space-between; /* Spread buttons and dropdown */
+    width: 100%; /* Take full width */
+    min-width: auto; /* Remove the constraining 200px min-width */
+    order: 2; /* Move actions below title */
+    gap: 12px;
+  }
+  
+  /* 4. Close Button: Must be visible and distinct */
+  .close-btn {
+    order: 1; 
+    align-self: center !important;
+    margin-right: 0 !important;
+  }
+
+  /* 5. Status Dropdown: Let it take primary focus and space in the action row */
+  .status-dropdown {
+    min-width: 120px;
+    width: 100%; 
+    flex: 1 1 50%; /* Give it priority space */
+    order: 2;
+  }
+
+  /* 6. Main Content Body: Reduce padding and force two-column details to stack */
+  .task-details-content {
+    padding: 16px 12px !important; /* Reduce overall padding */
+  }
+  
+  /* Force the columns inside the main body (v-row) to stack vertically */
+  /* This ensures details don't get too narrow, resolving the root layout issue */
+  :deep(.v-row) {
+    flex-direction: column !important;
+  }
+  
+  :deep(.v-col) {
+    /* Restore single-column width */
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+}
 </style>

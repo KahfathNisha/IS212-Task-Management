@@ -62,9 +62,11 @@ const handleLogout = async () => {
   padding: 4px 0;
 }
 
+/* Base Desktop Logo Size */
 .logo {
   width: 180px;
   height: 180px;
+  flex-shrink: 0; /* Prevents the logo from shrinking prematurely */
 }
 
 .welcome-text {
@@ -129,13 +131,23 @@ const handleLogout = async () => {
   transform: translateY(0);
 }
 
+/* ------------------------------------------- */
+/* MEDIUM SCREEN / TABLET OPTIMIZATION (<= 768px) */
+/* ------------------------------------------- */
 @media (max-width: 768px) {
   .home-header {
-    padding: 20px 0;
+    padding: 10px 0; /* Reduce vertical padding */
   }
 
   .header-content {
     padding: 0 24px;
+    gap: 10px; /* Reduce gap */
+  }
+  
+  /* Shrink Logo Moderately */
+  .logo {
+    width: 120px;
+    height: 120px;
   }
 
   .welcome-greeting {
@@ -152,11 +164,54 @@ const handleLogout = async () => {
     font-size: 14px;
   }
 
+  /* Hide Logout Text, leave only icon */
   .logout-btn span {
     display: none;
   }
 }
 
+/* ------------------------------------------- */
+/* AGGRESSIVE MOBILE OPTIMIZATION (<= 400px) */
+/* ------------------------------------------- */
+@media (max-width: 400px) {
+  .header-content {
+    padding: 0 12px; /* Tighter padding */
+  }
+
+  /* Shrink Logo Aggressively */
+  .logo {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .welcome-section {
+    /* Align text block slightly better next to tiny logo */
+    align-items: center; 
+    gap: 8px;
+  }
+  
+  .welcome-greeting {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .welcome-name {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  /* Make logout button smaller (icon only) */
+  .logout-btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 8px !important; 
+    border-width: 1px;
+  }
+}
+
+
+/* --- Dark Mode Support (Unchanged) --- */
 [data-theme="dark"] .home-header {
   background: #2a2a2a;
   border-bottom-color: #555;
