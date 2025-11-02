@@ -1,3 +1,57 @@
-name: playwright-e2e-disabled
+name: Playwright E2E (with Firebase emulators)
 
-# Playwright E2E workflow disabled. Kept for history; it will not run.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Run Playwright tests with emulators
+        # Use firebase emulators:exec to run emulators and execute tests against them
+        working-directory: backend
+        run: |
+          # Start backend so Playwright tests can hit the API, then run frontend tests
+          npx firebase emulators:exec --only auth,firestore -- bash -lc '
+            set -euo pipefail
+            echo "Installing backend deps..."
+            (cd backend && npm ci)
+            echo "Starting backend (node) in background..."
+            (cd backend && node src/server.js > backend/backend.log 2>&1) &
+            BACKEND_PID=$!
+            echo "Backend PID: $BACKEND_PID"
+            echo "Waiting for backend /health..."
+            npx wait-on -t 120000 http://127.0.0.1:3000/health || true
+            echo "Running frontend E2E tests"
+            (cd frontend && npm ci && npx playwright install --with-deps && npx playwright test)
+            kill ${BACKEND_PID:-0} || true
+          '
+        env:
+          # Ensure firebase uses the project from backend/firebase.json
+          CI: true
+
+    # allow the job to use larger timeouts
+    timeout-minutes: 30
