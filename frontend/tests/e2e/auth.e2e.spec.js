@@ -13,6 +13,34 @@ test.describe('Auth E2E (Playwright)', () => {
         firstName: 'PW', lastName: 'User', email, password, department: 'qa', role: 'staff', title: 'Tester', securityQuestion: 'Q', securityAnswer: 'A'
       }
     }).catch(() => null);
+    // Poll the Auth emulator REST API until the user appears to avoid a race
+    // where the client tries to sign in before the emulator has fully recorded the user.
+    const authEmulatorHost = process.env.PLAYWRIGHT_FIREBASE_AUTH_EMULATOR_HOST || 'http://127.0.0.1:9099';
+    const projectId = process.env.PLAYWRIGHT_FIREBASE_PROJECT_ID || 'all-in-one-smu';
+    const accountsEndpoint = `${authEmulatorHost.replace(/\/$/, '')}/emulator/v1/projects/${projectId}/accounts`;
+
+    const maxMs = 10000; // wait up to 10s
+    const start = Date.now();
+    let found = false;
+    while (Date.now() - start < maxMs && !found) {
+      try {
+        const r = await page.request.get(accountsEndpoint);
+        if (r && r.ok()) {
+          const body = await r.json();
+          const users = body.users || body.accounts || [];
+          if (users.some(u => u.email === email)) {
+            found = true;
+            break;
+          }
+        }
+      } catch (e) {
+        // ignore and retry
+      }
+      // small backoff
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((res) => setTimeout(res, 250));
+    }
+    if (!found) console.warn('[e2e] Auth emulator did not show the user within timeout; test may fail with auth/user-not-found');
   });
 
   test('can log in through UI using Auth emulator', async ({ page }) => {
