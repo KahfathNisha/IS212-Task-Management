@@ -13,9 +13,7 @@
     "test:watch": "vitest --watch",
   "test:coverage": "vitest --coverage"
   },
-  "playwright": {
-    "version": "1.36.0"
-  },
+  
   "dependencies": {
     "@mdi/font": "^7.3.67",
     "axios": "^1.12.2",
@@ -34,7 +32,7 @@
   },
   "devDependencies": {
     "@pinia/testing": "^0.1.7",
-    "@playwright/test": "^1.56.1",
+    
     "@vitejs/plugin-vue": "^5.0.3",
     "@vitest/coverage-v8": "^3.2.4",
     "@vue/test-utils": "^2.4.6",
