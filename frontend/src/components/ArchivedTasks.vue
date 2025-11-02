@@ -7,6 +7,18 @@
         <v-spacer />
         <v-btn icon @click="dialog = false"><v-icon>mdi-close</v-icon></v-btn>
       </v-card-title>
+      
+      <!-- Status Message Snackbar -->
+      <v-alert
+        v-if="statusMessage.show"
+        :type="statusMessage.type"
+        closable
+        @click:close="statusMessage.show = false"
+        class="ma-4"
+      >
+        {{ statusMessage.text }}
+      </v-alert>
+      
       <v-card-text>
         <v-list>
           <v-list-item
@@ -23,9 +35,11 @@
                   variant="outlined"
                   @click="unarchive(task.id)"
                   class="unarchive-btn"
+                  :loading="unarchivingId === task.id"
+                  :disabled="unarchivingId === task.id"
                 >
                   <v-icon left size="18">mdi-archive-arrow-up</v-icon>
-                  Unarchive
+                  {{ unarchivingId === task.id ? 'Unarchiving...' : 'Unarchive' }}
                 </v-btn>
               </div>
               <v-list-item-subtitle class="task-desc">{{ task.description }}</v-list-item-subtitle>
@@ -67,6 +81,28 @@ watch(dialog, v => { if (!v) emit('close') })
 
 const archivedTasks = ref([])
 const allUsers = ref([])
+const unarchivingId = ref(null)
+
+// Status message state
+const statusMessage = ref({
+  show: false,
+  text: '',
+  type: 'success' // 'success', 'error', 'warning', 'info'
+})
+
+// Helper function to show status messages
+const showStatus = (message, type = 'success') => {
+  statusMessage.value = {
+    show: true,
+    text: message,
+    type: type
+  }
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    statusMessage.value.show = false
+  }, 5000)
+}
 
 // Load users for email to name conversion
 onMounted(async () => {
@@ -105,17 +141,73 @@ const getDisplayName = (assignedValue) => {
 }
 
 const fetchArchivedTasks = async () => {
-  const res = await axios.get('http://localhost:3000/tasks?archived=true')
-  archivedTasks.value = res.data.filter(t => t.archived)
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    
+    console.log('🔍 Fetching archived tasks...');
+    console.log('🔍 Token exists:', !!token);
+    
+    const res = await axios.get('http://localhost:3000/tasks?archived=true', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    console.log('🔍 API Response status:', res.status);
+    console.log('🔍 API Response data:', res.data);
+    console.log('🔍 Number of tasks returned:', res.data.length);
+    
+    // Log each task's archived status
+    res.data.forEach((task, index) => {
+      console.log(`🔍 Task ${index + 1}: "${task.title}" - archived: ${task.archived}`);
+    });
+    
+    archivedTasks.value = res.data;
+    
+    if (archivedTasks.value.length === 0) {
+      console.log('📭 No archived tasks found');
+      showStatus('No archived tasks found.', 'info')
+    } else {
+      console.log(`✅ Found ${archivedTasks.value.length} archived tasks`);
+    }
+  } catch (error) {
+    console.error('❌ Fetch error:', error);
+    console.error('❌ Error response:', error.response?.data);
+    showStatus('Failed to fetch archived tasks', 'error')
+  }
 }
 
 watch(dialog, (val) => {
-  if (val) fetchArchivedTasks()
+  if (val) {
+    fetchArchivedTasks()
+    // Reset status message when dialog opens
+    statusMessage.value.show = false
+  }
 })
 
 const unarchive = async (id) => {
-  await axios.put(`http://localhost:3000/tasks/${id}/unarchive`)
-  fetchArchivedTasks()
+  try {
+    unarchivingId.value = id
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+  
+    const response = await axios.put(`http://localhost:3000/tasks/${id}/unarchive`, {}, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.status === 200) {
+      showStatus('Task unarchived successfully!', 'success')
+      await fetchArchivedTasks() // Refresh the list
+    }
+  } catch (error) {
+    console.error('Failed to unarchive task:', error)
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to unarchive task'
+    showStatus(`Error: ${errorMessage}`, 'error')
+  } finally {
+    unarchivingId.value = null
+  }
 }
 
 const formatDate = (date) => {
@@ -164,5 +256,10 @@ const formatRecurrence = (rec) => {
 }
 .unarchive-btn {
   min-width: 110px;
+}
+
+/* Status message styling */
+.v-alert {
+  margin-bottom: 16px !important;
 }
 </style>

@@ -507,7 +507,7 @@
       @change-status="changeTaskStatus"
       @view-parent="viewTaskDetails"
       @open-attachment="openAttachment"
-      @archive="isTaskEditable(selectedTask) ? archiveTask : handleReadonlyAction"
+      @archive="archiveTask"
       :is-read-only="!isTaskEditable(selectedTask)"
     />
 
@@ -1326,6 +1326,7 @@ const archiveTask = async (taskId) => {
     showMessage('Task archived successfully!', 'success');
     showDetailsDialog.value = false;
   } catch (error) {
+    console.error('Archive error:', error);
     showMessage(error.response?.data?.message || 'Failed to archive task', 'error');
   }
 }

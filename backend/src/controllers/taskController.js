@@ -255,9 +255,23 @@ exports.getTask = async (req, res) => {
 exports.getAllTasks = async (req, res) => {
     try {
         const { email, role, department } = req.user;
-        console.log('📋 [getAllTasks] Fetching tasks for:', { email, role, department });
+        const { archived } = req.query;  
+
+        // console.log('📋 [getAllTasks] Fetching tasks for:', { email, role, department });
+        // console.log('📋 [getAllTasks] Archived filter:', archived);
+
+        let query = db.collection('tasks');
+
+        if (archived === 'true') {
+            query = query.where('archived', '==', true);
+            console.log('📋 Filtering for archived tasks');
+        } else {
+            query = query.where('archived', '==', false);
+            console.log('📋 Filtering for non-archived tasks');
+        }
+    
+        const snapshot = await query.get();
         
-        const snapshot = await db.collection('tasks').get();
         const tasks = snapshot.docs.map(doc => {
             const data = doc.data();
 
@@ -286,9 +300,11 @@ exports.getAllTasks = async (req, res) => {
                 statusHistory: statusHistory
             };
         });
+        
         console.log('✅ [getAllTasks] Returning', tasks.length, 'tasks');
         res.status(200).json(tasks);
     } catch (err) {
+        console.error('❌ [getAllTasks] Error:', err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -821,22 +837,36 @@ exports.assignTask = async (req, res) => {
 // Soft-delete / archive task
 exports.archiveTask = async (req, res) => {
     try {
+        console.log(`📦 [archiveTask] Archiving task ${req.params.id}`);
+        
         const taskDoc = await db.collection('tasks').doc(req.params.id).get();
+        
+        if (!taskDoc.exists) {
+            console.log(`❌ [archiveTask] Task ${req.params.id} not found`);
+            return res.status(404).json({ message: 'Task not found' });
+        }
+        
         const task = taskDoc.data();
+        console.log(`📦 [archiveTask] Task found: "${task.title}"`);
         
         await db.collection('tasks').doc(req.params.id).update({
             archived: true,
             updatedAt: admin.firestore.Timestamp.now()
         });
         
+        console.log(`✅ [archiveTask] Task ${req.params.id} archived successfully`);
+        
         // Update project stats when task is archived
         if (task.projectId) {
+            console.log(`📊 [archiveTask] Updating project stats for project ${task.projectId}`);
             await updateProjectStats(task.projectId);
         }
         
         // Send notification about task archiving
         if (task.assigneeId) {
             try {
+                console.log(`📢 [archiveTask] Sending archive notification to ${task.assigneeId}`);
+                
                 const archiveNotificationData = {
                     title: `Task Archived`,
                     body: `Task "${task.title}" has been archived`,
@@ -847,14 +877,20 @@ exports.archiveTask = async (req, res) => {
                 await NotificationService.sendNotification(task.assigneeId, archiveNotificationData, {
                     sendEmail: false
                 });
+                
+                console.log(`✅ [archiveTask] Archive notification sent successfully`);
             } catch (error) {
-                console.error('Failed to send archive notification:', error);
+                console.error('❌ [archiveTask] Failed to send archive notification:', error);
                 // Don't fail the archive if notification fails
             }
         }
         
-        res.status(200).json({ message: 'Task archived' });
+        res.status(200).json({ 
+            message: 'Task archived successfully',
+            taskId: req.params.id 
+        });
     } catch (err) {
+        console.error(`❌ [archiveTask] Error archiving task ${req.params.id}:`, err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -922,7 +958,7 @@ exports.getAllRecurringTasks = async (req, res) => {
             updatedAt: formatTimestampToISO(doc.data().updatedAt),
         }));
         
-        console.log(`Found ${recurringTasks.length} recurring tasks for user: ${userId}`);
+        // console.log(`Found ${recurringTasks.length} recurring tasks for user: ${userId}`);
         res.status(200).json(recurringTasks);
     } catch (err) {
         console.error('Get recurring tasks error:', err);
@@ -1003,14 +1039,17 @@ exports.updateRecurringTask = async (req, res) => {
 
 // Helper: Remove recurrence and convert to single-instance tasks
 async function handleRecurrenceRemoval(recurringTaskId, tasksSnapshot, now) {
-    // Mark template as inactive
-    await db.collection('recurringTasks').doc(recurringTaskId).update({ active: false });
-    
-    // Convert future instances to single-instance tasks
     const batch = db.batch();
+    
     tasksSnapshot.forEach(doc => {
         const data = doc.data();
         const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
+        
+        // ✅ Skip archived tasks - don't modify them at all
+        if (data.archived === true) {
+            console.log(`Skipping archived task: ${data.title}`);
+            return; // Don't update archived tasks
+        }
         
         if (data.status !== 'Completed' && dueDate > now) {
             // Clean title by removing emoji
@@ -1019,23 +1058,25 @@ async function handleRecurrenceRemoval(recurringTaskId, tasksSnapshot, now) {
             if (cleanTitle.startsWith('🔄')) cleanTitle = cleanTitle.substring(1);
             if (cleanTitle.endsWith(' 🔄')) cleanTitle = cleanTitle.slice(0, -2);
             
+            // ✅ Don't touch archived field at all
             batch.update(doc.ref, {
                 title: cleanTitle,
                 recurringTaskId: admin.firestore.FieldValue.delete(),
                 recurrence: admin.firestore.FieldValue.delete(),
                 updatedAt: admin.firestore.Timestamp.now()
+                // ✅ Removed archived: false
             });
         }
     });
-    await batch.commit();
     
-    console.log(`✅ Recurrence disabled for ${recurringTaskId}. Future instances converted to single-instance tasks.`);
+    await batch.commit();
+    console.log(`✅ Recurrence disabled for ${recurringTaskId}. Preserved archive status.`);
 }
 
 // Helper: Handle schedule changes by recreating tasks
 async function handleScheduleChange(recurringTaskId, originalData, newRecurrence, 
                                   tasksSnapshot, now, taskOwner, taskOwnerDepartment) {
-    console.log(`🔄 Schedule changed for ${recurringTaskId}. Recreating future tasks...`);
+    // console.log(`🔄 Schedule changed for ${recurringTaskId}. Recreating future tasks...`);
     
     // Delete future task instances
     const deleteBatch = db.batch();
@@ -1053,25 +1094,34 @@ async function handleScheduleChange(recurringTaskId, originalData, newRecurrence
     await createRecurringTaskInstances(recurringTaskId, originalData, newRecurrence, 
                                      now, taskOwner, taskOwnerDepartment);
     
-    console.log(`✅ Recreated future tasks for ${recurringTaskId}`);
+    // console.log(`✅ Recreated future tasks for ${recurringTaskId}`);
 }
 
 // Helper: Update future task instances with new recurrence data
 async function handleSimpleUpdate(tasksSnapshot, now, recurrence, taskOwner, taskOwnerDepartment) {
     const batch = db.batch();
-    const updateData = {
-        recurrence,
-        updatedAt: admin.firestore.Timestamp.now()
-    };
-    if (taskOwner) updateData.taskOwner = taskOwner;
-    if (taskOwnerDepartment) updateData.taskOwnerDepartment = taskOwnerDepartment;
-
+    
     tasksSnapshot.forEach(doc => {
         const data = doc.data();
         const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
         
+        // ✅ Skip archived tasks
+        if (data.archived === true) {
+            console.log(`Skipping archived task: ${data.title}`);
+            return;
+        }
+        
         if (data.status !== 'Completed' && dueDate > now) {
-            // Add emoji to title if recurrence is enabled and title doesn't already have it
+            const updateData = {
+                recurrence,
+                updatedAt: admin.firestore.Timestamp.now()
+                // ✅ Removed archived: false
+            };
+            
+            if (taskOwner) updateData.taskOwner = taskOwner;
+            if (taskOwnerDepartment) updateData.taskOwnerDepartment = taskOwnerDepartment;
+            
+            // Add emoji to title if recurrence is enabled
             if (recurrence.enabled && !data.title.startsWith('🔄 ')) {
                 updateData.title = `🔄 ${data.title}`;
             }
@@ -1079,9 +1129,9 @@ async function handleSimpleUpdate(tasksSnapshot, now, recurrence, taskOwner, tas
             batch.update(doc.ref, updateData);
         }
     });
-    await batch.commit();
     
-    console.log(`✅ Updated future task instances`);
+    await batch.commit();
+    console.log(`✅ Updated future task instances (preserved archived tasks)`);
 }
 
 // Helper: Create new recurring task instances
@@ -1131,7 +1181,7 @@ async function createRecurringTaskInstances(recurringTaskId, templateData, recur
         current = next;
     }
     
-    console.log(`✅ Created ${newTasksCreated} new task instances`);
+    // console.log(`✅ Created ${newTasksCreated} new task instances`);
 }
 
 // Helper: Get interval function based on recurrence type

@@ -53,10 +53,9 @@ router.put('/:id/archive', verifyToken, taskController.archiveTask);
 // Unarchive a task
 router.put('/:id/unarchive', verifyToken, taskController.unarchiveTask);
 
-// 2. Add the middleware ONLY to the updateTask route
-router.put('/:id', verifyToken, taskController.updateTask);
-
 // Update recurrence rules for a recurring task
 router.put('/recurring/:id', verifyToken, taskController.updateRecurringTask);
+
+router.put('/:id', verifyToken, taskController.updateTask);
 
 module.exports = router;
