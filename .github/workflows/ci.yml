@@ -1,3 +1,74 @@
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run emulators + tests (auth, firestore)
+        # Use firebase emulators:exec to ensure emulator environment variables are injected
+        run: |
+          # run a compound script under emulators:exec. It will start the backend & frontend
+          # dev servers in background, wait for them, run Jest and Playwright, and then kill background servers.
+          firebase emulators:exec --only auth,firestore --project=all-in-one-smu -- bash -lc '
+            set -euo pipefail
+            echo "Starting backend dev server..."
+            (cd backend && npm run dev) &
+            BACKEND_PID=$!
+            echo "Backend pid: $BACKEND_PID"
+
+            echo "Starting frontend dev server..."
+            (cd frontend && npm run dev) &
+            FRONTEND_PID=$!
+            echo "Frontend pid: $FRONTEND_PID"
+
+            echo "Waiting for backend and frontend to be ready..."
+            # wait for the backend and frontend to accept connections
+            npx wait-on http://localhost:3000 http://localhost:5173 || true
+
+            echo "Running backend integration tests (Jest)"
+            (cd backend && npx jest --runInBand --ci)
+
+            echo "Install Playwright browsers and run E2E (use existing servers)"
+            export PLAYWRIGHT_USE_EXISTING=1
+            (cd frontend && npx playwright install --with-deps && npx playwright test --reporter=list)
+
+            echo "Shutting down background servers"
+            kill $BACKEND_PID || true
+            kill $FRONTEND_PID || true
+          '
+
+      - name: Upload Playwright reports (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report || frontend/test-results || ''
 # This workflow runs automatic checks on your frontend and backend code
 # when you push to the 'main' branch or open a pull request.
 name: CI - Frontend and Backend

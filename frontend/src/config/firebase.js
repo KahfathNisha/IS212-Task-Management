@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 
@@ -32,6 +32,20 @@ if (!isTest && hasApiKey && isBrowser) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  // If the developer enables emulator mode via env, connect client SDK to emulators
+  if (import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'true') {
+    try {
+      console.log('🧪 Connecting Firebase client SDK to emulators');
+      // default emulator hosts (override via Vite env if necessary)
+      const authHost = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST || 'http://localhost:9099';
+      const firestoreHost = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || 'localhost';
+      const firestorePort = parseInt(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || '8080', 10);
+      connectAuthEmulator(auth, authHost, { disableWarnings: true });
+      connectFirestoreEmulator(db, firestoreHost, firestorePort);
+    } catch (err) {
+      console.warn('⚠️ Failed to connect client SDK to emulators:', err);
+    }
+  }
   functions = getFunctions(app);
   storage = getStorage(app);
   console.log('✅ Firebase initialized successfully');

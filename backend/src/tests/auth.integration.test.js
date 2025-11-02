@@ -8,7 +8,7 @@
 // Use NODE_ENV=test to prevent server.js auto-listen, but still initialize
 // Firebase in the test by requiring the config after setting emulator env vars.
 process.env.NODE_ENV = 'test';
-process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'is212-e2e';
+process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'all-in-one-smu';
 // Point to local emulators (adjust if your emulator uses other hosts/ports)
 process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8080';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || 'localhost:9099';
@@ -30,10 +30,11 @@ describe('Auth integration tests (emulator)', () => {
   jest.setTimeout(30000);
 
   // small helper to add a timeout to potentially-hanging promises
-  const withTimeout = (p, ms = 5000) => Promise.race([
-    p,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('operation timed out')), ms))
-  ]);
+  // ensure the timer is cleared if the promise resolves/rejects to avoid leaving a Node timer open
+  const withTimeout = (p, ms = 5000) => new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('operation timed out')), ms);
+    Promise.resolve(p).then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); });
+  });
 
   beforeAll(async () => {
     // Clean collections used by tests (best-effort). Use timeouts so tests don't hang
