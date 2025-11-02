@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 
@@ -33,7 +33,7 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  currentView: {    // ← ADD THIS NEW PROP
+  currentView: {
     type: String,
     default: 'list'
   }
@@ -55,7 +55,7 @@ const emit = defineEmits([
   'add-task',
   'bulk-update-status',
   'bulk-delete',
-  'change-view'    // ← ADD THIS
+  'change-view'
 ])
 
 // ===========================
@@ -74,7 +74,6 @@ const sortOpen = ref(false)
 const sortWrapper = ref(null)
 
 // Search & Filter State
-const searchQuery = computed(() => props.searchQuery || '')
 const statusFilter = ref([])
 
 // Bulk Select State
@@ -124,8 +123,8 @@ const filteredTasks = computed(() => {
   }
   
   // Apply search filter
-  if (searchQuery.value && searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase().trim()
+  if (props.searchQuery && props.searchQuery.trim()) {
+    const query = props.searchQuery.toLowerCase().trim()
     tasks = tasks.filter(task => {
       return (
         task.title?.toLowerCase().includes(query) ||
@@ -235,7 +234,7 @@ watch(() => props.currentView, (newView) => {
 /**
  * Clear bulk selection when filters change
  */
-watch([searchQuery, statusFilter], () => {
+watch([() => props.searchQuery, statusFilter], () => {
   if (bulkSelectMode.value) {
     selectedTaskIds.value = []
   }
@@ -647,8 +646,6 @@ const calculateProgress = (task) => {
   return Math.round((completedSubtasks / totalSubtasks) * 100)
 }
 
-// Add this function to your <script setup> block in ListView.vue
-
 // Function to check if a task is overdue (needed locally for styling)
 const isTaskOverdue = (dueDate, status) => {
   if (status === 'Completed' || !dueDate) return false;
@@ -708,16 +705,13 @@ defineExpose({
 
 <template>
   <div class="list-view-content">
-    <!-- Main Content Area -->
     <div class="main-content">
-      <!-- View Toggle Bar - SPANS FULL WIDTH ACROSS BOTH PANELS -->
       <div class="view-toggle-bar-wrapper">
         <div class="view-toggle-bar">
           <div class="view-tabs">            
           </div>
 
           <div class="view-actions">
-            <!-- SORT ORDER TOGGLE -->
             <button
               class="sort-order-btn"
               type="button"
@@ -728,7 +722,6 @@ defineExpose({
               <v-icon size="small">mdi-sort</v-icon>
             </button>
 
-            <!-- SORT BY (self-contained, no nextTick needed) -->
             <div class="sort-wrapper" ref="sortWrapper">
               <button
                 class="sort-btn"
@@ -741,7 +734,6 @@ defineExpose({
                 <span class="current-sort">{{ currentSort }}</span>
               </button>
 
-              <!-- Always present in DOM; just toggled with v-show -->
               <div
                 class="custom-filter-dropdown"
                 v-show="sortOpen"
@@ -831,11 +823,8 @@ defineExpose({
         </div>
       </div>
 
-      <!-- Content Panels Wrapper - Side by Side -->
       <div class="content-panels-wrapper">
-        <!-- Left Panel: Task List -->
         <div class="task-list-panel">
-          <!-- Select All (only in bulk mode) -->
           <div v-if="bulkSelectMode" class="select-all-bar">
             <v-checkbox
               :model-value="allSelected"
@@ -847,7 +836,6 @@ defineExpose({
             />
           </div>
 
-          <!-- Bulk Actions Bar (shown when items selected) -->
           <div v-if="bulkSelectMode && selectedTaskIds.length > 0" class="bulk-actions-bar">
             <div class="bulk-info">
               <v-icon>mdi-checkbox-multiple-marked</v-icon>
@@ -863,10 +851,8 @@ defineExpose({
             </div>
           </div>
 
-          <!-- Task List Scroll Area -->
           <div class="tasks-list-scroll">
-            <!-- Task Cards -->
-              <div 
+            <div 
                 v-for="task in sortedTasks" 
                 :key="task.id"
                 class="task-list-card"
@@ -928,7 +914,6 @@ defineExpose({
               </div>
             </div>
 
-            <!-- Empty State -->
             <div v-if="filteredTasks.length === 0" class="no-tasks-message">
               <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
               <p class="empty-title">No tasks found</p>
@@ -939,18 +924,14 @@ defineExpose({
           </div>
         </div>
 
-        <!-- Right Panel: Task Details -->
         <div class="task-detail-panel">
-          <!-- No Selection State -->
           <div v-if="!selectedTask" class="no-selection">
             <v-icon size="80" color="grey-lighten-2">mdi-clipboard-text-search-outline</v-icon>
             <h3>Select a task to view details</h3>
             <p>Click on any task from the list to see its full details here</p>
           </div>
 
-          <!-- Task Detail Content -->
           <div v-else class="task-detail-content">
-            <!-- Header -->
             <div class="detail-header">
               <div class="detail-title-section">
                 <h2>{{ selectedTask.title }}</h2>
@@ -996,9 +977,7 @@ defineExpose({
 
             <v-divider class="my-4"></v-divider>
 
-            <!-- Task Details Body -->
             <div class="detail-body">
-              <!-- Row 1: Description and Due Date -->
               <v-row>
                 <v-col cols="12" md="6">
                   <div class="detail-section">
@@ -1020,7 +999,6 @@ defineExpose({
                 </v-col>
               </v-row>
 
-              <!-- Row 2: Assignee and Priority -->
               <v-row>
                 <v-col cols="12" md="6">
                   <div class="detail-section">
@@ -1042,7 +1020,6 @@ defineExpose({
                 </v-col>
               </v-row>
 
-              <!-- Row 3: Collaborators (if exists) -->
               <v-row v-if="selectedTask.collaborators && selectedTask.collaborators.length > 0">
                 <v-col cols="12">
                   <div class="detail-section">
@@ -1065,7 +1042,6 @@ defineExpose({
                 </v-col>
               </v-row>
 
-              <!-- Progress Bar (for tasks with subtasks) -->
               <div class="detail-section" v-if="selectedTask.subtasks && selectedTask.subtasks.length > 0">
                 <h4>Progress</h4>
                 <div class="progress-bar-container">
@@ -1076,7 +1052,6 @@ defineExpose({
                 </div>
               </div>
 
-              <!-- Attachments -->
               <div class="detail-section" v-if="selectedTask.attachments && selectedTask.attachments.length > 0">
                 <h4>Attachments ({{ selectedTask.attachments.length }})</h4>
                 <div class="attachments-list">
@@ -1093,7 +1068,6 @@ defineExpose({
                 </div>
               </div>
 
-              <!-- Status History -->
               <div class="detail-section" v-if="selectedTask && selectedTask.statusHistory && selectedTask.statusHistory.length > 0">
                 <h4>Status History</h4>
                 <div class="status-updates">
@@ -1111,7 +1085,6 @@ defineExpose({
                 </div>
               </div>
 
-              <!-- Subtasks List -->
               <div class="detail-section" v-if="selectedTask.subtasks && selectedTask.subtasks.length > 0">
                 <h4>Subtasks ({{ selectedTask.subtasks.length }})</h4>
                 <div class="subtask-list">
@@ -1147,7 +1120,6 @@ defineExpose({
                 </div>
               </div>
 
-              <!-- Parent Task Reference (for subtasks) -->
               <div class="detail-section" v-if="selectedTask.isSubtask && selectedTask.parentTask">
                 <h4>Parent Task</h4>
                 <div class="parent-task-card">
@@ -1163,7 +1135,6 @@ defineExpose({
                 </div>
               </div>
 
-              <!-- Status Update Action -->
               <div class="detail-actions">
                 <v-select
                   :model-value="selectedTask.status"
@@ -2041,6 +2012,7 @@ defineExpose({
 /* ===========================
    Responsive Design
    =========================== */
+/* Existing 1400px and 1200px remain the same */
 @media (max-width: 1400px) {
   .task-list-panel {
     width: 50%;
@@ -2053,21 +2025,39 @@ defineExpose({
   }
 }
 
+/* 🟢 CRITICAL FIX: Make panels stack and scrollable on Tablet/Mobile */
 @media (max-width: 1024px) {
+  /* 1. Main Content: Stack panels vertically */
   .main-content {
-    flex-direction: column;
+    flex-direction: column !important;
+    overflow: visible !important; 
+    height: auto !important; /* Allow content to dictate height */
   }
   
+  /* 2. Content Panels Wrapper: Allows scrolling of stacked content */
+  .content-panels-wrapper {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    height: auto !important;
+  }
+  
+  /* 3. Task List Panel: Give it a fixed, scrollable height */
   .task-list-panel {
-    width: 100%;
-    max-width: none;
-    height: 50vh;
-    border-right: none;
-    border-bottom: 2px solid #e0e0e0;
+    width: 100% !important;
+    max-width: none !important;
+    height: 45vh !important; 
+    min-height: 350px !important;
+    border-right: none !important;
+    border-bottom: 2px solid #e0e0e0 !important;
+    flex-shrink: 0 !important;
   }
   
+  /* 4. Task Detail Panel: Allow it to take up the rest of the space (auto height) */
   .task-detail-panel {
-    height: 50vh;
+    height: auto !important; 
+    min-height: 45vh !important; 
+    flex-shrink: 0 !important;
+    overflow-y: visible !important;
   }
 }
 
