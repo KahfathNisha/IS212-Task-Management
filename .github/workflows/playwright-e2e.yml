@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install backend deps
         working-directory: backend
@@ -34,7 +34,21 @@ jobs:
         # Use firebase emulators:exec to run emulators and execute tests against them
         working-directory: backend
         run: |
-          npx firebase emulators:exec --only auth,firestore "cd ../frontend && npm run test:e2e"
+          # Start backend so Playwright tests can hit the API, then run frontend tests
+          npx firebase emulators:exec --only auth,firestore -- bash -lc '
+            set -euo pipefail
+            echo "Installing backend deps..."
+            (cd backend && npm ci)
+            echo "Starting backend (node) in background..."
+            (cd backend && node src/server.js > backend/backend.log 2>&1) &
+            BACKEND_PID=$!
+            echo "Backend PID: $BACKEND_PID"
+            echo "Waiting for backend /health..."
+            npx wait-on -t 120000 http://127.0.0.1:3000/health || true
+            echo "Running frontend E2E tests"
+            (cd frontend && npm ci && npx playwright install --with-deps && npx playwright test)
+            kill ${BACKEND_PID:-0} || true
+          '
         env:
           # Ensure firebase uses the project from backend/firebase.json
           CI: true

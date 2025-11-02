@@ -14,10 +14,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 18
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install firebase-tools
         run: npm install -g firebase-tools@latest
@@ -44,7 +44,8 @@ jobs:
             (cd frontend && npm ci)
 
             echo "Starting backend in background (logging to backend/backend.log)..."
-            (cd backend && npm run dev > backend.log 2>&1) &
+            # Use node directly in CI to avoid nodemon/TTY issues
+            (cd backend && node src/server.js > backend.log 2>&1) &
             BACKEND_PID=$!
             echo "Backend PID: $BACKEND_PID"
 
@@ -55,7 +56,7 @@ jobs:
 
             echo "Waiting for emulators and servers to be ready (may take up to 120s)..."
             # wait for emulator ports and servers (prefer IPv4 addresses to avoid ::1 issues)
-            npx wait-on -t 120000 http://127.0.0.1:3000 http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:9099 http://127.0.0.1:8080 || true
+            npx wait-on -t 120000 http://127.0.0.1:3000/health http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:9099 http://127.0.0.1:8080 || true
 
             echo "Checking backend and emulator endpoints..."
             # Basic health checks with retries; check backend /health specifically
