@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Auth E2E (Playwright)', () => {
-  const backendBase = 'http://localhost:3000';
+  // Prefer explicit IPv4 to avoid CI environments resolving `localhost` to IPv6 (::1)
+  const backendBase = 'http://127.0.0.1:3000';
   const email = `pw.user+${Date.now()}@example.com`;
   const password = 'Playwright1!';
 

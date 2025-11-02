@@ -104,7 +104,8 @@ console.log('🔧 Ready to start server');
 
 // Only start server if not testing
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(PORT, (err) => {
+    // Bind to 0.0.0.0 so both IPv4 and IPv6 loopback (::1) can reach the server in CI
+    app.listen(PORT, '0.0.0.0', (err) => {
         if (err) {
             console.error('❌ Failed to start server:', err);
             process.exit(1);

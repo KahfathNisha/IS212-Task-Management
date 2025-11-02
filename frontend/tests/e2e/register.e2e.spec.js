@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { waitForAppReady } from './test-helpers.js';
 
-const backendBase = 'http://localhost:3000';
+// Prefer explicit IPv4 to avoid CI environments resolving `localhost` to IPv6 (::1)
+const backendBase = 'http://127.0.0.1:3000';
 
 test.describe('Register UI E2E (stabilized)', () => {
   test('register page loads and backend can create a user (stabilized)', async ({ page }) => {

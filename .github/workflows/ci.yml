@@ -31,36 +31,50 @@ jobs:
         run: npm ci
 
       - name: Run emulators + tests (auth, firestore)
-        # Use firebase emulators:exec to ensure emulator environment variables are injected
+        # Run everything under firebase emulators:exec so emulator env vars are injected.
+        # This script starts backend+frontend, waits for emulator + servers to be ready,
+        # runs Jest and Playwright, then shuts down background servers.
         run: |
-          # run a compound script under emulators:exec. It will start the backend & frontend
-          # dev servers in background, wait for them, run Jest and Playwright, and then kill background servers.
           firebase emulators:exec --only auth,firestore --project=all-in-one-smu -- bash -lc '
             set -euo pipefail
-            echo "Starting backend dev server..."
+            echo "Installing backend deps..."
+            (cd backend && npm ci)
+
+            echo "Installing frontend deps..."
+            (cd frontend && npm ci)
+
+            echo "Starting backend in background..."
             (cd backend && npm run dev) &
             BACKEND_PID=$!
-            echo "Backend pid: $BACKEND_PID"
+            echo "Backend PID: $BACKEND_PID"
 
-            echo "Starting frontend dev server..."
+            echo "Starting frontend in background..."
             (cd frontend && npm run dev) &
             FRONTEND_PID=$!
-            echo "Frontend pid: $FRONTEND_PID"
+            echo "Frontend PID: $FRONTEND_PID"
 
-            echo "Waiting for backend and frontend to be ready..."
-            # wait for the backend and frontend to accept connections
-            npx wait-on http://localhost:3000 http://localhost:5173 || true
+            echo "Waiting for emulators and servers to be ready (may take up to 120s)..."
+            # wait for emulator ports and servers
+            npx wait-on -t 120000 http://localhost:3000 http://localhost:5173 http://localhost:9099 http://localhost:8080 || true
+
+            echo "Checking emulator endpoints..."
+            # Basic health checks with retries
+            for i in 1 2 3; do
+              curl --fail http://localhost:9099/ || true
+              curl --fail http://localhost:8080/ || true
+              sleep 1
+            done
 
             echo "Running backend integration tests (Jest)"
             (cd backend && npx jest --runInBand --ci)
 
-            echo "Install Playwright browsers and run E2E (use existing servers)"
+            echo "Run Playwright E2E (using existing servers)"
             export PLAYWRIGHT_USE_EXISTING=1
             (cd frontend && npx playwright install --with-deps && npx playwright test --reporter=list)
 
             echo "Shutting down background servers"
-            kill $BACKEND_PID || true
-            kill $FRONTEND_PID || true
+            kill ${BACKEND_PID:-0} || true
+            kill ${FRONTEND_PID:-0} || true
           '
 
       - name: Upload Playwright reports (if any)

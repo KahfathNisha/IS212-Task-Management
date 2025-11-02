@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-const backendBase = 'http://localhost:3000';
+// Prefer explicit IPv4 to avoid CI environments resolving `localhost` to IPv6 (::1)
+const backendBase = 'http://127.0.0.1:3000';
 
 test.describe('Password Reset (stable API-driven)', () => {
   test('request and complete password reset via backend API (stable)', async ({ page }) => {
