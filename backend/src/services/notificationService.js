@@ -190,7 +190,7 @@ class NotificationService {
     static async processDeadlineReminders(now) {
         try {
             // Get all users with email notifications enabled
-            // const usersSnapshot = await db.collection("Users")
+            // const usersSnapshot = await db.collection("users")
             //     .where("notificationSettings.emailEnabled", "==", true)
             //     .get();
             const usersSnapshot = { docs: [] }; //temporary

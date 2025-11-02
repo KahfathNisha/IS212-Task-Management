@@ -66,7 +66,7 @@ async function setupTestData() {
   console.log('📝 Creating test users...');
   for (const user of testUsers) {
     try {
-      const userRef = db.collection('Users').doc(user.email);
+      const userRef = db.collection('users').doc(user.email);
       await userRef.set({
         ...user,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),

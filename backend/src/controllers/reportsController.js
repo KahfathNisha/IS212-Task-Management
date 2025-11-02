@@ -73,7 +73,7 @@ exports.generateProjectReport = async (req, res) => {
 
     const [projectDoc, userDoc] = await Promise.all([
       db.collection('projects').doc(projectId).get(),
-      db.collection('Users').doc(requesterId).get()
+      db.collection('users').doc(requesterId).get()
     ]);
 
     if (!projectDoc.exists) return res.status(404).json({ success: false, message: 'Project not found.' });
@@ -109,7 +109,7 @@ exports.generateProjectReport = async (req, res) => {
 
     // Batch fetch assignee info for all assigned emails
     const assigneeEmails = Array.from(new Set(tasks.map(t => t.assignedTo).filter(Boolean)));
-    const userDocs = await Promise.all(assigneeEmails.map(email => db.collection('Users').doc(email).get()));
+    const userDocs = await Promise.all(assigneeEmails.map(email => db.collection('users').doc(email).get()));
     const emailToUser = {};
     userDocs.forEach(doc => {
       if (doc.exists) emailToUser[doc.id] = {
@@ -196,7 +196,7 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized.' });
     }
     // Authorization: Check RBAC for department reports
-    const userDoc = await db.collection('Users').doc(requesterId).get();
+    const userDoc = await db.collection('users').doc(requesterId).get();
     if (!userDoc.exists) {
       return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
     }
@@ -224,9 +224,9 @@ exports.generateDepartmentReport = async (req, res) => {
     console.log('Querying users with department:', department);
     let usersSnapshot;
     if (department === 'ALL') {
-      usersSnapshot = await db.collection('Users').get();
+      usersSnapshot = await db.collection('users').get();
     } else {
-      usersSnapshot = await db.collection('Users').where('department', '==', department).get();
+      usersSnapshot = await db.collection('users').where('department', '==', department).get();
     }
     const departmentUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     const userEmails = departmentUsers.map(user => user.email);
@@ -317,7 +317,7 @@ exports.generateCompanyReport = async (req, res) => {
     }
 
     // Authorization: Only Directors can generate company reports
-    const userDoc = await db.collection('Users').doc(requesterId).get();
+    const userDoc = await db.collection('users').doc(requesterId).get();
     if (!userDoc.exists) {
       return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
     }
@@ -374,7 +374,7 @@ exports.generateCompanyReport = async (req, res) => {
     const overduePercentage = totalTasks > 0 ? ((overdueCount / totalTasks) * 100).toFixed(1) : 0;
 
     // Get all departments for filter dropdown
-    const departmentsSnapshot = await db.collection('Users').get();
+    const departmentsSnapshot = await db.collection('users').get();
     const allDepartments = new Set();
     departmentsSnapshot.docs.forEach(doc => {
       const dept = doc.data().department;
@@ -424,8 +424,8 @@ exports.generateIndividualReport = async (req, res) => {
 
     // Authorization check
     const [requesterDoc, employeeDoc] = await Promise.all([
-      db.collection('Users').doc(requesterId).get(),
-      db.collection('Users').doc(employeeEmail).get()
+      db.collection('users').doc(requesterId).get(),
+      db.collection('users').doc(employeeEmail).get()
     ]);
 
     if (!requesterDoc.exists) {

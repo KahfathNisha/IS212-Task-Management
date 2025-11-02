@@ -32,7 +32,7 @@ const { admin, db } = require('./firebase-init');
 const NotificationService = require('../src/services/notificationService');
 
 async function ensureTestUser(userEmail) {
-  await db.collection('Users').doc(userEmail).set({
+  await db.collection('users').doc(userEmail).set({
     name: 'Test User',
     email: userEmail,
     testEmail: 'breannong@gmail.com',

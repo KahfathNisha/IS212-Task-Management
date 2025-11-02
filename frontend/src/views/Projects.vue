@@ -1709,7 +1709,7 @@ const capitalizeDepartment = (deptName) => {
     .join(' ');
 };
 
-// Get departments from Users collection (organized by department field)
+// Get departments from users collection (organized by department field)
 const departmentsFromUsers = computed(() => {
   const deptMap = new Map();
   allUsers.value.forEach(user => {
@@ -1911,10 +1911,10 @@ function editDepartment(deptName) {
     isEditingDepartment.value = true;
     showAddDepartmentDialog.value = true;
   } else {
-    // If not in departments collection, create/edit using dept name from Users
+    // If not in departments collection, create/edit using dept name from users
     editingDepartmentId.value = null;
     newDepartmentTitle.value = deptName;
-    // Pre-populate members from Users collection who belong to this department
+    // Pre-populate members from users collection who belong to this department
     const usersInDept = allUsers.value.filter(user => 
       user.department && user.department.trim().toLowerCase() === deptName.toLowerCase()
     );

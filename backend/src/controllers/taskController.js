@@ -437,7 +437,7 @@ exports.updateTask = async (req, res) => {
         // VALIDATION: Prevent same-tier assignment and transfer ownership when assigned
         if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId) {
             // Fetch new assignee's user data to check their role
-            const newAssigneeDoc = await db.collection('Users').doc(newAssigneeId).get();
+            const newAssigneeDoc = await db.collection('users').doc(newAssigneeId).get();
             
             if (!newAssigneeDoc.exists) {
                 return res.status(404).json({ message: 'New assignee not found' });
@@ -756,7 +756,7 @@ const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reas
 
         // Send email to new assignee if assigned
         if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
-            const newAssigneeDoc = await db.collection('Users').doc(newAssigneeId).get();
+            const newAssigneeDoc = await db.collection('users').doc(newAssigneeId).get();
             if (newAssigneeDoc.exists()) {
                 const newAssigneeData = newAssigneeDoc.data();
                 const settings = newAssigneeData.notificationSettings || {};
@@ -776,7 +776,7 @@ const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reas
 
         // Send email to old assignee if removed
         if (oldAssigneeId && oldAssigneeId !== newAssigneeId) {
-            const oldAssigneeDoc = await db.collection('Users').doc(oldAssigneeId).get();
+            const oldAssigneeDoc = await db.collection('users').doc(oldAssigneeId).get();
             if (oldAssigneeDoc.exists()) {
                 const oldAssigneeData = oldAssigneeDoc.data();
                 const settings = oldAssigneeData.notificationSettings || {};
@@ -796,7 +796,7 @@ const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reas
 
         // Send confirmation to original task owner if different from reassignedBy
         if (taskData.taskOwner && taskData.taskOwner !== reassignedBy) {
-            const ownerDoc = await db.collection('Users').where('name', '==', taskData.taskOwner).get();
+            const ownerDoc = await db.collection('users').where('name', '==', taskData.taskOwner).get();
             if (!ownerDoc.empty) {
                 const ownerData = ownerDoc.docs[0].data();
                 const ownerEmail = ownerDoc.docs[0].id;

@@ -43,10 +43,10 @@ describe('Auth integration tests (emulator)', () => {
       return;
     }
     try {
-      const usersSnap = await withTimeout(db.collection('Users').get(), 5000);
+      const usersSnap = await withTimeout(db.collection('users').get(), 5000);
       for (const doc of usersSnap.docs) {
         // set to null to mimic delete without depending on delete permissions
-        await withTimeout(db.collection('Users').doc(doc.id).set(null), 5000).catch(() => {});
+        await withTimeout(db.collection('users').doc(doc.id).set(null), 5000).catch(() => {});
       }
     } catch (err) {
       console.warn('⚠️ Skipping Users cleanup (emulator may be offline):', err.message);
@@ -152,7 +152,7 @@ describe('Auth integration tests (emulator)', () => {
     // best-effort cleanup: remove created user and password reset docs
     try {
       // delete users doc
-      await db.collection('Users').doc(email).set(null);
+      await db.collection('users').doc(email).set(null);
       // delete password reset docs
       const prs = await db.collection('passwordResets').get();
       for (const d of prs.docs) await db.collection('passwordResets').doc(d.id).set(null);

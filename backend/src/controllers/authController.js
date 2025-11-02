@@ -615,7 +615,7 @@ exports.registerUser = async (req, res) => {
     });
 
     // --- Create User Profile in Firestore (AC1) ---
-    // Using 'Users' (uppercase) as we fixed before
+    // Using 'users' (lowercase) collection name
     const userDocRef = db.collection('users').doc(email); 
     
     await userDocRef.set({

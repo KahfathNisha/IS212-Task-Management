@@ -15,7 +15,7 @@ const { admin, db } = require('./firebase-init');
 const NotificationService = require('../src/services/notificationService');
 
 async function ensureTestUser(userEmail) {
-  await db.collection('Users').doc(userEmail).set({
+  await db.collection('users').doc(userEmail).set({
     name: 'Test User',
     email: userEmail,
     testEmail: 'breannong@gmail.com',
@@ -71,7 +71,7 @@ async function run() {
   await send('Task Status Updated', `Task "${task.title}" status changed to "Completed"`, 'success', 'task_status_changed', { status: 'Completed' });
 
   // Verify stats
-  const snapshot = await db.collection('Users').doc(userEmail).collection('notifications').orderBy('createdAt', 'desc').limit(10).get();
+  const snapshot = await db.collection('users').doc(userEmail).collection('notifications').orderBy('createdAt', 'desc').limit(10).get();
   console.log('📊 Recent notifications:', snapshot.size);
   snapshot.docs.forEach((doc, i) => {
     const n = doc.data();

@@ -9,7 +9,7 @@ let unsubscribeNotifications = null;
 function initializeUnreadNotificationListener(userId) {
   const notificationStore = useNotificationStore();
   const notificationsQuery = query(
-    collection(db, "Users", userId, "notifications"),
+    collection(db, "users", userId, "notifications"),
     where("isRead", "==", false)
   );
   unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {

@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      return get(/databases/$(database)/documents/Users/$(request.auth.token.email)).data;
+      return get(/databases/$(database)/documents/users/$(request.auth.token.email)).data;
     }
     
     function getUserRole() {
@@ -48,9 +48,9 @@ service cloud.firestore {
     }
     
     // ========================================
-    // Users Collection
+    // users Collection
     // ========================================
-    match /Users/{userId} {
+    match /users/{userId} {
       // Users can read their own profile
       allow read: if isSignedIn() && request.auth.token.email == userId;
       
