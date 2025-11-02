@@ -26,34 +26,39 @@
             :key="task.id"
             class="archived-task-item"
           >
-            <v-list-item-content>
-              <div class="task-header">
-                <v-list-item-title class="task-title">{{ task.title }}</v-list-item-title>
-                <v-btn
-                  color="primary"
-                  size="small"
-                  variant="outlined"
-                  @click="unarchive(task.id)"
-                  class="unarchive-btn"
-                  :loading="unarchivingId === task.id"
-                  :disabled="unarchivingId === task.id"
-                >
-                  <v-icon left size="18">mdi-archive-arrow-up</v-icon>
-                  {{ unarchivingId === task.id ? 'Unarchiving...' : 'Unarchive' }}
-                </v-btn>
+            <!-- ✅ Fix: Remove v-list-item-content and use proper Vuetify 3 structure -->
+            <template v-slot:prepend>
+              <!-- Optional: Add an icon here if needed -->
+            </template>
+            
+            <v-list-item-title class="task-title">{{ task.title }}</v-list-item-title>
+            <v-list-item-subtitle class="task-desc">{{ task.description }}</v-list-item-subtitle>
+            
+            <div class="task-details">
+              <div><strong>Status:</strong> {{ task.status }}</div>
+              <div><strong>Priority:</strong> {{ task.priority }}</div>
+              <div v-if="task.dueDate"><strong>Due:</strong> {{ formatDate(task.dueDate) }}</div>
+              <div v-if="task.assigneeId"><strong>Assignee:</strong> {{ getDisplayName(task.assigneeId) }}</div>
+              <div v-if="task.recurrence && task.recurrence.enabled">
+                <strong>Recurrence:</strong>
+                {{ formatRecurrence(task.recurrence) }}
               </div>
-              <v-list-item-subtitle class="task-desc">{{ task.description }}</v-list-item-subtitle>
-              <div class="task-details">
-                <div><strong>Status:</strong> {{ task.status }}</div>
-                <div><strong>Priority:</strong> {{ task.priority }}</div>
-                <div v-if="task.dueDate"><strong>Due:</strong> {{ formatDate(task.dueDate) }}</div>
-                <div v-if="task.assigneeId"><strong>Assignee:</strong> {{ getDisplayName(task.assigneeId) }}</div>
-                <div v-if="task.recurrence && task.recurrence.enabled">
-                  <strong>Recurrence:</strong>
-                  {{ formatRecurrence(task.recurrence) }}
-                </div>
-              </div>
-            </v-list-item-content>
+            </div>
+
+            <template v-slot:append>
+              <v-btn
+                color="primary"
+                size="small"
+                variant="outlined"
+                @click="unarchive(task.id)"
+                class="unarchive-btn"
+                :loading="unarchivingId === task.id"
+                :disabled="unarchivingId === task.id"
+              >
+                <v-icon left size="18">mdi-archive-arrow-up</v-icon>
+                {{ unarchivingId === task.id ? 'Unarchiving...' : 'Unarchive' }}
+              </v-btn>
+            </template>
           </v-list-item>
         </v-list>
         <div v-if="archivedTasks.length === 0" class="text-center grey--text">
@@ -142,41 +147,43 @@ const getDisplayName = (assignedValue) => {
 
 const fetchArchivedTasks = async () => {
   try {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-    
-    console.log('🔍 Token exists:', !!token);
-    console.log('🔍 Token value:', token ? token.substring(0, 20) + '...' : 'No token');
-    
-    if (!token) {
-      console.log('❌ No token found');
-      showStatus('Authentication required. Please log in again.', 'error')
-      return
-    }
-    
-    console.log('🔍 Making request to: http://localhost:3000/tasks?archived=true');
-    
-    const res = await axios.get('http://localhost:3000/tasks?archived=true', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
+    console.log('🔍 Making request to: http://localhost:3000/tasks/archived');
+
+    // ✅ Remove token requirement for testing
+    const res = await axios.get('http://localhost:3000/tasks/archived')
     
     console.log('✅ Response received:', res.status);
-    console.log('✅ Response data:', res.data);
+    console.log('✅ Response data type:', typeof res.data);
+    console.log('✅ Response is array:', Array.isArray(res.data));
+    console.log('✅ Response data length:', res.data?.length);
+    console.log('🗂️ RAW RESPONSE DATA:', res.data);
+    
+    // ✅ Log each individual archived task
+    if (Array.isArray(res.data)) {
+      res.data.forEach((task, index) => {
+        console.log(`📋 Archived Task ${index + 1}:`, {
+          id: task.id,
+          title: task.title,
+          archived: task.archived,
+          status: task.status,
+          description: task.description,
+          dueDate: task.dueDate,
+          createdAt: task.createdAt
+        });
+      });
+    }
     
     archivedTasks.value = res.data;
-    console.log(`✅ Set ${archivedTasks.value.length} archived tasks`);
+    console.log(`✅ Set ${archivedTasks.value.length} archived tasks to reactive variable`);
+    
+    if (archivedTasks.value.length === 0) {
+      showStatus('No archived tasks found.', 'info')
+    } else {
+      console.log(`📋 Successfully loaded ${archivedTasks.value.length} archived tasks`);
+    }
     
   } catch (error) {
     console.error('❌ Full error object:', error);
-    console.error('❌ Error message:', error.message);
-    console.error('❌ Error response:', error.response);
-    
-    if (error.response) {
-      console.error('❌ Response status:', error.response.status);
-      console.error('❌ Response data:', error.response.data);
-    }
-    
     showStatus('Failed to fetch archived tasks: ' + (error.response?.data?.error || error.message), 'error')
   }
 }
