@@ -1,4 +1,3 @@
-<!-- ArchivedTasks.vue -->
 <template>
   <v-dialog v-model="dialog" max-width="700px" persistent>
     <v-card>
@@ -8,13 +7,13 @@
         <v-btn icon @click="dialog = false"><v-icon>mdi-close</v-icon></v-btn>
       </v-card-title>
       
-      <!-- Status Message Snackbar -->
       <v-alert
         v-if="statusMessage.show"
         :type="statusMessage.type"
         closable
         @click:close="statusMessage.show = false"
         class="ma-4"
+        density="compact"
       >
         {{ statusMessage.text }}
       </v-alert>
@@ -26,9 +25,8 @@
             :key="task.id"
             class="archived-task-item"
           >
-            <!-- ✅ Fix: Remove v-list-item-content and use proper Vuetify 3 structure -->
             <template v-slot:prepend>
-              <!-- Optional: Add an icon here if needed -->
+              <v-icon color="grey-lighten-1">mdi-folder-zip-outline</v-icon>
             </template>
             
             <v-list-item-title class="task-title">{{ task.title }}</v-list-item-title>
@@ -55,13 +53,13 @@
                 :loading="unarchivingId === task.id"
                 :disabled="unarchivingId === task.id"
               >
-                <v-icon left size="18">mdi-archive-arrow-up</v-icon>
-                {{ unarchivingId === task.id ? 'Unarchiving...' : 'Unarchive' }}
+                <v-icon start size="18">mdi-archive-arrow-up</v-icon>
+                {{ unarchivingId === task.id ? 'Restoring...' : 'Unarchive' }}
               </v-btn>
             </template>
           </v-list-item>
         </v-list>
-        <div v-if="archivedTasks.length === 0" class="text-center grey--text">
+        <div v-if="archivedTasks.length === 0" class="text-center grey--text py-6">
           No archived tasks found.
         </div>
       </v-card-text>
@@ -72,8 +70,27 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
-import { collection, getDocs } from 'firebase/firestore'
-import { db } from '@/config/firebase'
+// We are removing the direct Firestore imports: import { collection, getDocs } from 'firebase/firestore'
+import { useAuthStore } from '@/stores/auth' // Used for secure token access
+
+// --- 1. Centralized Axios Client (Re-configured for this component) ---
+const authStore = useAuthStore();
+const axiosClient = axios.create({
+    baseURL: 'http://localhost:3000/api', 
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Interceptor to attach the current Firebase ID Token
+axiosClient.interceptors.request.use(async (config) => {
+    const token = await authStore.getToken(); // Securely get token from store
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+}, error => Promise.reject(error));
+// -------------------------------------------------------------------
 
 const props = defineProps({
   show: Boolean
@@ -82,7 +99,10 @@ const emit = defineEmits(['close'])
 
 const dialog = ref(props.show)
 watch(() => props.show, v => dialog.value = v)
-watch(dialog, v => { if (!v) emit('close') })
+// Simplified close logic
+watch(dialog, v => { 
+  if (!v) emit('close') 
+})
 
 const archivedTasks = ref([])
 const allUsers = ref([])
@@ -92,7 +112,7 @@ const unarchivingId = ref(null)
 const statusMessage = ref({
   show: false,
   text: '',
-  type: 'success' // 'success', 'error', 'warning', 'info'
+  type: 'success'
 })
 
 // Helper function to show status messages
@@ -102,25 +122,28 @@ const showStatus = (message, type = 'success') => {
     text: message,
     type: type
   }
-  
-  // Auto-hide after 5 seconds
   setTimeout(() => {
     statusMessage.value.show = false
   }, 5000)
 }
 
-// Load users for email to name conversion
-onMounted(async () => {
+// 🟢 FIX 3: Fetch users via secured backend API instead of client-side Firestore
+const fetchAllUsers = async () => {
   try {
-    const usersSnapshot = await getDocs(collection(db, 'Users'))
-    allUsers.value = usersSnapshot.docs.map(doc => ({
-      email: doc.id,
-      name: doc.data().name || doc.id
+    // Rely on the backend's /auth/users/all secured endpoint
+    const response = await axiosClient.get('/auth/users/all'); 
+    allUsers.value = response.data.map(user => ({
+      email: user.email,
+      name: user.name || user.email
     }))
   } catch (e) {
-    allUsers.value = []
+    console.error('Failed to load users for display names:', e);
+    allUsers.value = [];
   }
-})
+}
+
+onMounted(fetchAllUsers)
+
 
 // Helper to convert assignedTo to display name
 const getDisplayName = (assignedValue) => {
@@ -135,63 +158,39 @@ const getDisplayName = (assignedValue) => {
   
   if (!lookupValue) return ''
   
-  // If it's already a name, return it
   if (!lookupValue.includes('@')) {
     return lookupValue
   }
   
-  // If it's an email, look up the name
+  // If it's an email, look up the name in the securely loaded list
   const user = allUsers.value.find(u => u.email === lookupValue)
   return user && user.name ? user.name : lookupValue
 }
 
 const fetchArchivedTasks = async () => {
   try {
-    console.log('🔍 Making request to: http://localhost:3000/tasks/archived');
-
-    // ✅ Remove token requirement for testing
-    const res = await axios.get('http://localhost:3000/tasks/archived')
-    
-    console.log('✅ Response received:', res.status);
-    console.log('✅ Response data type:', typeof res.data);
-    console.log('✅ Response is array:', Array.isArray(res.data));
-    console.log('✅ Response data length:', res.data?.length);
-    console.log('🗂️ RAW RESPONSE DATA:', res.data);
-    
-    // ✅ Log each individual archived task
-    if (Array.isArray(res.data)) {
-      res.data.forEach((task, index) => {
-        console.log(`📋 Archived Task ${index + 1}:`, {
-          id: task.id,
-          title: task.title,
-          archived: task.archived,
-          status: task.status,
-          description: task.description,
-          dueDate: task.dueDate,
-          createdAt: task.createdAt
-        });
-      });
-    }
+    // 🟢 FIX 1: Use the secured axiosClient instance and the correct endpoint
+    const res = await axiosClient.get('/tasks/archived');
     
     archivedTasks.value = res.data;
-    console.log(`✅ Set ${archivedTasks.value.length} archived tasks to reactive variable`);
     
-    if (archivedTasks.value.length === 0) {
-      showStatus('No archived tasks found.', 'info')
-    } else {
+    if (archivedTasks.value.length > 0) {
       console.log(`📋 Successfully loaded ${archivedTasks.value.length} archived tasks`);
     }
     
   } catch (error) {
-    console.error('❌ Full error object:', error);
-    showStatus('Failed to fetch archived tasks: ' + (error.response?.data?.error || error.message), 'error')
+    console.error('❌ Failed to fetch archived tasks:', error);
+    let errorMessage = error.response?.data?.message || error.message || 'Failed to fetch archived tasks';
+    if (error.response?.status === 403) {
+        errorMessage = 'Access denied. You do not have permission to view archived tasks.';
+    }
+    showStatus(`Error: ${errorMessage}`, 'error')
   }
 }
 
 watch(dialog, (val) => {
   if (val) {
     fetchArchivedTasks()
-    // Reset status message when dialog opens
     statusMessage.value.show = false
   }
 })
@@ -199,14 +198,9 @@ watch(dialog, (val) => {
 const unarchive = async (id) => {
   try {
     unarchivingId.value = id
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-  
-    const response = await axios.put(`http://localhost:3000/tasks/${id}/unarchive`, {}, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    
+    // 🟢 FIX 2: Use the secured axiosClient instance and the relative PUT URL
+    const response = await axiosClient.put(`/tasks/${id}/unarchive`, {}) 
     
     if (response.status === 200) {
       showStatus('Task unarchived successfully!', 'success')
@@ -223,6 +217,7 @@ const unarchive = async (id) => {
 
 const formatDate = (date) => {
   if (!date) return ''
+  // Handle Firestore Timestamp objects if they exist, or ISO strings
   const d = typeof date === 'string' ? new Date(date) : date.toDate ? date.toDate() : date
   return d.toLocaleDateString()
 }
