@@ -209,7 +209,7 @@ exports.checkLockout = async (req, res) => {
       });
     }
     
-    return res.json({
+    res.json({
       success: true,
       isLocked: false
     });
@@ -615,12 +615,8 @@ exports.registerUser = async (req, res) => {
     });
 
     // --- Create User Profile in Firestore (AC1) ---
-<<<<<<< Updated upstream
     // Using 'users' (lowercase) collection name
-=======
-    // Using 'Users' (uppercase) as we fixed before
->>>>>>> Stashed changes
-    const userDocRef = db.collection('users').doc(email); 
+    const userDocRef = db.collection('users').doc(email);
     
     await userDocRef.set({
       uid: userRecord.uid,
