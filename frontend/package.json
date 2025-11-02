@@ -11,8 +11,7 @@
     "test:notifications": "vitest src/tests/notification*.test.js",
     "test:comprehensive": "vitest src/tests/notificationComprehensive.test.js",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage",
-    "test:e2e": "npx playwright test"
+  "test:coverage": "vitest --coverage"
   },
   "playwright": {
     "version": "1.36.0"
