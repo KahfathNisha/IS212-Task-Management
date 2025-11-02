@@ -493,6 +493,7 @@
         @add-task="showCreateDialog = true"
         @bulk-update-status="canCreateEdit ? handleBulkUpdateStatus : handleReadonlyAction"
         @bulk-delete="canCreateEdit ? handleBulkDelete : handleReadonlyAction"
+        @archive-task="archiveFromList"
       />
           
     </div>
@@ -1328,6 +1329,25 @@ const archiveTask = async (taskId) => {
   } catch (error) {
     console.error('Archive error:', error);
     showMessage(error.response?.data?.message || 'Failed to archive task', 'error');
+  }
+}
+
+const archiveFromList = async (taskId) => {
+  try {
+    console.log(`🗂️ Archiving task from ListView: ${taskId}`)
+    
+    // Call your existing archiveTask function
+    await archiveTask(taskId)
+    
+    // Refresh the task list to remove the archived task
+    await fetchTasks()
+    
+    console.log(`✅ Task ${taskId} archived successfully`)
+    
+  } catch (error) {
+    console.error('❌ Failed to archive task:', error)
+    // Show error message to user
+    showErrorMessage('Failed to archive task. Please try again.')
   }
 }
 

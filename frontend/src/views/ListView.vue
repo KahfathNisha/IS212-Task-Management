@@ -55,7 +55,8 @@ const emit = defineEmits([
   'add-task',
   'bulk-update-status',
   'bulk-delete',
-  'change-view'
+  'change-view',
+  'archive-task' 
 ])
 
 // ===========================
@@ -673,6 +674,25 @@ const getTaskCardClasses = (task) => {
   return baseClasses;
 };
 
+
+const showArchiveConfirm = ref(false)
+
+// Archive task
+const handleArchiveTask = () => {
+  if (selectedTask.value) {
+    showArchiveConfirm.value = true
+  }
+}
+
+const confirmArchive = () => {
+  showArchiveConfirm.value = false
+  if (selectedTask.value && selectedTask.value.id) {
+    emit('archive-task', selectedTask.value.id)
+    // Clear selection after archiving
+    selectedTask.value = null
+  }
+}
+
 // ===========================
 // Expose Methods (Optional)
 // ===========================
@@ -965,14 +985,41 @@ defineExpose({
                 </div>
               </div>
 
-              <v-btn
-                color="primary"
-                @click="$emit('edit-task', selectedTask)"
-                prepend-icon="mdi-pencil"
-                rounded="lg"
-              >
-                Edit
-              </v-btn>
+              <div class="detail-actions-buttons">
+                <v-btn
+                  color="primary"
+                  @click="$emit('edit-task', selectedTask)"
+                  prepend-icon="mdi-pencil"
+                  rounded="lg"
+                  variant="elevated"
+                >
+                  Edit
+                </v-btn>
+                
+                <v-btn
+                  color="warning"
+                  @click="handleArchiveTask"
+                  prepend-icon="mdi-archive"
+                  rounded="lg"
+                  variant="tonal"
+                >
+                  Archive
+                </v-btn>
+
+                <v-dialog v-model="showArchiveConfirm" max-width="400">
+                  <v-card class="archive-confirm-card">
+                    <v-card-title>Archive Task?</v-card-title>
+                    <v-card-text>
+                      Are you sure you want to archive this task? You can unarchive it later from the archived tasks list.
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-spacer />
+                      <v-btn color="grey" variant="text" @click="showArchiveConfirm = false">Cancel</v-btn>
+                      <v-btn color="error" variant="text" @click="confirmArchive">Archive</v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </v-dialog>
+              </div>
             </div>
 
             <v-divider class="my-4"></v-divider>
@@ -1697,6 +1744,12 @@ defineExpose({
   margin-bottom: 20px;
 }
 
+.detail-actions-buttons {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .detail-title-section {
   flex: 1;
 }
@@ -2259,6 +2312,21 @@ defineExpose({
 .task-list-card {
   animation: slideIn 0.35s ease;
 }
+
+/* Archive confirmation dialog styles */
+.archive-confirm-card {
+  background: #fff !important;
+}
+
+.v-overlay__scrim {
+  background: rgba(30, 30, 30, 0.7) !important;
+}
+
+[data-theme="dark"] .archive-confirm-card {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
 
 @keyframes slideIn {
   from {
