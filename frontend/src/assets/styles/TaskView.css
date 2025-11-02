@@ -144,22 +144,15 @@
   display: flex;
   flex-direction: column;
   overflow: hidden; 
-  
-  /* 🌟 CRITICAL FIX: Ensure main view content does not obscure the fixed dropdown */
-  /* This is often needed to establish a lower stacking context for the main content */
-  /* if the dropdown is positioned relative to the body/viewport. */
   position: relative; 
-  z-index: 1; /* Keep the main content *below* the dropdown (z-index: 1000) */
+  z-index: 1;
 }
 
 .view-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  
-  /* FIX: Minimal horizontal padding */
   padding: 16px 8px 12px 8px; 
-  
   background: transparent;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
@@ -170,14 +163,11 @@
 
 /* Archive Button Styling */
 .archive-btn {
-  /* FIX: Set size explicitly and remove any margins/padding */
   min-width: 36px !important; 
   width: 36px !important;
   height: 36px !important;
   margin: 0 !important;
   padding: 0 !important; 
-  
-  /* Styling from screenshot */
   background: rgba(107, 155, 107, 0.5) !important;
   color: #6b9b6b !important;
   box-shadow: none !important;
@@ -227,16 +217,11 @@
 }
 
 .header-right {
-  /* FIX: Ensure flex properties are active for alignment */
   display: flex;
   align-items: center;
-  gap: 8px; /* Space between the two buttons */
-  
+  gap: 8px;
   flex-shrink: 0;
   min-width: 0;
-  
-  /* FIX: Removed conflicting padding-right: 10px; */
-  /* padding-right: 10px; */ 
 }
 
 /* ===========================
@@ -295,32 +280,27 @@
 /* 🟢 START OF OVERDUE FIXES FOR CALENDAR VIEW (REVISED) */
 .task-item.task-overdue,
 .week-task-item.task-overdue {
-  /* Use a slightly darker, more professional red for the border */
-  border: 1px solid #e57373 !important; /* Lighter red for the dashed border */
-  /* Force override background color with a softer, pastel red */
-  background-color: #ffebee !important; /* Very light red, almost pink */
-  box-shadow: 0 0 5px rgba(239, 83, 80, 0.2); /* Soft red shadow */
-  
-  /* Ensure the left border is always a prominent, standard red */
-  border-left: 4px solid #ef5350 !important; /* Standard material red */
+  border: 1px solid #e57373 !important;
+  background-color: #ffebee !important;
+  box-shadow: 0 0 5px rgba(239, 83, 80, 0.2);
+  border-left: 4px solid #ef5350 !important;
   opacity: 1 !important; 
 }
 
 [data-theme="dark"] .task-item.task-overdue,
 [data-theme="dark"] .week-task-item.task-overdue {
-  background-color: rgba(239, 83, 80, 0.15) !important; /* Darker red tint */
-  border: 1px solid #e57373 !important; /* Lighter red for dashed border in dark mode */
-  border-left: 4px solid #ef5350 !important; /* Standard material red */
+  background-color: rgba(239, 83, 80, 0.15) !important;
+  border: 1px solid #e57373 !important;
+  border-left: 4px solid #ef5350 !important;
 }
 
-/* Text and Chip Styling inside overdue task to make it legible and prominent */
 .task-overdue .task-title, 
 .task-overdue .week-task-title {
-  color: #c62828 !important; /* Darker red for text */
+  color: #c62828 !important;
 }
 
 .task-overdue .v-chip {
-  background-color: #ef5350 !important; /* Standard red for chips */
+  background-color: #ef5350 !important;
   color: white !important;
   font-weight: bold;
 }
@@ -334,13 +314,11 @@
 
 /* Add Task button - force green in light mode, blue in dark mode */
 :deep(.v-btn[prepend-icon="mdi-plus"]) {
-  /* FIX: Ensure the button is compact and has no margins */
   height: 36px !important;
   padding: 0 12px !important;
   font-size: 13px !important;
   margin: 0 !important; 
   white-space: nowrap;
-  
   background: #6b9b6b !important;
   color: white !important;
   border: none !important;
@@ -1323,4 +1301,257 @@
 
 .header-right {
   flex: 0 0 auto !important; /* This prevents the right side from shrinking */
+}
+
+/* ================================================================= */
+/* 🌟 RESPONSIVE OVERRIDES (TABLET/MOBILE - Max-width 1024px) */
+/* ================================================================= */
+
+@media (max-width: 1024px) {
+    /* 1. Main Layout: Switch from row to column */
+    .content-layout {
+        flex-direction: column;
+        /* Revert flex: 1; on column layout */
+        overflow: visible; 
+        height: auto; 
+    }
+    
+    .main-view-area {
+        /* Ensure main view takes up all available width when stacked */
+        width: 100%;
+        min-width: 100%;
+    }
+
+    /* 2. Sidebar: Force full width and order above main content */
+    .upcoming-sidebar {
+        width: 100% !important;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        flex-shrink: 0;
+    }
+    
+    [data-theme="dark"] .upcoming-sidebar {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .sidebar-collapsed {
+        /* If collapsed, give it minimal, fixed height and full width */
+        height: 60px;
+        width: 100% !important;
+    }
+
+    /* Adjust padding for a tighter mobile fit */
+    .view-header,
+    .view-controls,
+    .calendar-nav {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    /* 3. Header Buttons: Stack and stretch */
+    .view-header {
+        /* Allow header elements to stack if necessary */
+        flex-wrap: wrap !important;
+        align-items: flex-start !important;
+        gap: 8px !important; /* Reduce gap */
+    }
+
+    .header-left {
+        /* Left content takes full width on its row */
+        flex-basis: 100% !important;
+        order: 1;
+        margin-bottom: 8px;
+    }
+    
+    .header-right {
+        /* Buttons container takes full width on its row, aligns to end */
+        flex-basis: 100% !important;
+        order: 2;
+        justify-content: flex-end !important;
+        gap: 8px !important;
+    }
+    
+    .recurring-btn,
+    .archive-btn {
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+    }
+    
+    .add-task-btn {
+        height: 32px !important;
+        min-width: auto !important; /* Allow shrinking */
+        padding: 0 10px !important;
+        font-size: 13px !important;
+    }
+    
+    /* 4. Controls/Filters: Stack tabs and filters vertically */
+    .controls-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .view-toggle-left {
+        /* Ensure view tabs use full width but center if possible */
+        width: 100%;
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .view-tabs {
+        justify-content: space-around; /* Spread tabs out */
+        gap: 8px; /* Reduce gap between tabs */
+    }
+
+    .filters-right {
+        width: 100%;
+        flex-wrap: wrap; /* Allow filter buttons to wrap */
+        justify-content: flex-start;
+    }
+
+    .filter-label {
+        display: none; /* Hide label to save space */
+    }
+    
+    /* Make filter buttons smaller and more compact */
+    .filter-btn {
+        font-size: 12px;
+        height: 32px !important;
+        min-width: auto;
+        padding: 0 12px !important;
+    }
+    
+    .reset-btn {
+        flex-grow: 1; /* Allow reset button to fill remaining space */
+    }
+
+    /* 5. Calendar View Adjustments (for Month view) */
+    .calendar-body {
+        grid-auto-rows: minmax(70px, auto); /* Reduced min height */
+        max-height: calc(100vh - 180px); /* Adjust max height for mobile view */
+    }
+    
+    .calendar-day {
+        min-height: 70px;
+        max-height: 100px; /* Max height adjustment */
+        padding: 4px;
+        font-size: 10px;
+    }
+
+    .day-number {
+        font-size: 12px;
+    }
+    
+    /* Hide non-essential info in calendar cells to save space */
+    .task-item {
+        padding: 3px 4px;
+        font-size: 9px;
+        min-height: 18px;
+    }
+    .task-status {
+        display: none !important;
+    }
+
+    /* 6. Calendar Navigation */
+    .nav-center {
+        /* Allow title and toggle to stack if screen is very narrow */
+        flex-direction: column;
+        gap: 4px;
+        position: static; /* Remove absolute positioning */
+        transform: none; 
+    }
+    
+    .period-title {
+        font-size: 16px;
+    }
+
+    .view-toggle {
+        display: flex !important;
+        flex-wrap: wrap;
+    }
+
+    .week-container {
+        gap: 6px;
+    }
+}
+
+/* ================================================================= */
+/* 🌟 AGGRESSIVE PHONE OPTIMIZATION (Max-width 480px) */
+/* ================================================================= */
+
+@media (max-width: 480px) {
+
+    /* 1. Header Simplification */
+    .view-header .header-right {
+        /* Align all buttons to the right and save space */
+        justify-content: flex-end !important;
+        gap: 4px !important;
+    }
+
+    /* Hide less-critical action buttons entirely on small phones */
+    .recurring-btn,
+    .archive-btn {
+        display: none !important;
+    }
+    
+    .add-task-btn {
+        /* Ensure the Add Task button remains highly visible */
+        height: 32px !important;
+        padding: 0 10px !important;
+        font-size: 13px !important;
+    }
+
+    /* 2. Calendar Density */
+    .calendar-body {
+        /* Set an even smaller minimum height for cell rows */
+        grid-auto-rows: minmax(50px, auto); 
+    }
+    
+    .calendar-day {
+        min-height: 50px;
+        max-height: 80px;
+        padding: 2px;
+    }
+
+    /* Reduce font size for date numbers */
+    .day-number {
+        font-size: 10px;
+    }
+
+    /* Make task items extremely compact */
+    .task-item {
+        padding: 1px 3px;
+        font-size: 8px;
+        min-height: 14px;
+        border-left-width: 2px; /* Thinner border to save width */
+    }
+    
+    /* 3. Filter Simplification (Buttons to Icons) */
+    .filters-right {
+        justify-content: space-between;
+    }
+    
+    /* Target the filter buttons and hide the text label */
+    .filter-btn {
+        min-width: 38px !important; /* Fixed width for icon */
+        max-width: 38px !important;
+        padding: 0 !important;
+    }
+    
+    .filter-btn .v-btn__content span {
+        /* Hide the text content (Department, Priority, Assignee) */
+        display: none !important;
+    }
+    
+    .filter-btn .v-icon {
+        /* Ensure the icon is centered and visible */
+        margin: 0 !important;
+    }
+    
+    .reset-btn {
+        flex-grow: 1; 
+        font-size: 12px;
+    }
 }

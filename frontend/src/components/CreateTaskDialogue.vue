@@ -25,7 +25,7 @@
             class="mb-4"
           />
           
-          <div class="d-flex ga-4 mb-4">
+          <div class="d-flex ga-4 mb-4 mobile-stack">
             <v-select
               v-model="localTask.status"
               label="Status"
@@ -46,7 +46,7 @@
             />
           </div>
 
-          <div class="d-flex ga-4 mb-4">
+          <div class="d-flex ga-4 mb-4 mobile-stack">
             <v-select
               v-model="localTask.priority"
               label="Priority *"
@@ -105,7 +105,7 @@
             </v-alert>
           </div>
           
-          <div class="d-flex ga-4 mb-4">
+          <div class="d-flex ga-4 mb-4 mobile-stack">
             <v-autocomplete
               v-model="localTask.assignedTo"
               label="Assignee"
@@ -206,7 +206,7 @@
               class="mb-3"
             />
 
-            <div class="d-flex ga-4 mb-3">
+            <div class="d-flex ga-4 mb-3 mobile-stack">
               <v-select
                 v-model="subtask.status"
                 label="Status"
@@ -239,7 +239,7 @@
             </div>
 
 
-            <div class="d-flex ga-4 mb-3">
+            <div class="d-flex ga-4 mb-3 mobile-stack">
               <v-autocomplete
                 v-model="subtask.assignedTo"
                 label="Assignee"
@@ -370,7 +370,7 @@ const props = defineProps({
   currentUser: { type: Object, default: () => null }
 })
 
-const emit = defineEmits(['update:show', 'save', 'cancel'])
+const emit = defineEmits(['update:show', 'save', 'cancel', 'message'])
 
 const showMessage = (message, color = 'success') => {
   emit('message', { message, color })
@@ -866,7 +866,30 @@ const onProjectChange = async (projectId) => {
 
 /* Small responsive tweak */
 @media (max-width: 600px) {
-  .ga-4 { gap: 8px !important; flex-direction: column; }
-  .d-flex.ga-4 { flex-direction: column; }
+  /* 1. Stack all multi-column fields */
+  .mobile-stack { flex-direction: column !important; }
+  
+  /* 2. Overwrite the default d-flex stacking for single fields */
+  .ga-4 { gap: 8px !important; }
+  .d-flex.ga-4 { flex-direction: column !important; }
+
+  /* 3. Ensure the collaborators permission row stacks */
+  .permission-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Allow the collaborator name to take full width */
+  .permission-row .flex-1 {
+    flex: 0 0 100% !important;
+    font-size: 14px;
+  }
+  
+  /* Ensure the toggle itself doesn't wrap unnecessarily */
+  .custom-permission-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style>

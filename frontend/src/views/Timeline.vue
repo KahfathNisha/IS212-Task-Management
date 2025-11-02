@@ -49,7 +49,7 @@
 import { ref, computed, watch, onMounted, defineProps, defineEmits, nextTick } from 'vue';
 import Gantt from 'frappe-gantt';
 
-// 🚨 CSS IMPORT: Using the deep relative path you determined.
+// 🚨 CSS IMPORT: Ensure this path is correct for your project structure
 import '/node_modules/frappe-gantt/dist/frappe-gantt.css'; 
 
 // Define Props and Emits
@@ -97,6 +97,7 @@ const parseGanttDate = (dateString) => {
       .replace(' at ', ' ')
       .replace(' UTC+8', '');
       
+    // Attempt to fix common format issues before parsing
     cleanedString = cleanedString.replace(/(\d{1,2}\s+[A-Za-z]+\s+)(\d{4})/, '$1$2,');
 
     const date = new Date(cleanedString);
@@ -151,7 +152,6 @@ const getGanttTaskClass = (task) => {
   const normalizedStatus = status ? status.trim().toLowerCase() : '';
 
   if (isTaskOverdue(dueDate, status)) {
-    // 👈 Applied a distinct class name for better CSS targeting
     return 'bar-deadline-passed'; 
   }
 
@@ -186,11 +186,12 @@ const tasksForGantt = computed(() => {
       const end = new Date(endDateString);
       
       if (start > end) {
+        // If start date is after end date, use end date for both to render a single day point
         startDateString = endDateString; 
       }
       
       const progressToFillBar = 100;
-      const customClass = getGanttTaskClass(task); // Pass the whole task object now
+      const customClass = getGanttTaskClass(task); 
 
       const ganttTask = {
         id: task.id,
@@ -211,8 +212,6 @@ const tasksForGantt = computed(() => {
     .filter(task => task !== null); 
 });
 
-// Since the JS attempt failed, we rely purely on the Unscoped CSS now.
-const removeTooltip = () => { /* No action needed here, relies on CSS */ }
 
 // === Methods ===
 
@@ -249,8 +248,6 @@ const initializeGantt = () => {
     on_date_change: (task, start, end) => {
       console.log(`Task ${task.name} moved to Start: ${start}, End: ${end}`);
     },
-    
-    // custom_popup_html option is removed
   });
 
   ganttInstance.value.change_view_mode(ganttViewMode.value);
@@ -293,7 +290,6 @@ watch(ganttViewMode, (newMode) => {
 .view-header {
   padding: 16px 24px 12px 24px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -380,10 +376,8 @@ watch(ganttViewMode, (newMode) => {
 /* 🟢 NEW: Deadline Passed Task Bar Styling for Frappe Gantt */
 :deep(.bar-deadline-passed rect), 
 :deep(.bar-deadline-passed .bar-progress) {
-  /* Using a bolder red for maximum visibility of passed deadlines */
   fill: #f44336 !important; /* Bright Red */
   stroke: #c62828 !important; /* Darker red border */
-  /* Add an aggressive shadow/glow to make it pop */
   filter: drop-shadow(0 0 4px rgba(244, 67, 54, 0.5));
 }
 
@@ -479,6 +473,73 @@ watch(ganttViewMode, (newMode) => {
 /* View Tabs (reusing existing styles) */
 .view-tab {
   padding: 0 0 4px 0 !important; 
+}
+
+
+/* ================================================================= */
+/* 🟢 MOBILE RESPONSIVENESS (Max-width 768px) */
+/* ================================================================= */
+
+@media (max-width: 768px) {
+    
+    /* Reduce padding on the main view area */
+    .view-header,
+    .view-controls {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+    
+    .gantt-chart-container {
+        padding: 12px !important;
+        min-height: 300px;
+    }
+    
+    /* 1. Condense Color Key */
+    .color-key-container {
+        gap: 8px 12px !important;
+        padding-top: 8px !important;
+    }
+
+    .color-key-item {
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    
+    .color-swatch {
+        width: 12px;
+        height: 12px;
+        margin-right: 6px;
+    }
+
+    /* 2. Condense View Mode Buttons */
+    .gantt-toggle-buttons {
+        gap: 12px !important;
+    }
+
+    .view-tab {
+        font-size: 13px !important;
+        padding: 0 0 3px 0 !important;
+    }
+    
+    /* 3. Reduce Gantt Row Height (Aggressive adjustment to save vertical space) */
+    :deep(.gantt .grid-row) {
+        height: 30px !important; 
+    }
+    
+    :deep(.gantt .bar-wrapper) {
+        height: 30px !important; 
+    }
+
+    :deep(.gantt .bar) {
+        height: 20px !important; 
+        transform: translate(0, 5px); 
+    }
+
+    /* 4. Make Side Labels Tighter */
+    :deep(.name) {
+        transform: translateX(80px) !important;
+        font-size: 13px;
+    }
 }
 </style>
 
