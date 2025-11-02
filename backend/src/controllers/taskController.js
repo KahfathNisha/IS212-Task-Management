@@ -130,7 +130,7 @@ exports.createTask = async (req, res) => {
             const recurrence = task.recurrence;
             const recurringTaskRef = await db.collection('recurringTasks').add({
                 taskOwner: task.taskOwner,
-                taskOwnerDepartment: taskOwnerDepartment, // ADDED
+                taskOwnerDepartment: taskOwnerDepartment, 
                 recurrence: recurrence,
                 title: task.title,
                 description: task.description,
@@ -934,59 +934,228 @@ exports.getAllRecurringTasks = async (req, res) => {
 exports.updateRecurringTask = async (req, res) => {
     try {
         const recurringTaskId = req.params.id;
+        const { recurrence, taskOwner, taskOwnerDepartment } = req.body;
+
+        // Get original recurring task and validate ownership
+        const originalDoc = await db.collection('recurringTasks').doc(recurringTaskId).get();
+        if (!originalDoc.exists) {
+            return res.status(404).json({ error: 'Recurring task not found' });
+        }
         
-        const {recurrence, taskOwner, taskOwnerDepartment } = req.body;
-
-        const recurringUpdateData = {
-            recurrence,
-            updatedAt: admin.firestore.Timestamp.now()
-        };
-        if (taskOwner) recurringUpdateData.taskOwner = taskOwner;
+        const originalData = originalDoc.data();
+        const loggedInUser = req.user;
+        const isOwner = originalData.taskOwner === loggedInUser.email || 
+                       originalData.taskOwner === loggedInUser.name;
         
-        if (taskOwnerDepartment) recurringUpdateData.taskOwnerDepartment = taskOwnerDepartment; 
-
-        await db.collection('recurringTasks').doc(recurringTaskId).update(recurringUpdateData);
-
-        const now = new Date();
-        const tasksSnapshot = await db.collection('tasks').where('recurringTaskId', '==', recurringTaskId).get();
-        
-        const futureInstanceUpdate = {
-            recurrence,
-            updatedAt: admin.firestore.Timestamp.now()
-        };
-        if (taskOwner) futureInstanceUpdate.taskOwner = taskOwner;
-        // ADDED: Update taskOwnerDepartment in future instances
-        if (taskOwnerDepartment) futureInstanceUpdate.taskOwnerDepartment = taskOwnerDepartment; 
-
-        const batch = db.batch();
-        tasksSnapshot.forEach(doc => {
-            const data = doc.data();
-            const dueDate = data.dueDate?.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
-            if (data.status !== 'Completed' && dueDate >= now) {
-                batch.update(doc.ref, futureInstanceUpdate);
-            }
-        });
-        await batch.commit();
-
-        if (!recurrence.enabled) {
-            await db.collection('recurringTasks').doc(recurringTaskId).update({ active: false });
-            
-            const batch2 = db.batch();
-            tasksSnapshot.forEach(doc => {
-                const data = doc.data();
-                const dueDate = data.dueDate?.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
-                if (data.status !== 'Completed' && dueDate >= now) {
-                    batch2.update(doc.ref, {
-                        recurringTaskId: admin.firestore.FieldValue.delete(),
-                        updatedAt: admin.firestore.Timestamp.now()
-                    });
-                }
+        if (!isOwner) {
+            return res.status(403).json({ 
+                message: "Only the task owner can modify recurrence settings." 
             });
-            await batch2.commit();
         }
 
-        res.status(200).json({ message: 'Recurrence updated successfully' });
+        // Check if schedule changed (requires task recreation)
+        const scheduleChanged = (
+            originalData.recurrence.type !== recurrence.type || 
+            originalData.recurrence.interval !== recurrence.interval ||
+            originalData.recurrence.startDate !== recurrence.startDate ||
+            originalData.recurrence.endDate !== recurrence.endDate
+        );
+
+        // Update recurring task template
+        const updateData = {
+            recurrence,
+            updatedAt: admin.firestore.Timestamp.now()
+        };
+        if (taskOwner) updateData.taskOwner = taskOwner;
+        if (taskOwnerDepartment) updateData.taskOwnerDepartment = taskOwnerDepartment;
+
+        await db.collection('recurringTasks').doc(recurringTaskId).update(updateData);
+
+        // Get all related task instances
+        const tasksSnapshot = await db.collection('tasks')
+            .where('recurringTaskId', '==', recurringTaskId)
+            .get();
+        
+        const now = new Date();
+
+        if (!recurrence.enabled) {
+            // Handle recurrence removal: convert to single-instance tasks
+            await handleRecurrenceRemoval(recurringTaskId, tasksSnapshot, now);
+        } else if (scheduleChanged) {
+            // Handle schedule change: recreate future tasks
+            await handleScheduleChange(recurringTaskId, originalData, recurrence, 
+                                     tasksSnapshot, now, taskOwner, taskOwnerDepartment);
+        } else {
+            // Handle simple update: update future task instances only
+            await handleSimpleUpdate(tasksSnapshot, now, recurrence, taskOwner, taskOwnerDepartment);
+        }
+
+        const message = scheduleChanged && recurrence.enabled 
+            ? 'Recurrence updated successfully. Future tasks recreated with new schedule.'
+            : 'Recurrence updated successfully';
+            
+        res.status(200).json({ message });
     } catch (err) {
+        console.error('Error updating recurring task:', err);
         res.status(500).json({ error: err.message });
     }
 };
+
+// Helper: Remove recurrence and convert to single-instance tasks
+async function handleRecurrenceRemoval(recurringTaskId, tasksSnapshot, now) {
+    // Mark template as inactive
+    await db.collection('recurringTasks').doc(recurringTaskId).update({ active: false });
+    
+    // Convert future instances to single-instance tasks
+    const batch = db.batch();
+    tasksSnapshot.forEach(doc => {
+        const data = doc.data();
+        const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
+        
+        if (data.status !== 'Completed' && dueDate > now) {
+            // Clean title by removing emoji
+            let cleanTitle = data.title;
+            if (cleanTitle.startsWith('🔄 ')) cleanTitle = cleanTitle.substring(2);
+            if (cleanTitle.startsWith('🔄')) cleanTitle = cleanTitle.substring(1);
+            if (cleanTitle.endsWith(' 🔄')) cleanTitle = cleanTitle.slice(0, -2);
+            
+            batch.update(doc.ref, {
+                title: cleanTitle,
+                recurringTaskId: admin.firestore.FieldValue.delete(),
+                recurrence: admin.firestore.FieldValue.delete(),
+                updatedAt: admin.firestore.Timestamp.now()
+            });
+        }
+    });
+    await batch.commit();
+    
+    console.log(`✅ Recurrence disabled for ${recurringTaskId}. Future instances converted to single-instance tasks.`);
+}
+
+// Helper: Handle schedule changes by recreating tasks
+async function handleScheduleChange(recurringTaskId, originalData, newRecurrence, 
+                                  tasksSnapshot, now, taskOwner, taskOwnerDepartment) {
+    console.log(`🔄 Schedule changed for ${recurringTaskId}. Recreating future tasks...`);
+    
+    // Delete future task instances
+    const deleteBatch = db.batch();
+    tasksSnapshot.forEach(doc => {
+        const data = doc.data();
+        const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
+        
+        if (data.status !== 'Completed' && dueDate > now) {
+            deleteBatch.delete(doc.ref);
+        }
+    });
+    await deleteBatch.commit();
+    
+    // Create new task instances with updated schedule
+    await createRecurringTaskInstances(recurringTaskId, originalData, newRecurrence, 
+                                     now, taskOwner, taskOwnerDepartment);
+    
+    console.log(`✅ Recreated future tasks for ${recurringTaskId}`);
+}
+
+// Helper: Update future task instances with new recurrence data
+async function handleSimpleUpdate(tasksSnapshot, now, recurrence, taskOwner, taskOwnerDepartment) {
+    const batch = db.batch();
+    const updateData = {
+        recurrence,
+        updatedAt: admin.firestore.Timestamp.now()
+    };
+    if (taskOwner) updateData.taskOwner = taskOwner;
+    if (taskOwnerDepartment) updateData.taskOwnerDepartment = taskOwnerDepartment;
+
+    tasksSnapshot.forEach(doc => {
+        const data = doc.data();
+        const dueDate = data.dueDate?.toDate() || new Date(data.dueDate);
+        
+        if (data.status !== 'Completed' && dueDate > now) {
+            // Add emoji to title if recurrence is enabled and title doesn't already have it
+            if (recurrence.enabled && !data.title.startsWith('🔄 ')) {
+                updateData.title = `🔄 ${data.title}`;
+            }
+            
+            batch.update(doc.ref, updateData);
+        }
+    });
+    await batch.commit();
+    
+    console.log(`✅ Updated future task instances`);
+}
+
+// Helper: Create new recurring task instances
+async function createRecurringTaskInstances(recurringTaskId, templateData, recurrence, 
+                                          now, taskOwner, taskOwnerDepartment) {
+    let current = new Date(recurrence.startDate);
+    const end = new Date(recurrence.endDate);
+    const interval = recurrence.type === 'custom' ? recurrence.interval : 1;
+    
+    const addFn = getIntervalFunction(recurrence.type, interval);
+    if (!addFn) return;
+
+    // Skip to first future date
+    while (current <= now) {
+        addFn(current);
+    }
+    
+    let newTasksCreated = 0;
+    while (current <= end) {
+        const dueDateInstance = calculateDueDate(current, recurrence);
+        
+        const newTask = {
+            title: `🔄 ${templateData.title}`,
+            description: templateData.description,
+            taskOwner: taskOwner || templateData.taskOwner,
+            taskOwnerDepartment: taskOwnerDepartment || templateData.taskOwnerDepartment,
+            priority: templateData.priority || 'Medium',
+            status: 'Unassigned',
+            dueDate: admin.firestore.Timestamp.fromDate(dueDateInstance),
+            createdAt: admin.firestore.Timestamp.now(),
+            updatedAt: admin.firestore.Timestamp.now(),
+            recurringTaskId: recurringTaskId,
+            recurrence: recurrence,
+            archived: false,
+            statusHistory: [{
+                timestamp: admin.firestore.Timestamp.now(),
+                oldStatus: null,
+                newStatus: 'Unassigned'
+            }]
+        };
+        
+        await db.collection('tasks').add(newTask);
+        newTasksCreated++;
+        
+        const next = new Date(current);
+        addFn(next);
+        current = next;
+    }
+    
+    console.log(`✅ Created ${newTasksCreated} new task instances`);
+}
+
+// Helper: Get interval function based on recurrence type
+function getIntervalFunction(type, interval) {
+    switch (type) {
+        case 'daily': return date => date.setDate(date.getDate() + 1);
+        case 'weekly': return date => date.setDate(date.getDate() + 7);
+        case 'monthly': return date => date.setMonth(date.getMonth() + 1);
+        case 'custom': return date => date.setDate(date.getDate() + interval);
+        default: return null;
+    }
+}
+
+// Helper: Calculate due date with offset
+function calculateDueDate(baseDate, recurrence) {
+    const dueDate = new Date(baseDate);
+    const offset = recurrence.dueOffset || 0;
+    const unit = recurrence.dueOffsetUnit || 'days';
+    
+    if (unit === 'days') {
+        dueDate.setDate(dueDate.getDate() + offset);
+    } else if (unit === 'weeks') {
+        dueDate.setDate(dueDate.getDate() + offset * 7);
+    }
+    
+    return dueDate;
+}
