@@ -165,6 +165,7 @@ exports.createTask = async (req, res) => {
                     }
                     const recurringTaskInstance = {
                         ...task,
+                        title:  "🔄 " + task.title,
                         dueDate: admin.firestore.Timestamp.fromDate(dueDateInstance),
                         createdAt: admin.firestore.Timestamp.now(),
                         updatedAt: admin.firestore.Timestamp.now(),
