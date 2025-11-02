@@ -144,8 +144,16 @@ const fetchArchivedTasks = async () => {
   try {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     
-    console.log('🔍 Fetching archived tasks...');
     console.log('🔍 Token exists:', !!token);
+    console.log('🔍 Token value:', token ? token.substring(0, 20) + '...' : 'No token');
+    
+    if (!token) {
+      console.log('❌ No token found');
+      showStatus('Authentication required. Please log in again.', 'error')
+      return
+    }
+    
+    console.log('🔍 Making request to: http://localhost:3000/tasks?archived=true');
     
     const res = await axios.get('http://localhost:3000/tasks?archived=true', {
       headers: {
@@ -153,27 +161,23 @@ const fetchArchivedTasks = async () => {
       }
     })
     
-    console.log('🔍 API Response status:', res.status);
-    console.log('🔍 API Response data:', res.data);
-    console.log('🔍 Number of tasks returned:', res.data.length);
-    
-    // Log each task's archived status
-    res.data.forEach((task, index) => {
-      console.log(`🔍 Task ${index + 1}: "${task.title}" - archived: ${task.archived}`);
-    });
+    console.log('✅ Response received:', res.status);
+    console.log('✅ Response data:', res.data);
     
     archivedTasks.value = res.data;
+    console.log(`✅ Set ${archivedTasks.value.length} archived tasks`);
     
-    if (archivedTasks.value.length === 0) {
-      console.log('📭 No archived tasks found');
-      showStatus('No archived tasks found.', 'info')
-    } else {
-      console.log(`✅ Found ${archivedTasks.value.length} archived tasks`);
-    }
   } catch (error) {
-    console.error('❌ Fetch error:', error);
-    console.error('❌ Error response:', error.response?.data);
-    showStatus('Failed to fetch archived tasks', 'error')
+    console.error('❌ Full error object:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error response:', error.response);
+    
+    if (error.response) {
+      console.error('❌ Response status:', error.response.status);
+      console.error('❌ Response data:', error.response.data);
+    }
+    
+    showStatus('Failed to fetch archived tasks: ' + (error.response?.data?.error || error.message), 'error')
   }
 }
 
