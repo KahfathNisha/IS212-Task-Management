@@ -204,6 +204,7 @@ const getStatusIcon = (status) => {
 }
 
 const openTaskDialog = (task) => {
+  if (!task) return
   console.log('📋 Opening task dialog for:', task.title)
   selectedTask.value = task
   showTaskDialog.value = true
