@@ -15,7 +15,7 @@ class NotificationService {
                 type: notificationData.type || 'info' // 'info', 'warning', 'error', 'success'
             };
 
-            const docRef = await db.collection('Users').doc(userId).collection('notifications').add(notification);
+            const docRef = await db.collection('users').doc(userId).collection('notifications').add(notification);
             console.log(`📢 [NotificationService] Created notification for user ${userId}:`);
             console.log(`   Title: ${notification.title}`);
             console.log(`   Body: ${notification.body}`);
@@ -34,7 +34,7 @@ class NotificationService {
      */
     static async sendEmailNotification(userId, taskData, hoursLeft, minutesLeft, userTimezone) {
         try {
-            const userDoc = await db.collection('Users').doc(userId).get();
+            const userDoc = await db.collection('users').doc(userId).get();
             if (!userDoc.exists) {
                 console.log(`User ${userId} not found for email notification`);
                 return false;
@@ -95,7 +95,7 @@ class NotificationService {
      */
     static async markAsRead(userId, notificationId) {
         try {
-            await db.collection('Users').doc(userId).collection('notifications').doc(notificationId).update({
+            await db.collection('users').doc(userId).collection('notifications').doc(notificationId).update({
                 isRead: true,
                 readAt: admin.firestore.Timestamp.now()
             });
@@ -111,7 +111,7 @@ class NotificationService {
      */
     static async markAllAsRead(userId) {
         try {
-            const notificationsSnapshot = await db.collection('Users').doc(userId).collection('notifications')
+            const notificationsSnapshot = await db.collection('users').doc(userId).collection('notifications')
                 .where('isRead', '==', false)
                 .get();
 
@@ -136,7 +136,7 @@ class NotificationService {
      */
     static async getUserNotifications(userId, limit = 50, startAfter = null) {
         try {
-            let query = db.collection('Users').doc(userId).collection('notifications')
+            let query = db.collection('users').doc(userId).collection('notifications')
                 .orderBy('createdAt', 'desc')
                 .limit(limit);
 
@@ -166,7 +166,7 @@ class NotificationService {
             cutoffDate.setDate(cutoffDate.getDate() - daysOld);
             const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoffDate);
 
-            const oldNotificationsSnapshot = await db.collection('Users').doc(userId).collection('notifications')
+            const oldNotificationsSnapshot = await db.collection('users').doc(userId).collection('notifications')
                 .where('createdAt', '<', cutoffTimestamp)
                 .get();
 
@@ -190,11 +190,12 @@ class NotificationService {
     static async processDeadlineReminders(now) {
         try {
             // Get all users with email notifications enabled
-            const usersSnapshot = await db.collection("Users")
-                .where("notificationSettings.emailEnabled", "==", true)
-                .get();
+            // const usersSnapshot = await db.collection("Users")
+            //     .where("notificationSettings.emailEnabled", "==", true)
+            //     .get();
+            const usersSnapshot = { docs: [] }; //temporary
 
-            console.log(`📅 [DeadlineReminders] Processing reminders for ${usersSnapshot.size} users`);
+            // console.log(`📅 [DeadlineReminders] Processing reminders for ${usersSnapshot.size} users`);
 
             for (const userDoc of usersSnapshot.docs) {
                 const userData = userDoc.data();
@@ -243,7 +244,7 @@ class NotificationService {
                         today.setHours(0, 0, 0, 0);
                         const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
                         
-                        const existingReminders = await db.collection('Users').doc(userId)
+                        const existingReminders = await db.collection('users').doc(userId)
                             .collection('notifications')
                             .where('taskId', '==', taskDoc.id)
                             .where('createdAt', '>=', todayTimestamp)
