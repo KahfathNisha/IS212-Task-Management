@@ -1,5 +1,6 @@
 const { db } = require('../config/firebase');
 const NotificationService = require('../services/notificationService');
+const EmailService = require('../services/emailService');
 
 // Get user notifications
 exports.getNotifications = async (req, res) => {
@@ -191,9 +192,115 @@ exports.createTestNotification = async (req, res) => {
         });
     } catch (error) {
         console.error('Error creating test notification:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+// Send test email via SendGrid (for integration testing)
+exports.sendTestEmail = async (req, res) => {
+    try {
+        const { to, subject, text } = req.body;
+
+        if (!to || !subject || !text) {
+            return res.status(400).json({
+                success: false,
+                error: 'to, subject, and text are required'
+            });
+        }
+
+        // Whitelist check for test environment
+        const allowedDomains = ['example.com', 'test.com', 'gmail.com'];
+        const emailDomain = to.split('@')[1];
+
+        if (process.env.NODE_ENV === 'test' && !allowedDomains.includes(emailDomain)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Email domain not allowed in test environment'
+            });
+        }
+
+        const result = await EmailService.sendTestEmail(to, subject, text);
+
+        res.status(200).json({
+            success: true,
+            message: 'Test email sent successfully',
+            accepted: true,
+            statusCode: 202, // SendGrid typically returns 202 for accepted
+            requestId: result[0]?.headers?.['x-message-id'] || 'unknown'
+        });
+    } catch (error) {
+        console.error('Error sending test email:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+// Send test reassignment email via SendGrid (for integration testing)
+exports.sendTestReassignmentEmail = async (req, res) => {
+    console.log('sendTestReassignmentEmail called with body:', JSON.stringify(req.body, null, 2));
+    try {
+        const {
+            to,
+            taskData,
+            reassignmentType = 'assigned',
+            reassignedBy = 'Test Admin',
+            reassignmentTime,
+            userTimezone = 'UTC'
+        } = req.body;
+
+        if (!to || !taskData) {
+            return res.status(400).json({
+                success: false,
+                error: 'to and taskData are required'
+            });
+        }
+
+        // Whitelist check for test environment
+        const allowedDomains = ['example.com', 'test.com', 'gmail.com'];
+        const emailDomain = to.split('@')[1];
+
+        console.log('Email domain check:', emailDomain, 'NODE_ENV:', process.env.NODE_ENV, 'allowedDomains:', allowedDomains);
+        if (process.env.NODE_ENV === 'test' && !allowedDomains.includes(emailDomain)) {
+            console.log('Email domain not allowed, returning 403');
+            return res.status(403).json({
+                success: false,
+                error: 'Email domain not allowed in test environment'
+            });
+        }
+        console.log('Email domain check passed - proceeding to send email');
+
+        console.log('Validation passed, calling EmailService.sendReassignmentNotification');
+        const result = await EmailService.sendReassignmentNotification(
+            to,
+            taskData,
+            reassignmentType,
+            reassignedBy,
+            reassignmentTime ? new Date(reassignmentTime) : new Date(),
+            userTimezone
+        );
+
+        console.log('EmailService.sendReassignmentNotification result:', result);
+        console.log('Sending success response');
+
+        res.status(200).json({
+            success: true,
+            message: 'Test reassignment email sent successfully',
+            accepted: true,
+            statusCode: 202, // SendGrid typically returns 202 for accepted
+            requestId: 'reassignment-email-sent' // Since sendReassignmentNotification doesn't return headers like sendTestEmail
+        });
+    } catch (error) {
+        console.log('Error in sendTestReassignmentEmail:', error.message);
+        console.log('Error stack:', error.stack);
+        console.error('Error sending test reassignment email:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 };

@@ -16,7 +16,7 @@ test.describe('Auth E2E (Playwright)', () => {
     // Poll the Auth emulator REST API until the user appears to avoid a race
     // where the client tries to sign in before the emulator has fully recorded the user.
     const authEmulatorHost = process.env.PLAYWRIGHT_FIREBASE_AUTH_EMULATOR_HOST || 'http://127.0.0.1:9099';
-    const projectId = process.env.PLAYWRIGHT_FIREBASE_PROJECT_ID || 'all-in-one-smu';
+    const projectId = process.env.PLAYWRIGHT_FIREBASE_PROJECT_ID || 'g1-fariprice-tm';
     const accountsEndpoint = `${authEmulatorHost.replace(/\/$/, '')}/emulator/v1/projects/${projectId}/accounts`;
 
     const maxMs = 10000; // wait up to 10s

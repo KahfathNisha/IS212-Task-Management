@@ -30,54 +30,61 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Run emulators + tests (auth, firestore)
-        # Run everything under firebase emulators:exec so emulator env vars are injected.
-        # This script starts backend+frontend, waits for emulator + servers to be ready,
-        # runs Jest and Playwright, then shuts down background servers.
+      - name: Start backend
         run: |
-          firebase emulators:exec --only auth,firestore --project=all-in-one-smu -- bash -lc '
-            set -euo pipefail
-            echo "Installing backend deps..."
-            (cd backend && npm ci)
+          cd backend
+          npm run start &
+          sleep 10
 
-            echo "Installing frontend deps..."
-            (cd frontend && npm ci)
+      - name: Start Firebase Emulators
+        run: |
+          firebase emulators:start --only auth,firestore --project=all-in-one-smu &
+          sleep 10
 
-            echo "Starting backend in background (logging to backend/backend.log)..."
-            # Use node directly in CI to avoid nodemon/TTY issues
-            (cd backend && node src/server.js > backend.log 2>&1) &
-            BACKEND_PID=$!
-            echo "Backend PID: $BACKEND_PID"
+      - name: Health checks
+        run: |
+          echo "Performing health checks..."
+          for i in 1 2 3; do
+            echo "Attempt $i: Checking backend health..."
+            curl --fail http://127.0.0.1:3000/health || (echo "Backend health check failed on attempt $i" && exit 1)
+            echo "Attempt $i: Checking auth emulator..."
+            curl --fail http://127.0.0.1:9099/ || (echo "Auth emulator check failed on attempt $i" && exit 1)
+            echo "Attempt $i: Checking firestore emulator..."
+            curl --fail http://127.0.0.1:8080/ || (echo "Firestore emulator check failed on attempt $i" && exit 1)
+            sleep 2
+          done
+          echo "All health checks passed."
 
-            echo "Starting frontend in background (logging to frontend/frontend.log)..."
-            (cd frontend && npm run dev > frontend.log 2>&1) &
-            FRONTEND_PID=$!
-            echo "Frontend PID: $FRONTEND_PID"
+      - name: Run tests
+        # Run tests with emulators and servers already running.
+        # This script starts frontend, waits for it to be ready,
+        # runs Jest and Playwright, then shuts down frontend.
+        run: |
+          export FIRESTORE_EMULATOR_HOST=localhost:8080
+          export AUTH_EMULATOR_HOST=localhost:9099
+          echo "Starting frontend in background (logging to frontend/frontend.log)..."
+          (cd frontend && npm run dev > frontend.log 2>&1) &
+          FRONTEND_PID=$!
+          echo "Frontend PID: $FRONTEND_PID"
 
-            echo "Waiting for emulators and servers to be ready (may take up to 120s)..."
-            # wait for emulator ports and servers (prefer IPv4 addresses to avoid ::1 issues)
-            npx wait-on -t 120000 http://127.0.0.1:3000/health http://127.0.0.1:5173 http://127.0.0.1:5174 http://127.0.0.1:9099 http://127.0.0.1:8080 || true
+          echo "Waiting for frontend to be ready (may take up to 120s)..."
+          npx wait-on -t 120000 http://127.0.0.1:5173 http://127.0.0.1:5174 || (echo "Frontend wait-on failed" && exit 1)
 
-            echo "Checking backend and emulator endpoints..."
-            # Basic health checks with retries; check backend /health specifically
-            for i in 1 2 3; do
-              curl --fail http://127.0.0.1:3000/health || true
-              curl --fail http://127.0.0.1:9099/ || true
-              curl --fail http://127.0.0.1:8080/ || true
-              sleep 1
-            done
+          echo "Checking frontend availability..."
+          curl --fail http://127.0.0.1:5173/ || (echo "Frontend not responding" && exit 1)
 
-            echo "Running backend integration tests (Jest)"
-            (cd backend && npx jest --runInBand --ci)
+          echo "Running backend integration tests (Jest)"
+          (cd backend && npx jest --runInBand --ci)
 
-            echo "Run Playwright E2E (using existing servers)"
-            export PLAYWRIGHT_USE_EXISTING=1
-            (cd frontend && npx playwright install --with-deps && npx playwright test --reporter=list)
+          echo "Installing Playwright dependencies..."
+          (cd frontend && npx playwright install --with-deps)
 
-            echo "Shutting down background servers"
-            kill ${BACKEND_PID:-0} || true
-            kill ${FRONTEND_PID:-0} || true
-          '
+          echo "Run Playwright E2E (using existing servers)"
+          export PLAYWRIGHT_USE_EXISTING=1
+          (cd frontend && npx playwright test --reporter=list)
+
+          echo "Shutting down background servers"
+          kill ${FRONTEND_PID:-0} || true
 
       - name: Upload Playwright reports (if any)
         if: always()

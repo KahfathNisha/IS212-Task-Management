@@ -262,6 +262,39 @@ class EmailService {
             throw emailValidationError;
         }
     }
+
+    // Generic method to send test emails (for integration testing)
+    static async sendTestEmail(to, subject, text) {
+        // Validate inputs
+        const validatedEmail = this.validateEmail(to);
+        if (!validatedEmail) {
+            throw new Error('Invalid email address provided');
+        }
+
+        if (!subject || typeof subject !== 'string' || !subject.trim()) {
+            throw new Error('Subject is required and must be a non-empty string');
+        }
+
+        if (!text || typeof text !== 'string' || !text.trim()) {
+            throw new Error('Text is required and must be a non-empty string');
+        }
+
+        const msg = {
+            to: validatedEmail,
+            from: process.env.SENDGRID_FROM_EMAIL,
+            subject: subject.trim(),
+            text: text.trim()
+        };
+
+        try {
+            const result = await sgMail.send(msg);
+            console.log(`Test email sent to ${validatedEmail} with subject: ${subject}`);
+            return result;
+        } catch (error) {
+            console.error('Test email send error:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = EmailService;

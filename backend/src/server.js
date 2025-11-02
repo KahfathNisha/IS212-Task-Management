@@ -71,6 +71,12 @@ app.use('/api/auth', authRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/notifications', notificationRouter);
 
+// Test routes (only in non-production)
+if (process.env.NODE_ENV !== 'production') {
+  const testEmailRouter = require('../routes/test-email.js');
+  app.use('/api/notifications/test', testEmailRouter);
+}
+
 // Firebase test endpoint (optional)
 app.get('/firebase-test', async (req, res) => {
     try {
