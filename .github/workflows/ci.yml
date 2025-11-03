@@ -38,9 +38,10 @@ jobs:
       - name: Start Firebase Emulators
         run: |
           # Start emulators in background and redirect logs for upload on failure
+          # Ensure firebase-tools is available and start emulators with sufficient startup time
           cd backend
           firebase emulators:start --only auth,firestore --project=all-in-one-smu > ../emulator-logs.txt 2>&1 &
-          sleep 8
+          sleep 15  # Increased sleep time to ensure emulators are fully started
 
       - name: Start backend
         run: |
@@ -52,8 +53,8 @@ jobs:
       - name: Health checks
         run: |
           echo "Performing health checks..."
-          MAX_ATTEMPTS=10
-          SLEEP_SECS=3
+          MAX_ATTEMPTS=15  # Increased from 10 to 15 attempts
+          SLEEP_SECS=4     # Increased from 3 to 4 seconds between attempts
 
           check_url() {
             local url=$1
