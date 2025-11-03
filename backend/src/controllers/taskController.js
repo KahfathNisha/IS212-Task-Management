@@ -982,20 +982,45 @@ exports.unarchiveTask = async (req, res) => {
 };
 
 // Get All Recurring Tasks
+// In TaskController.js (Replacing the original exports.getAllRecurringTasks)
+
+// Get All Recurring Tasks
 exports.getAllRecurringTasks = async (req, res) => {
     try {
-        // Get userId from query parameters or request user
-        const userId = req.user.email;
+        const { email, role, department } = req.user;
         
-        if (!userId) {
-            return res.status(400).json({ error: 'User ID is required' });
+        if (!email || !role) {
+            return res.status(401).json({ message: 'User authentication data missing.' });
         }
 
-        // Query recurring tasks for the specific user
-        const snapshot = await db.collection('recurringTasks')
-            .where('taskOwner', '==', userId)
-            .get();
+        console.log(`📋 [getAllRecurringTasks] Fetching for user: ${email} (Role: ${role}, Dept: ${department})`);
+
+        let query = db.collection('recurringTasks').where('active', '==', true); // Only active recurring tasks
+
+        if (role === 'director' || role === 'hr') {
+            // Directors and HR see ALL recurring tasks (No additional 'where' clauses needed)
+            // Note: For large datasets, this unconstrained query can be costly. 
+            // Consider adding a 'limit' or time-based constraint if performance is an issue.
+            console.log('✅ [getAllRecurringTasks] Director/HR: Fetching all recurring tasks.');
+        
+        } else if (role === 'manager' && department) {
+            // Manager sees recurring tasks owned by anyone in their department
+            query = query.where('taskOwnerDepartment', '==', department);
+            console.log(`✅ [getAllRecurringTasks] Manager: Filtering by department: ${department}`);
             
+        } else if (role === 'staff' || !department) { 
+            // Staff, or a Manager without a department, only see tasks they own
+            query = query.where('taskOwner', '==', email);
+            console.log(`✅ [getAllRecurringTasks] Staff/No Dept: Filtering by task owner: ${email}`);
+            
+        } else {
+            // Default fallback: only see tasks they own
+            query = query.where('taskOwner', '==', email);
+            console.log(`⚠️ [getAllRecurringTasks] Unrecognized Role: Filtering by task owner: ${email}`);
+        }
+    
+        const snapshot = await query.get();
+        
         const recurringTasks = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
@@ -1003,10 +1028,11 @@ exports.getAllRecurringTasks = async (req, res) => {
             updatedAt: formatTimestampToISO(doc.data().updatedAt),
         }));
         
-        // console.log(`Found ${recurringTasks.length} recurring tasks for user: ${userId}`);
+        console.log(`✅ [getAllRecurringTasks] Found ${recurringTasks.length} recurring tasks.`);
         res.status(200).json(recurringTasks);
+        
     } catch (err) {
-        console.error('Get recurring tasks error:', err);
+        console.error('❌ [getAllRecurringTasks] Error:', err);
         res.status(500).json({ error: err.message });
     }
 };
