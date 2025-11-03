@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.token.email)).data;
+      return get(/databases/$(database)/documents/Users/$(request.auth.token.email)).data;
     }
     
     function getUserRole() {
@@ -48,9 +48,9 @@ service cloud.firestore {
     }
     
     // ========================================
-    // users Collection
+    // Users Collection (note: uppercase 'Users')
     // ========================================
-    match /users/{userId} {
+    match /Users/{userId} {
       // Users can read their own profile
       allow read: if isSignedIn() && request.auth.token.email == userId;
       
@@ -74,7 +74,8 @@ service cloud.firestore {
       // Add rules for the 'notifications' subcollection INSIDE the user document match.
       // This allows a user to read/write notifications in their OWN subcollection.
       match /notifications/{notificationId} {
-        // A user can read their own notifications
+        // A user can read (both get and list queries) their own notifications
+        // 'read' permission covers both individual document reads and collection queries
         allow read: if isSignedIn() && request.auth.token.email == userId;
         
         // The application (running as the user) can create new notifications
@@ -82,6 +83,9 @@ service cloud.firestore {
         
         // The application (running as the user) can update 'isRead' status
         allow update: if isSignedIn() && request.auth.token.email == userId;
+        
+        // Users can delete their own notifications
+        allow delete: if isSignedIn() && request.auth.token.email == userId;
       }
       // --- END OF FIX ---
     }

@@ -12,41 +12,52 @@ function initializeUnreadNotificationListener(userId) {
     collection(db, "Users", userId, "notifications"),
     where("isRead", "==", false)
   );
-  unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
-    // Handle new notifications (added)
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === "added") {
-        const notificationData = change.doc.data();
-        console.log('📥 New notification added:', notificationData.title);
-        notificationStore.addNotification({
-          id: change.doc.id, // Include the database notification ID
-          title: notificationData.title,
-          body: notificationData.body,
-          taskId: notificationData.taskId,
-          type: notificationData.type || 'info'
+  unsubscribeNotifications = onSnapshot(
+    notificationsQuery, 
+    (snapshot) => {
+      // Handle new notifications (added)
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const notificationData = change.doc.data();
+          console.log('📥 New notification added:', notificationData.title);
+          notificationStore.addNotification({
+            id: change.doc.id, // Include the database notification ID
+            title: notificationData.title,
+            body: notificationData.body,
+            taskId: notificationData.taskId,
+            type: notificationData.type || 'info'
+          });
+        }
+      });
+      
+      // Handle initial load - clear queue and reload all unread notifications
+      if (snapshot.docs.length > 0) {
+        console.log('📥 Loading existing unread notifications:', snapshot.docs.length);
+        // Clear existing queue to avoid duplicates
+        notificationStore.clearNotifications();
+        
+        // Add all unread notifications to the queue
+        snapshot.docs.forEach((doc) => {
+          const notificationData = doc.data();
+          notificationStore.addNotification({
+            id: doc.id, // Include the database notification ID
+            title: notificationData.title,
+            body: notificationData.body,
+            taskId: notificationData.taskId,
+            type: notificationData.type || 'info'
+          });
         });
       }
-    });
-    
-    // Handle initial load - clear queue and reload all unread notifications
-    if (snapshot.docs.length > 0) {
-      console.log('📥 Loading existing unread notifications:', snapshot.docs.length);
-      // Clear existing queue to avoid duplicates
-      notificationStore.clearNotifications();
-      
-      // Add all unread notifications to the queue
-      snapshot.docs.forEach((doc) => {
-        const notificationData = doc.data();
-        notificationStore.addNotification({
-          id: doc.id, // Include the database notification ID
-          title: notificationData.title,
-          body: notificationData.body,
-          taskId: notificationData.taskId,
-          type: notificationData.type || 'info'
-        });
-      });
+    },
+    (error) => {
+      console.error('❌ Firestore notification listener error:', error);
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   User ID:', userId);
+      // Don't throw - just log the error so the app doesn't crash
+      // The backend API can still be used as fallback
     }
-  });
+  );
 }
 
 // API functions to interact with backend notification endpoints

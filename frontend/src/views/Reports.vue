@@ -16,6 +16,17 @@
         Report Type Selection Tabs (RBAC)
         ========================================
       -->
+      <!-- Show loading/error message if user role not loaded -->
+      <v-alert 
+        v-if="authStore.isAuthenticated && !authStore.loading && !authStore.userRole" 
+        type="warning" 
+        variant="tonal" 
+        class="mb-4"
+      >
+        <strong>User role not loaded.</strong> Please refresh the page or log out and log back in. 
+        <br>If this persists, check that your backend Firebase service account key matches your frontend Firebase project.
+      </v-alert>
+      
       <!-- Desktop: Use tabs with grow, Mobile: Stack in grid -->
       <div class="report-type-tabs-wrapper">
         <v-tabs 
@@ -42,14 +53,14 @@
           </v-tab>
       </v-tabs>
       </div>
-      <v-divider></v-divider>
+      <v-divider class="mb-2"></v-divider>
 
       <!-- 
         ========================================
         Report Parameter Controls
         ========================================
       -->
-      <v-card-text>
+      <v-card-text class="report-controls-container">
         <v-window v-model="selectedReportType">
           
           <!-- Project Report Controls -->
@@ -566,6 +577,10 @@ let activeChart2 = null; // For pages with two charts
 // --- RBAC: Control what tabs are visible ---
 const rbac = computed(() => {
   const role = authStore.userRole?.toLowerCase();
+  // Debug: Log when role is missing
+  if (!role && authStore.isAuthenticated && !authStore.loading) {
+    console.warn('⚠️ Reports: userRole is missing but user is authenticated. UserData:', authStore.userData);
+  }
   return {
     canViewProject: ['staff', 'manager', 'director'].includes(role),
     canViewIndividual: ['staff', 'manager', 'director', 'hr'].includes(role),
@@ -732,37 +747,115 @@ async function fetchSelectorData() {
     }
 
     if (rbac.value.canViewDepartment || rbac.value.canViewCompany) {
-      // Use API endpoint to get departments list instead of direct Firestore query
+      // Use departments API endpoint to get departments list
       try {
         const token = await authStore.getToken();
-        const response = await fetch('/api/auth/users', {
+        const response = await fetch('/api/departments', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
         let deptArray = [];
         if (response.ok) {
-          const users = await response.json();
-          const depts = new Set(users.map(u => u.department).filter(Boolean));
-          if (department) depts.add(department);
-          deptArray = Array.from(depts).sort();
+          const departmentsData = await response.json();
+          
+          // Extract department names, handling various possible structures
+          deptArray = departmentsData
+            .map((d) => {
+              // Handle both object and string responses
+              if (typeof d === 'string') {
+                return d;
+              }
+              
+              // Check if name looks like a Firestore auto-generated ID
+              const nameIsFirestoreId = d.name && d.name.length > 15 && /^[a-zA-Z0-9]+$/.test(d.name);
+              
+              // Prioritize title/label/departmentName over name if name is a Firestore ID
+              let deptName;
+              if (nameIsFirestoreId) {
+                // If name is a Firestore ID, prefer other fields
+                deptName = d.title || d.label || d.departmentName || d.name;
+              } else {
+                // Normal priority: name first
+                deptName = d.name || d.departmentName || d.title || d.label || d.id;
+              }
+              
+              // If still not found, try accessing as a direct property
+              return deptName || (d && typeof d === 'object' ? Object.values(d)[0] : null);
+            })
+            .map((dept) => String(dept).trim())
+            .filter((dept) => {
+              // Filter out invalid values
+              if (!dept || dept === '') {
+                return false;
+              }
+              
+              // Filter out 'ALL' and 'all' in any case (these are UI placeholders, not real departments)
+              const deptUpper = dept.toUpperCase();
+              if (deptUpper === 'ALL' || deptUpper === 'ALL DEPARTMENTS' || deptUpper === 'ALL DEPARTMENT') {
+                return false;
+              }
+              
+              // Filter out Firestore auto-generated IDs (they're usually 20+ chars alphanumeric)
+              if (dept.length > 15 && /^[a-zA-Z0-9]+$/.test(dept)) {
+                return false;
+              }
+              
+              return true;
+            });
+          
+          // Add user's department if it's valid (but filter out "ALL")
+          if (department && department.trim() !== '' && department.toUpperCase() !== 'ALL') {
+            const deptTrimmed = department.trim();
+            if (!deptArray.includes(deptTrimmed)) {
+              deptArray.push(deptTrimmed);
+            }
+          }
+          
+          deptArray.sort();
+          
+          // Debug: Log if we're getting unexpected values
+          if (deptArray.length === 0) {
+            console.warn('⚠️ No departments found after processing!');
+          }
+          // Final check - remove any "ALL" that might have slipped through
+          const filteredDeptArray = deptArray.filter(d => d.toUpperCase() !== 'ALL' && d.toUpperCase() !== 'ALL DEPARTMENTS');
+          if (filteredDeptArray.length !== deptArray.length) {
+            console.warn(`⚠️ Filtered out ${deptArray.length - filteredDeptArray.length} "ALL" entries`);
+            deptArray = filteredDeptArray;
+          }
         } else {
-          // Fallback: use known departments if API fails
-          deptArray = ['Engineering', 'Finance', 'HR and Admin', 'Operations'];
-          if (department) deptArray.push(department);
+          // Fallback: extract from users if departments API fails
+          const errorText = await response.text();
+          console.warn('❌ Departments API failed:', response.status, response.statusText, errorText);
+          console.warn('📋 Falling back to users list');
+          const usersResponse = await fetch('/api/auth/users', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (usersResponse.ok) {
+            const users = await usersResponse.json();
+            const depts = new Set(users.map(u => u.department).filter(Boolean));
+            if (department) depts.add(department);
+            deptArray = Array.from(depts).sort();
+          } else {
+            // Final fallback: use known departments
+            console.warn('❌ Users API also failed, using hardcoded departments');
+            deptArray = ['Engineering', 'Finance', 'HR and Admin', 'Operations'];
+            if (department) deptArray.push(department);
+          }
         }
         
         if (role === 'director' || role === 'hr') {
-          // Directors and HR can see all departments (but NOT "Company (All)" for department reports)
-          departments.value = deptArray; // No "Company (All)" for department reports
-          // Company reports use allDepartmentsForFilter which includes "All Departments"
+          // Directors and HR can see all departments
+          departments.value = deptArray; // This is for department report dropdown
           allDepartmentsForFilter.value = [
             { title: 'All Departments', value: 'ALL' },
             ...deptArray.map(dept => ({ title: dept, value: dept }))
           ];
         } else if (role === 'manager' && department) {
-          // Managers can only see their own department
+          // Managers can only see their own department for department reports
           departments.value = [department];
           params.value.department = department;
+          // But can see all for company report filter
           allDepartmentsForFilter.value = [
             { title: 'All Departments', value: 'ALL' },
             ...deptArray.map(dept => ({ title: dept, value: dept }))
@@ -999,16 +1092,12 @@ function renderProjectCharts() {
 
 function renderIndividualCharts() {
   const summary = reportData.value.summary;
-  console.log('Rendering individual charts, summary:', summary);
   const pieCtx = document.getElementById('individual-pie-chart')?.getContext('2d');
-  console.log('Pie chart canvas context:', pieCtx);
   
   if (pieCtx && summary && summary.totalTasks > 0) {
     try {
       const statusCounts = summary.statusCounts || {};
-      console.log('Status counts:', statusCounts);
       const labels = Object.keys(statusCounts).filter(k => (statusCounts[k] || 0) > 0);
-      console.log('Filtered labels:', labels);
       
       // Build chart data including overdue tasks as a separate category
       const chartLabels = [...labels];
@@ -1052,7 +1141,6 @@ function renderIndividualCharts() {
         }
       }
     });
-      console.log('Individual pie chart rendered successfully');
     } catch (error) {
       console.error('Error rendering individual chart:', error);
       errorMessage.value = 'Failed to render status breakdown chart: ' + error.message;
@@ -1201,7 +1289,6 @@ async function exportToPDF() {
   const canvasToImageMap = new Map();
     const canvasElements = sourceEl.querySelectorAll('canvas');
     
-    console.log(`Found ${canvasElements.length} canvas elements to export`);
     
   for (let i = 0; i < canvasElements.length; i++) {
     const canvas = canvasElements[i];
@@ -1211,8 +1298,6 @@ async function exportToPDF() {
       // Get the Chart.js instance from the canvas
       const chart = Chart.getChart(canvas);
       if (chart) {
-          console.log(`Found chart instance for ${canvasId}, type: ${chart.config.type}`);
-          
           // Get the container element to determine proper dimensions
           const container = canvas.parentElement;
           const containerRect = container ? container.getBoundingClientRect() : null;
@@ -1414,7 +1499,6 @@ async function exportToPDF() {
             const size = Math.min(imgWidth, imgHeight, 400);
             imgWidth = size;
             imgHeight = size; // MUST be equal
-            console.log(`Pie chart ${canvasId}: forcing square dimensions ${imgWidth}x${imgHeight}`);
           }
     } else {
           // Old format fallback
@@ -1694,6 +1778,16 @@ function getTaskColor(task) {
 </script>
 
 <style scoped>
+.report-controls-container {
+  padding-top: 8px !important;
+}
+
+/* Prevent clipping of inputs in v-window-item */
+:deep(.v-window-item) {
+  padding-top: 12px !important;
+  overflow: visible !important;
+}
+
 .report-task-list {
   overflow: hidden;
   /* Use theme surface color */

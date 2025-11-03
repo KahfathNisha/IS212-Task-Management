@@ -362,7 +362,7 @@ exports.generateDepartmentReport = async (req, res) => {
  * User Story: "Report Generation for Board Review for Director"
  */
 exports.generateCompanyReport = async (req, res) => {
-   try {
+  try {
     const { startDate, endDate, department } = req.query;
     const { requesterId } = req.query;
     const perms = await getUserPermissions(requesterId);
@@ -390,7 +390,7 @@ exports.generateCompanyReport = async (req, res) => {
     } else {
       tasksSnapshot = await db.collection('tasks').get();
     }
-     
+    
     let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     // Filter by multiple departments if needed (when using departments parameter and multiple were selected)

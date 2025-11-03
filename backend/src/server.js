@@ -13,7 +13,8 @@ const authRouter = require('./routes/authRouter');
 const reportsRouter = require('./routes/reportsRouter');
 const projectsRouter = require('./routes/projectsRouter');
 const categoriesRouter = require('./routes/categoriesRouter');
-const notificationRouter = require('./routes/notificationRouter'); 
+const notificationRouter = require('./routes/notificationRouter');
+const departmentsRouter = require('./routes/departmentsRouter'); 
 
 console.log('✅ Routes loaded successfully');
 
@@ -70,6 +71,7 @@ app.use('/api/categories', categoriesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/departments', departmentsRouter);
 
 // Test routes (only in non-production)
 if (process.env.NODE_ENV !== 'production') {

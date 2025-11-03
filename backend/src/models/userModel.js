@@ -6,6 +6,7 @@ const userModel = {
     // Core user information
     name: "",           // User's display name (can be empty initially)
     role: "staff",      // Default role, can be 'staff' or other roles
+    department: null,   // User's department (required for RBAC and reports)
     
     // Security and authentication fields
     failedAttempts: 0,          // Number of failed login attempts

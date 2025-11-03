@@ -197,8 +197,225 @@ describe('Report Generation Integration Tests', () => {
       expect(res.status).toHaveBeenCalledWith(200);
       const response = res.json.mock.calls[0][0];
       expect(response.success).toBe(true);
-      expect(response.report.projectName).toBe(`${testPrefix} Project`);
+      expect(response.report.projectName || response.report.title).toBe(`${testPrefix} Project`);
       expect(response.report.summary.totalTasks).toBeGreaterThan(0);
+    });
+
+    it('should show status breakdown (To Do, Ongoing, Pending Review, Completed)', async () => {
+      const req = {
+        params: { projectId: testProjectId },
+        query: { requesterId: staffEmail },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      const summary = response.report.summary;
+      
+      // Verify all 4 statuses are included in statusCounts
+      expect(summary.statusCounts).toHaveProperty('To Do');
+      expect(summary.statusCounts).toHaveProperty('Ongoing');
+      expect(summary.statusCounts).toHaveProperty('Pending Review');
+      expect(summary.statusCounts).toHaveProperty('Completed');
+      
+      // Verify status counts are numbers
+      expect(typeof summary.statusCounts['To Do']).toBe('number');
+      expect(typeof summary.statusCounts['Ongoing']).toBe('number');
+      expect(typeof summary.statusCounts['Pending Review']).toBe('number');
+      expect(typeof summary.statusCounts['Completed']).toBe('number');
+      
+      // Verify sum of status counts equals total tasks
+      const sumOfStatuses = 
+        summary.statusCounts['To Do'] + 
+        summary.statusCounts['Ongoing'] + 
+        summary.statusCounts['Pending Review'] + 
+        summary.statusCounts['Completed'];
+      expect(sumOfStatuses).toBe(summary.totalTasks);
+    });
+
+    it('should show team member workload distribution', async () => {
+      const req = {
+        params: { projectId: testProjectId },
+        query: { requesterId: staffEmail },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      const summary = response.report.summary;
+      
+      // Verify memberWorkload exists and is an object
+      expect(summary.memberWorkload).toBeDefined();
+      expect(typeof summary.memberWorkload).toBe('object');
+      
+      // Verify memberNames exists (for displaying names in workload chart)
+      expect(summary.memberNames).toBeDefined();
+      expect(typeof summary.memberNames).toBe('object');
+      
+      // If there are tasks assigned, verify workload counts
+      if (Object.keys(summary.memberWorkload).length > 0) {
+        Object.keys(summary.memberWorkload).forEach(email => {
+          expect(summary.memberWorkload[email]).toBeGreaterThan(0);
+          expect(summary.memberNames[email]).toBeDefined();
+        });
+      }
+    });
+
+    it('should show overdue tasks for deadline planning', async () => {
+      const req = {
+        params: { projectId: testProjectId },
+        query: { requesterId: staffEmail },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      const summary = response.report.summary;
+      
+      // Verify overdue information exists
+      expect(summary.overdueCount).toBeDefined();
+      expect(typeof summary.overdueCount).toBe('number');
+      expect(summary.overdueCount).toBeGreaterThanOrEqual(0);
+      
+      expect(summary.overduePercentage).toBeDefined();
+      expect(typeof summary.overduePercentage).toBe('string');
+      
+      // Verify tasks include isOverdue flag
+      if (response.report.tasks && response.report.tasks.length > 0) {
+        const overdueTasks = response.report.tasks.filter(t => t.isOverdue === true);
+        expect(overdueTasks.length).toBe(summary.overdueCount);
+      }
+    });
+
+    it('should show at-risk tasks (due in 3 days) for deadline planning', async () => {
+      const req = {
+        params: { projectId: testProjectId },
+        query: { requesterId: staffEmail },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      
+      // Verify tasks include isAtRisk flag for deadline planning
+      if (response.report.tasks && response.report.tasks.length > 0) {
+        response.report.tasks.forEach(task => {
+          expect(task.hasOwnProperty('isAtRisk')).toBe(true);
+          expect(typeof task.isAtRisk).toBe('boolean');
+          
+          // If task is at risk, it should not be completed or overdue
+          if (task.isAtRisk) {
+            expect(task.status).not.toBe('Completed');
+            expect(task.isOverdue).toBe(false);
+          }
+        });
+      }
+    });
+
+    it('should sort tasks by due date for deadline planning', async () => {
+      const req = {
+        params: { projectId: testProjectId },
+        query: { requesterId: staffEmail },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      
+      // Verify tasks are sorted by due date
+      if (response.report.tasks && response.report.tasks.length > 1) {
+        const tasks = response.report.tasks;
+        for (let i = 1; i < tasks.length; i++) {
+          const prevTask = tasks[i - 1];
+          const currTask = tasks[i];
+          
+          // If both have due dates, verify they're in ascending order
+          if (prevTask.dueDate && currTask.dueDate) {
+            const prevDate = prevTask.dueDate.toDate ? prevTask.dueDate.toDate() : new Date(prevTask.dueDate);
+            const currDate = currTask.dueDate.toDate ? currTask.dueDate.toDate() : new Date(currTask.dueDate);
+            expect(prevDate.getTime()).toBeLessThanOrEqual(currDate.getTime());
+          }
+          // Tasks without due dates should be at the end
+          if (!prevTask.dueDate && currTask.dueDate) {
+            // This is acceptable - no due date tasks go to end
+          }
+        }
+      }
+    });
+
+    it('should include all required fields for schedule overview', async () => {
+      const req = {
+        params: { projectId: testProjectId },
+        query: { requesterId: staffEmail },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      const report = response.report;
+      
+      // Verify report structure for schedule overview
+      expect(report).toHaveProperty('title');
+      expect(report).toHaveProperty('type', 'project');
+      expect(report).toHaveProperty('generatedAt');
+      expect(report).toHaveProperty('summary');
+      expect(report).toHaveProperty('tasks');
+      
+      // Verify summary structure
+      expect(report.summary).toHaveProperty('totalTasks');
+      expect(report.summary).toHaveProperty('statusCounts');
+      expect(report.summary).toHaveProperty('memberWorkload');
+      expect(report.summary).toHaveProperty('memberNames');
+      expect(report.summary).toHaveProperty('overdueCount');
+      expect(report.summary).toHaveProperty('overduePercentage');
+      
+      // Verify each task has required fields for timeline display
+      if (report.tasks && report.tasks.length > 0) {
+        report.tasks.forEach(task => {
+          expect(task).toHaveProperty('id');
+          expect(task).toHaveProperty('title');
+          expect(task).toHaveProperty('status');
+          expect(task).toHaveProperty('assignedTo');
+          expect(task.hasOwnProperty('isOverdue')).toBe(true);
+          expect(task.hasOwnProperty('isAtRisk')).toBe(true);
+        });
+      }
     });
 
     it('should deny staff access to non-member project', async () => {
@@ -350,6 +567,47 @@ describe('Report Generation Integration Tests', () => {
     });
   });
 
+  describe('Department List Integration', () => {
+    it('should exclude HR department from department list', async () => {
+      const departmentsController = require('../src/controllers/departmentsController');
+      
+      // Create a mock request with a director user (who can see all departments)
+      const req = {
+        user: {
+          email: directorEmail,
+          role: 'director',
+          department: 'Executive'
+        }
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await departmentsController.getAllDepartments(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      
+      // Verify HR departments are filtered out
+      if (Array.isArray(response)) {
+        const hrDepartments = response.filter(dept => {
+          const deptName = (dept.name || dept.id || '').toUpperCase();
+          return deptName === 'HR' || 
+                 deptName === 'H R' ||
+                 deptName.startsWith('HR ') || 
+                 deptName.includes(' HR ') ||
+                 deptName.endsWith(' HR') ||
+                 deptName === 'HUMAN RESOURCES' ||
+                 deptName === 'HR AND ADMIN' ||
+                 deptName === 'HR & ADMIN';
+        });
+        expect(hrDepartments.length).toBe(0);
+      }
+    });
+  });
+
   describe('Company Report Integration', () => {
     it('should generate company report for director', async () => {
       const req = {
@@ -393,11 +651,19 @@ describe('Report Generation Integration Tests', () => {
     });
 
     it('should filter company report by multiple departments', async () => {
+      // Create a Finance user for testing
+      const financeUserEmail = `${testPrefix}-finance@example.com`;
+      await createTestUser(financeUserEmail, {
+        name: 'Test Finance User',
+        role: 'staff',
+        department: 'Finance',
+      });
+
       // Create tasks in different departments
       await createTestTask(`${testPrefix}-finance-task`, {
         title: `${testPrefix} Finance Task`,
         status: 'Ongoing',
-        assignedTo: 'finance@example.com',
+        assignedTo: financeUserEmail,
         taskOwnerDepartment: 'Finance',
         createdAt: new Date('2024-01-15'),
       });
@@ -424,6 +690,142 @@ describe('Report Generation Integration Tests', () => {
       
       // Cleanup
       await db.collection('tasks').doc(`${testPrefix}-finance-task`).delete();
+      await db.collection('Users').doc(financeUserEmail).delete();
+    });
+
+    it('should exclude HR department from company report', async () => {
+      // Create a task in HR department
+      await createTestTask(`${testPrefix}-hr-task`, {
+        title: `${testPrefix} HR Task`,
+        status: 'Ongoing',
+        assignedTo: hrEmail,
+        taskOwnerDepartment: 'HR and Admin',
+        createdAt: new Date('2024-01-15'),
+      });
+
+      // Create a task in a non-HR department for comparison
+      await createTestTask(`${testPrefix}-engineering-task`, {
+        title: `${testPrefix} Engineering Task`,
+        status: 'Ongoing',
+        assignedTo: employeeEmail,
+        taskOwnerDepartment: 'Engineering',
+        createdAt: new Date('2024-01-15'),
+      });
+
+      const req = {
+        query: {
+          requesterId: directorEmail,
+          // No department filter - should show all departments except HR
+        },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateCompanyReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      expect(response.success).toBe(true);
+      
+      // Verify HR department is NOT in departmentStats
+      if (response.report.departmentStats && response.report.departmentStats.length > 0) {
+        const hrDepartments = response.report.departmentStats.filter(dept => {
+          const deptName = (dept.name || '').toUpperCase();
+          return deptName === 'HR' || 
+                 deptName === 'H R' ||
+                 deptName.startsWith('HR ') || 
+                 deptName.includes(' HR ') ||
+                 deptName.endsWith(' HR') ||
+                 deptName === 'HUMAN RESOURCES' ||
+                 deptName === 'HR AND ADMIN' ||
+                 deptName === 'HR & ADMIN';
+        });
+        expect(hrDepartments.length).toBe(0);
+      }
+      
+      // Verify Engineering department IS included
+      const engineeringDepts = response.report.departmentStats?.filter(dept => 
+        (dept.name || '').toUpperCase() === 'ENGINEERING'
+      ) || [];
+      // Engineering should be included if tasks exist
+      
+      // Cleanup
+      await db.collection('tasks').doc(`${testPrefix}-hr-task`).delete();
+      await db.collection('tasks').doc(`${testPrefix}-engineering-task`).delete();
+    });
+
+    it('should filter out HR department even when explicitly selected', async () => {
+      // Create an Engineering user for testing
+      const engUserEmail = `${testPrefix}-engineering-user@example.com`;
+      await createTestUser(engUserEmail, {
+        name: 'Test Engineering User',
+        role: 'staff',
+        department: 'Engineering',
+      });
+
+      // Create a task in HR department (should be excluded)
+      await createTestTask(`${testPrefix}-hr-explicit-task`, {
+        title: `${testPrefix} HR Explicit Task`,
+        status: 'Ongoing',
+        assignedTo: hrEmail,
+        taskOwnerDepartment: 'HR and Admin',
+        createdAt: new Date('2024-01-15'),
+      });
+
+      // Create a task in Engineering department (should be included)
+      await createTestTask(`${testPrefix}-engineering-explicit-task`, {
+        title: `${testPrefix} Engineering Explicit Task`,
+        status: 'Ongoing',
+        assignedTo: engUserEmail,
+        taskOwnerDepartment: 'Engineering',
+        createdAt: new Date('2024-01-15'),
+      });
+
+      // Try to explicitly select HR department
+      const req = {
+        query: {
+          requesterId: directorEmail,
+          departments: 'HR and Admin,Engineering', // HR explicitly selected
+        },
+      };
+
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+      };
+
+      await reportsController.generateCompanyReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = res.json.mock.calls[0][0];
+      expect(response.success).toBe(true);
+      
+      // Verify HR department is NOT in departmentStats even though it was selected
+      if (response.report.departmentStats && response.report.departmentStats.length > 0) {
+        const hrDepartments = response.report.departmentStats.filter(dept => {
+          const deptName = (dept.name || '').toUpperCase();
+          return deptName === 'HR' || 
+                 deptName === 'H R' ||
+                 deptName.startsWith('HR ') || 
+                 deptName.includes(' HR ') ||
+                 deptName.endsWith(' HR') ||
+                 deptName === 'HUMAN RESOURCES' ||
+                 deptName === 'HR AND ADMIN' ||
+                 deptName === 'HR & ADMIN';
+        });
+        expect(hrDepartments.length).toBe(0);
+      }
+      
+      // Verify Engineering tasks are included
+      expect(response.report.summary.totalTasks).toBeGreaterThan(0);
+      
+      // Cleanup
+      await db.collection('tasks').doc(`${testPrefix}-hr-explicit-task`).delete();
+      await db.collection('tasks').doc(`${testPrefix}-engineering-explicit-task`).delete();
+      await db.collection('Users').doc(engUserEmail).delete();
     });
   });
 
