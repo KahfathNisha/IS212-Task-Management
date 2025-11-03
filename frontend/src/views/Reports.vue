@@ -41,71 +41,91 @@
 
         <div v-if="projectReportData && !reportLoading" id="proj-report-content" class="report-export-fixed-container">
           <v-row>
-            <v-col cols="12" class="d-flex justify-space-between align-center mb-4">
-              <div>
-                <h2 class="text-h4">{{ projectReportData.projectName }}</h2>
-                <p class="text-medium-emphasis">Report generated on {{ new Date(projectReportData.generatedAt).toLocaleString() }}</p>
+            <v-col cols="12" class="report-header mb-4">
+              <div class="report-header-content">
+                <div class="report-title-section">
+                  <h2 class="text-h4 report-title">{{ projectReportData.projectName }}</h2>
+                  <p class="text-medium-emphasis report-subtitle">Report generated on {{ new Date(projectReportData.generatedAt).toLocaleString() }}</p>
+                </div>
+                <v-btn
+                  color="primary"
+                  @click="exportToPDF('proj-report-content', projectReportData.projectName)"
+                  :loading="exporting"
+                  :disabled="projectReportData.summary.totalTasks === 0"
+                  class="export-btn"
+                  size="small"
+                >
+                  <v-icon start>mdi-file-pdf-box</v-icon>
+                  <span class="export-btn-text">Export PDF</span>
+                </v-btn>
               </div>
-              <v-btn
-                color="primary"
-                @click="exportToPDF('proj-report-content', projectReportData.projectName)"
-                :loading="exporting"
-                :disabled="projectReportData.summary.totalTasks === 0"
-              >
-                <v-icon start>mdi-file-pdf-box</v-icon>
-                Export to PDF
-              </v-btn>
             </v-col>
           </v-row>
 
           <!-- Key Metrics -->
           <v-row class="mb-4">
-            <v-col cols="12" md="2">
+            <v-col cols="6" sm="4" md="2">
               <v-card variant="outlined">
                 <v-card-text>
-                  <div class="text-h6">{{ projectReportData.summary.totalTasks }}</div>
+                  <div class="text-h6">{{ projectReportData.summary.totalTasks || 0 }}</div>
                   <div class="text-caption text-medium-emphasis">Total Tasks</div>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="2">
+            <v-col cols="6" sm="4" md="2">
               <v-card variant="outlined">
                 <v-card-text>
-                  <div class="text-h6 text-info">{{ projectReportData.summary.statusCounts?.Unassigned || 0 }}</div>
+                  <div class="text-h6 text-info">{{ (projectReportData.summary.statusCounts && projectReportData.summary.statusCounts.Unassigned) || 0 }}</div>
                   <div class="text-caption text-medium-emphasis">Projected</div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ projectReportData.summary.totalTasks > 0 ? 
+                      (((projectReportData.summary.statusCounts?.Unassigned || 0) / projectReportData.summary.totalTasks) * 100).toFixed(1) : 0 }}%
+                  </div>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="2">
+            <v-col cols="6" sm="4" md="2">
               <v-card variant="outlined">
                 <v-card-text>
-                  <div class="text-h6 text-warning">{{ projectReportData.summary.statusCounts?.Ongoing || 0 }}</div>
+                  <div class="text-h6 text-warning">{{ (projectReportData.summary.statusCounts && projectReportData.summary.statusCounts.Ongoing) || 0 }}</div>
                   <div class="text-caption text-medium-emphasis">Ongoing</div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ projectReportData.summary.totalTasks > 0 ? 
+                      (((projectReportData.summary.statusCounts?.Ongoing || 0) / projectReportData.summary.totalTasks) * 100).toFixed(1) : 0 }}%
+                  </div>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="2">
+            <v-col cols="6" sm="4" md="2">
               <v-card variant="outlined">
                 <v-card-text>
-                  <div class="text-h6 text-purple">{{ projectReportData.summary.statusCounts?.['Pending Review'] || 0 }}</div>
+                  <div class="text-h6 text-purple">{{ (projectReportData.summary.statusCounts && projectReportData.summary.statusCounts['Pending Review']) || 0 }}</div>
                   <div class="text-caption text-medium-emphasis">Under Review</div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ projectReportData.summary.totalTasks > 0 ? 
+                      (((projectReportData.summary.statusCounts?.['Pending Review'] || 0) / projectReportData.summary.totalTasks) * 100).toFixed(1) : 0 }}%
+                  </div>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="2">
+            <v-col cols="6" sm="4" md="2">
               <v-card variant="outlined">
                 <v-card-text>
-                  <div class="text-h6 text-success">{{ projectReportData.summary.statusCounts?.Completed || 0 }}</div>
+                  <div class="text-h6 text-success">{{ (projectReportData.summary.statusCounts && projectReportData.summary.statusCounts.Completed) || 0 }}</div>
                   <div class="text-caption text-medium-emphasis">Completed</div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ projectReportData.summary.totalTasks > 0 ? 
+                      (((projectReportData.summary.statusCounts?.Completed || 0) / projectReportData.summary.totalTasks) * 100).toFixed(1) : 0 }}%
+                  </div>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="2">
-              <v-card variant="outlined" :class="{ 'border-error': projectReportData.summary.overdueCount > 0 }">
+            <v-col cols="6" sm="4" md="2">
+              <v-card variant="outlined" :class="{ 'border-error': (projectReportData.summary.overdueCount || 0) > 0 }">
                 <v-card-text>
                   <div class="text-h6 text-error">{{ projectReportData.summary.overdueCount || 0 }}</div>
                   <div class="text-caption text-medium-emphasis">Overdue</div>
-                  <div class="text-caption">({{ projectReportData.summary.overduePercentage || 0 }}%)</div>
+                  <div class="text-caption">{{ projectReportData.summary.overduePercentage || 0 }}%</div>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -166,12 +186,12 @@
 
           <v-row>
             <v-col cols="12" md="6">
-              <v-card variant="outlined">
+              <v-card variant="outlined" class="chart-card">
                 <v-card-title>Task Status Overview</v-card-title>
                 <v-card-text>
-                  <div style="min-height: 250px;">
-                    <canvas v-show="projectReportData.summary.totalTasks > 0" id="status-chart"></canvas>
-                    <div v-if="projectReportData.summary.totalTasks === 0" class="d-flex flex-column align-center justify-center fill-height text-center pa-8 text-grey">
+                  <div class="chart-container">
+                    <canvas v-show="projectReportData.summary.totalTasks > 0" id="status-chart" class="chart-canvas"></canvas>
+                    <div v-if="projectReportData.summary.totalTasks === 0" class="chart-empty-state">
                       <v-icon size="48" class="mb-2">mdi-chart-pie</v-icon>
                       <p>No task data available.</p>
                     </div>
@@ -180,12 +200,12 @@
               </v-card>
             </v-col>
             <v-col cols="12" md="6">
-              <v-card variant="outlined">
+              <v-card variant="outlined" class="chart-card">
                 <v-card-title>Team Workload</v-card-title>
                 <v-card-text>
-                  <div style="min-height: 250px;">
-                    <canvas v-show="projectReportData.summary.totalTasks > 0" id="workload-chart"></canvas>
-                    <div v-if="projectReportData.summary.totalTasks === 0" class="d-flex flex-column align-center justify-center fill-height text-center pa-8 text-grey">
+                  <div class="chart-container">
+                    <canvas v-show="projectReportData.summary.totalTasks > 0 && projectReportData.summary.memberWorkload && Object.keys(projectReportData.summary.memberWorkload).length > 0" id="workload-chart" class="chart-canvas"></canvas>
+                    <div v-if="projectReportData.summary.totalTasks === 0 || !projectReportData.summary.memberWorkload || Object.keys(projectReportData.summary.memberWorkload).length === 0" class="chart-empty-state">
                       <v-icon size="48" class="mb-2">mdi-chart-bar</v-icon>
                       <p>No workload data available.</p>
                     </div>
@@ -255,6 +275,9 @@
             <v-alert v-if="userRole === 'staff'" type="info" variant="tonal" density="compact" class="mt-2">
               You can view your own individual performance report.
             </v-alert>
+            <v-alert v-if="userRole === 'hr'" type="info" variant="tonal" density="compact" class="mt-2">
+              Select an employee from the dropdown above to view their individual performance report for KPI tracking.
+            </v-alert>
           </v-col>
           <v-col cols="12" md="3">
             <v-text-field
@@ -283,19 +306,23 @@
 
         <div v-if="individualReportData && !reportLoading" id="individual-report-content" class="report-export-fixed-container">
           <v-row>
-            <v-col cols="12" class="d-flex justify-space-between align-center mb-4">
-              <div>
-                <h2 class="text-h4">{{ individualReportData.employee.name }}</h2>
-                <p class="text-medium-emphasis">{{ individualReportData.employee.department }} • Report generated on {{ new Date(individualReportData.generatedAt).toLocaleString() }}</p>
+            <v-col cols="12" class="report-header mb-4">
+              <div class="report-header-content">
+                <div class="report-title-section">
+                  <h2 class="text-h4 report-title">{{ individualReportData.employee.name }}</h2>
+                  <p class="text-medium-emphasis report-subtitle">{{ individualReportData.employee.department }} • Report generated on {{ new Date(individualReportData.generatedAt).toLocaleString() }}</p>
+                </div>
+                <v-btn
+                  color="primary"
+                  @click="exportToPDF('individual-report-content', individualReportData.employee.name + '_Performance')"
+                  :loading="exporting"
+                  class="export-btn"
+                  size="small"
+                >
+                  <v-icon start>mdi-file-pdf-box</v-icon>
+                  <span class="export-btn-text">Export PDF</span>
+                </v-btn>
               </div>
-              <v-btn
-                color="primary"
-                @click="exportToPDF('individual-report-content', individualReportData.employee.name + '_Performance')"
-                :loading="exporting"
-              >
-                <v-icon start>mdi-file-pdf-box</v-icon>
-                Export to PDF
-              </v-btn>
             </v-col>
           </v-row>
 
@@ -380,11 +407,20 @@
         <v-select
           v-model="selectedDepartment"
           :items="departments"
-          label="Select a Department"
+          :label="(userRole === 'director' || userRole === 'hr') ? 'Select a Department' : 'Department'"
           variant="outlined"
           class="mb-6"
+          :disabled="userRole === 'manager' && departments.length === 1"
+          :readonly="userRole === 'manager' && departments.length === 1"
           @update:modelValue="fetchDepartmentReport"
+          :no-data-text="departments.length === 0 ? 'No departments available' : 'No departments available'"
         ></v-select>
+        <v-alert v-if="userRole === 'manager' && departments.length === 1" type="info" variant="tonal" density="compact" class="mb-4">
+          Viewing report for your department: {{ selectedDepartment || userDepartment }}
+        </v-alert>
+        <v-alert v-if="userRole === 'hr'" type="info" variant="tonal" density="compact" class="mb-4">
+          HR has access to all departments for company-wide KPI tracking.
+        </v-alert>
 
         <div v-if="reportLoading" class="text-center pa-8">
           <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
@@ -393,15 +429,22 @@
 
         <div v-if="deptReportData && !reportLoading" id="dept-report-content" class="report-export-fixed-container">
           <v-row>
-            <v-col cols="12" class="d-flex justify-space-between align-center mb-4">
-              <div>
-                <h2 class="text-h4">{{ deptReportData.departmentName }} Department</h2>
-                <p class="text-medium-emphasis">Report generated on {{ new Date(deptReportData.generatedAt).toLocaleString() }}</p>
+            <v-col cols="12" class="report-header mb-4">
+              <div class="report-header-content">
+                <div class="report-title-section">
+                  <h2 class="text-h4 report-title">{{ deptReportData.departmentName }} Department</h2>
+                  <p class="text-medium-emphasis report-subtitle">Report generated on {{ new Date(deptReportData.generatedAt).toLocaleString() }}</p>
+                </div>
+                <v-btn 
+                  color="primary" 
+                  @click="exportToPDF('dept-report-content', deptReportData.departmentName)"
+                  class="export-btn"
+                  size="small"
+                >
+                  <v-icon start>mdi-file-pdf-box</v-icon>
+                  <span class="export-btn-text">Export PDF</span>
+                </v-btn>
               </div>
-              <v-btn color="primary" @click="exportToPDF('dept-report-content', deptReportData.departmentName)">
-                <v-icon start>mdi-file-pdf-box</v-icon>
-                Export to PDF
-              </v-btn>
             </v-col>
           </v-row>
 
@@ -476,13 +519,41 @@
         
         <v-row class="mb-4">
           <v-col cols="12" md="4">
-        <v-select
-              v-model="companySelectedDepartment"
+            <v-select
+              v-model="companySelectedDepartments"
               :items="companyDepartments"
-              label="Filter by Department"
-          variant="outlined"
+              item-title="title"
+              item-value="value"
+              label="Filter by Department(s)"
+              variant="outlined"
+              multiple
+              chips
+              closable-chips
               @update:modelValue="fetchCompanyReport"
-        ></v-select>
+              :rules="[
+                v => v.length > 0 || 'Please select at least one department'
+              ]"
+            >
+              <template #selection="{ item: deptValue, index }">
+                <v-chip
+                  v-if="index < 2"
+                  :key="index"
+                  closable
+                  @click:close="removeDepartment(deptValue)"
+                >
+                  {{ getDepartmentTitle(deptValue) }}
+                </v-chip>
+                <span
+                  v-else-if="index === 2"
+                  class="text-grey text-caption align-self-center"
+                >
+                  (+{{ companySelectedDepartments.length - 2 }} others)
+                </span>
+              </template>
+            </v-select>
+            <v-alert v-if="companySelectedDepartments.includes('ALL') && companySelectedDepartments.length > 1" type="warning" variant="tonal" density="compact" class="mt-2">
+              "Company (All)" includes all departments. Remove it if you want to filter by specific departments.
+            </v-alert>
           </v-col>
           <v-col cols="12" md="4">
             <v-text-field
@@ -511,19 +582,23 @@
 
         <div v-if="companyReportData && !reportLoading" id="company-report-content" class="report-export-fixed-container">
           <v-row>
-            <v-col cols="12" class="d-flex justify-space-between align-center mb-4">
-              <div>
-                <h2 class="text-h4">Company Performance Report</h2>
-                <p class="text-medium-emphasis">Report generated on {{ new Date(companyReportData.generatedAt).toLocaleString() }}</p>
+            <v-col cols="12" class="report-header mb-4">
+              <div class="report-header-content">
+                <div class="report-title-section">
+                  <h2 class="text-h4 report-title">Company Performance Report</h2>
+                  <p class="text-medium-emphasis report-subtitle">Report generated on {{ new Date(companyReportData.generatedAt).toLocaleString() }}</p>
+                </div>
+                <v-btn
+                  color="primary"
+                  @click="exportToPDF('company-report-content', 'Company_Performance')"
+                  :loading="exporting"
+                  class="export-btn"
+                  size="small"
+                >
+                  <v-icon start>mdi-file-pdf-box</v-icon>
+                  <span class="export-btn-text">Export PDF</span>
+                </v-btn>
               </div>
-              <v-btn
-                color="primary"
-                @click="exportToPDF('company-report-content', 'Company_Performance')"
-                :loading="exporting"
-              >
-                <v-icon start>mdi-file-pdf-box</v-icon>
-                Export to PDF
-              </v-btn>
             </v-col>
           </v-row>
 
@@ -632,7 +707,7 @@ const canViewDepartmentReport = computed(() => {
 });
 
 const canViewCompanyReport = computed(() => {
-  return userRole.value === 'director';
+  return userRole.value === 'director' || userRole.value === 'hr';
 });
 
 const canViewAnyReport = computed(() => {
@@ -657,7 +732,7 @@ const projectReportData = ref(null);
 let statusChart = null;
 let workloadChart = null;
 
-const departments = ref(['Company (All)', 'Engineering', 'Finance', 'HR and Admin', 'Operations']);
+const departments = ref([]);
 const selectedDepartment = ref(null);
 const deptReportData = ref(null);
 let deptWorkloadChart = null;
@@ -671,8 +746,14 @@ const individualEndDate = ref(null);
 let individualStatusChart = null;
 
 const companyReportData = ref(null);
-const companySelectedDepartment = ref('ALL');
-const companyDepartments = ref(['ALL', 'Engineering', 'Finance', 'HR and Admin', 'Operations']);
+const companySelectedDepartments = ref(['ALL']);
+const companyDepartments = ref([
+  { title: 'Company (All)', value: 'ALL' },
+  { title: 'Engineering', value: 'Engineering' },
+  { title: 'Finance', value: 'Finance' },
+  { title: 'HR and Admin', value: 'HR and Admin' },
+  { title: 'Operations', value: 'Operations' }
+]);
 const companyStartDate = ref(null);
 const companyEndDate = ref(null);
 let companyStatusChart = null;
@@ -708,6 +789,37 @@ function formatDateField(date) {
   return 'N/A';
 }
 
+// Initialize departments based on user role
+async function initializeDepartments() {
+  if (canViewDepartmentReport.value) {
+    if (userRole.value === 'director' || userRole.value === 'hr') {
+      // Directors and HR can see all departments (HR for KPI tracking across company)
+      departments.value = ['Company (All)', 'Engineering', 'Finance', 'HR and Admin', 'Operations'];
+    } else if (userRole.value === 'manager') {
+      // Managers can only see their own department
+      if (!userDepartment.value) {
+        console.warn('User department not set for', userRole.value);
+        departments.value = [];
+        return;
+      }
+      
+      departments.value = [userDepartment.value];
+      // Auto-select their department
+      selectedDepartment.value = userDepartment.value;
+      
+      // Auto-fetch report for their department (wait a bit to ensure auth is ready)
+      await nextTick();
+      setTimeout(async () => {
+        if (selectedDepartment.value) {
+          await fetchDepartmentReport(selectedDepartment.value);
+        }
+      }, 300);
+    } else {
+      departments.value = [];
+    }
+  }
+}
+
 // Fetch projects
 watch(() => authStore.loading, (isLoading) => {
   if (!isLoading && canViewProjectReport.value) {
@@ -715,6 +827,9 @@ watch(() => authStore.loading, (isLoading) => {
   }
   if (!isLoading && canViewIndividualReport.value) {
     fetchEmployees();
+  }
+  if (!isLoading && canViewDepartmentReport.value) {
+    initializeDepartments();
   }
 }, { immediate: true });
 
@@ -770,23 +885,38 @@ async function fetchEmployees() {
       headers: { Authorization: `Bearer ${token}` }
     });
     
-    if (response.ok) {
-      const users = await response.json();
-      // Filter employees based on role
-      let filtered = users.filter(u => u.role?.toLowerCase() !== 'director');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to fetch employees' }));
+      throw new Error(errorData.message || `Failed to fetch employees (${response.status})`);
+    }
+    
+    const users = await response.json();
+    // Filter employees based on role
+    let filtered = users.filter(u => u.role?.toLowerCase() !== 'director');
+    
+    if (userRole.value === 'manager') {
+      // Only show employees in the same department
+      filtered = filtered.filter(u => u.department === userDepartment.value);
       
-      if (userRole.value === 'hr' || userRole.value === 'manager') {
-        // Only show employees in the same department
-        filtered = filtered.filter(u => u.department === userDepartment.value);
+      if (filtered.length === 0) {
+        console.warn('No employees found in department:', userDepartment.value);
       }
-      
-      availableEmployees.value = filtered.map(u => ({
-        label: `${u.name || u.email.split('@')[0]} (${u.department || 'N/A'})`,
-        value: u.email
-      }));
+    }
+    // HR can see all employees (for KPI tracking across company)
+    
+    availableEmployees.value = filtered.map(u => ({
+      label: `${u.name || u.email.split('@')[0]} (${u.department || 'N/A'})`,
+      value: u.email
+    }));
+    
+    // Auto-select first employee if available (but not for HR - let them choose)
+    // HR should manually select employees for individual reports
+    if (availableEmployees.value.length > 0 && !selectedEmployee.value && userRole.value !== 'hr') {
+      selectedEmployee.value = availableEmployees.value[0].value;
     }
   } catch (e) {
     console.error('Error fetching employees:', e);
+    alert(e.message || 'Failed to fetch employees');
     availableEmployees.value = [];
   } finally {
     employeesLoading.value = false;
@@ -813,10 +943,25 @@ async function fetchProjectReport(projectId) {
     const data = await response.json();
     if (data.success) {
       projectReportData.value = data.report;
-      if (data.report.summary.totalTasks > 0) {
-        await nextTick();
-        renderProjectCharts();
+      // Ensure summary and statusCounts exist
+      if (!projectReportData.value.summary) {
+        projectReportData.value.summary = {};
       }
+      if (!projectReportData.value.summary.statusCounts) {
+        projectReportData.value.summary.statusCounts = {};
+      }
+      if (!projectReportData.value.summary.memberWorkload) {
+        projectReportData.value.summary.memberWorkload = {};
+      }
+      
+      // Render charts after DOM is ready
+      await nextTick();
+      // Add a small delay to ensure canvas elements are fully rendered
+      setTimeout(() => {
+        if (projectReportData.value.summary.totalTasks > 0) {
+          renderProjectCharts();
+        }
+      }, 100);
     }
   } catch (error) {
     console.error('Error fetching project report:', error);
@@ -834,24 +979,42 @@ async function fetchIndividualReport() {
   individualStatusChart = null;
 
   try {
+    const token = await authStore.getToken();
     let url = `/api/reports/individual?employeeEmail=${encodeURIComponent(selectedEmployee.value)}&requesterId=${encodeURIComponent(userEmail.value)}`;
     if (individualStartDate.value) url += `&startDate=${individualStartDate.value}`;
     if (individualEndDate.value) url += `&endDate=${individualEndDate.value}`;
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to fetch individual report' }));
       if (response.status === 403) {
-        throw new Error('You do not have permission to view this individual report.');
+        throw new Error(errorData.message || 'You do not have permission to view this individual report.');
       }
-      throw new Error('Failed to fetch individual report');
+      throw new Error(errorData.message || `Failed to fetch individual report (${response.status})`);
     }
+    
     const data = await response.json();
     if (data.success) {
       individualReportData.value = data.report;
+      // Ensure metrics and statusCounts exist
+      if (!individualReportData.value.metrics) {
+        individualReportData.value.metrics = {};
+      }
+      if (!individualReportData.value.metrics.statusCounts) {
+        individualReportData.value.metrics.statusCounts = {};
+      }
+      
       if (data.report.metrics.totalTasks > 0) {
         await nextTick();
-        renderIndividualChart();
+        setTimeout(() => {
+          renderIndividualChart();
+        }, 100);
       }
+    } else {
+      throw new Error(data.message || 'Failed to generate individual report');
     }
   } catch (error) {
     console.error('Error fetching individual report:', error);
@@ -870,8 +1033,16 @@ async function fetchDepartmentReport(departmentName) {
 
   const param = departmentName === 'Company (All)' ? 'ALL' : encodeURIComponent(departmentName);
   try {
-    const response = await fetch(`/api/reports/department?department=${param}&requesterId=${encodeURIComponent(userEmail.value)}`);
-    if (!response.ok) throw new Error('Failed to fetch department report');
+    const token = await authStore.getToken();
+    const response = await fetch(`/api/reports/department?department=${param}&requesterId=${encodeURIComponent(userEmail.value)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to fetch department report' }));
+      throw new Error(errorData.message || `Failed to fetch department report (${response.status})`);
+    }
+    
     const data = await response.json();
     if (data.success) {
       deptReportData.value = data.report;
@@ -879,16 +1050,36 @@ async function fetchDepartmentReport(departmentName) {
         await nextTick();
         setTimeout(() => renderDepartmentChart(), 80);
       }
+    } else {
+      throw new Error(data.message || 'Failed to generate department report');
     }
   } catch (error) {
     console.error('Error fetching dept report:', error);
-    alert('Failed to fetch department report');
+    alert(error.message || 'Failed to fetch department report');
   } finally {
     reportLoading.value = false;
   }
 }
 
+function getDepartmentTitle(value) {
+  const dept = companyDepartments.value.find(d => d.value === value);
+  return dept ? dept.title : value;
+}
+
+function removeDepartment(deptValue) {
+  const index = companySelectedDepartments.value.indexOf(deptValue);
+  if (index > -1) {
+    companySelectedDepartments.value.splice(index, 1);
+    fetchCompanyReport();
+  }
+}
+
 async function fetchCompanyReport() {
+  // Validate selection
+  if (!companySelectedDepartments.value || companySelectedDepartments.value.length === 0) {
+    companySelectedDepartments.value = ['ALL'];
+  }
+  
   reportLoading.value = true;
   companyReportData.value = null;
   destroyChart(companyStatusChart);
@@ -897,29 +1088,60 @@ async function fetchCompanyReport() {
   companyDeptChart = null;
 
   try {
+    const token = await authStore.getToken();
     let url = `/api/reports/company?requesterId=${encodeURIComponent(userEmail.value)}`;
-    if (companySelectedDepartment.value && companySelectedDepartment.value !== 'ALL') {
-      url += `&department=${encodeURIComponent(companySelectedDepartment.value)}`;
+    
+    // Handle multiple department selection
+    if (companySelectedDepartments.value && companySelectedDepartments.value.length > 0) {
+      // If ALL is selected, use ALL; otherwise send selected departments
+      if (companySelectedDepartments.value.includes('ALL')) {
+        url += `&department=ALL`;
+      } else {
+        // Send comma-separated list of departments
+        url += `&departments=${encodeURIComponent(companySelectedDepartments.value.join(','))}`;
+      }
     }
+    
     if (companyStartDate.value) url += `&startDate=${companyStartDate.value}`;
     if (companyEndDate.value) url += `&endDate=${companyEndDate.value}`;
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to fetch company report' }));
       if (response.status === 403) {
-        throw new Error('Only directors can generate company reports.');
+        throw new Error(errorData.message || 'You do not have permission to generate company reports.');
       }
-      throw new Error('Failed to fetch company report');
+      throw new Error(errorData.message || `Failed to fetch company report (${response.status})`);
     }
     const data = await response.json();
     if (data.success) {
       companyReportData.value = data.report;
-      if (data.report.summary.availableDepartments) {
-        companyDepartments.value = ['ALL', ...data.report.summary.availableDepartments];
+      // Ensure summary and statusCounts exist
+      if (!companyReportData.value.summary) {
+        companyReportData.value.summary = {};
       }
+      if (!companyReportData.value.summary.statusCounts) {
+        companyReportData.value.summary.statusCounts = {};
+      }
+      if (!companyReportData.value.summary.departmentCounts) {
+        companyReportData.value.summary.departmentCounts = {};
+      }
+      
+      if (data.report.summary.availableDepartments) {
+        companyDepartments.value = [
+          { title: 'Company (All)', value: 'ALL' },
+          ...data.report.summary.availableDepartments.map(dept => ({ title: dept, value: dept }))
+        ];
+      }
+      
       if (data.report.summary.totalTasks > 0) {
         await nextTick();
-        renderCompanyCharts();
+        setTimeout(() => {
+          renderCompanyCharts();
+        }, 100);
       }
     }
   } catch (error) {
@@ -942,77 +1164,103 @@ function renderProjectCharts() {
   if (!projectReportData.value || projectReportData.value.summary.totalTasks === 0) return;
 
   const summary = projectReportData.value.summary;
+  
+  // Render Status Chart
   const statusCanvas = document.getElementById('status-chart');
   if (statusCanvas) {
-    const statusCtx = statusCanvas.getContext('2d');
-    
-    // Ensure all status types are included, even if count is 0
-    const allStatuses = ['Unassigned', 'Ongoing', 'Pending Review', 'Completed', 'Cancelled'];
-    const statusLabels = [];
-    const statusData = [];
-    const statusColors = {
-      'Unassigned': '#2196F3',      // Blue/Info
-      'Ongoing': '#FF9800',          // Orange/Warning
-      'Pending Review': '#9C27B0',   // Purple
-      'Completed': '#4CAF50',         // Green/Success
-      'Cancelled': '#757575'          // Grey
-    };
-    
-    allStatuses.forEach(status => {
-      const count = summary.statusCounts?.[status] || 0;
-      // Only include statuses that exist in the data or show 0
-      statusLabels.push(status);
-      statusData.push(count);
-    });
-    
-    statusChart = new Chart(statusCtx, {
-      type: 'pie',
-      data: {
-        labels: statusLabels,
-        datasets: [{
-          label: 'Task Status',
-          data: statusData,
-          backgroundColor: statusLabels.map(s => statusColors[s] || '#BDBDBD')
-        }]
-      },
-      options: { 
-        responsive: true, 
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'right'
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                const label = context.label || '';
-                const value = context.parsed || 0;
-                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                return `${label}: ${value} (${percentage}%)`;
+    try {
+      const statusCtx = statusCanvas.getContext('2d');
+      
+      // Get status counts from summary, ensure it exists
+      const statusCounts = summary.statusCounts || {};
+      
+      // Ensure all status types are included, even if count is 0
+      const allStatuses = ['Unassigned', 'Ongoing', 'Pending Review', 'Completed', 'Cancelled'];
+      const statusLabels = [];
+      const statusData = [];
+      const statusColors = {
+        'Unassigned': '#2196F3',      // Blue/Info
+        'Ongoing': '#FF9800',          // Orange/Warning
+        'Pending Review': '#9C27B0',   // Purple
+        'Completed': '#4CAF50',         // Green/Success
+        'Cancelled': '#757575'          // Grey
+      };
+      
+      allStatuses.forEach(status => {
+        const count = statusCounts[status] || 0;
+        statusLabels.push(status);
+        statusData.push(count);
+      });
+      
+      statusChart = new Chart(statusCtx, {
+        type: 'pie',
+        data: {
+          labels: statusLabels,
+          datasets: [{
+            label: 'Task Status',
+            data: statusData,
+            backgroundColor: statusLabels.map(s => statusColors[s] || '#BDBDBD')
+          }]
+        },
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                  return `${label}: ${value} (${percentage}%)`;
+                }
               }
             }
           }
         }
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error rendering status chart:', error);
+    }
   }
   
+  // Render Workload Chart
   const workloadCanvas = document.getElementById('workload-chart');
   if (workloadCanvas) {
-    const workloadCtx = workloadCanvas.getContext('2d');
-    workloadChart = new Chart(workloadCtx, {
-      type: 'bar',
-      data: {
-        labels: Object.keys(summary.memberWorkload).map(e => e.split('@')[0]),
-        datasets: [{
-          label: 'Number of Tasks Assigned',
-          data: Object.values(summary.memberWorkload),
-          backgroundColor: '#7E57C2'
-        }]
-      },
-       options: { responsive: true, maintainAspectRatio: false }
-    });
+    try {
+      const workloadCtx = workloadCanvas.getContext('2d');
+      const memberWorkload = summary.memberWorkload || {};
+      
+      // Only render if there's workload data
+      if (Object.keys(memberWorkload).length > 0) {
+        workloadChart = new Chart(workloadCtx, {
+          type: 'bar',
+          data: {
+            labels: Object.keys(memberWorkload).map(e => e.split('@')[0]),
+            datasets: [{
+              label: 'Number of Tasks Assigned',
+              data: Object.values(memberWorkload),
+              backgroundColor: '#7E57C2'
+            }]
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error rendering workload chart:', error);
+    }
   }
 }
 
@@ -1055,19 +1303,56 @@ function renderIndividualChart() {
   const metrics = individualReportData.value.metrics;
   const statusCanvas = document.getElementById('individual-status-chart');
   if (statusCanvas) {
-    const statusCtx = statusCanvas.getContext('2d');
-    individualStatusChart = new Chart(statusCtx, {
-      type: 'doughnut',
-      data: {
-        labels: Object.keys(metrics.statusCounts),
-        datasets: [{
-          label: 'Task Status',
-          data: Object.values(metrics.statusCounts),
-          backgroundColor: ['#42A5F5', '#66BB6A', '#FFA726', '#EF5350', '#BDBDBD']
-        }]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    try {
+      const statusCtx = statusCanvas.getContext('2d');
+      const statusCounts = metrics.statusCounts || {};
+      const statusLabels = Object.keys(statusCounts);
+      const statusData = Object.values(statusCounts);
+      
+      if (statusLabels.length > 0) {
+        const statusColors = {
+          'Unassigned': '#2196F3',
+          'Ongoing': '#FF9800',
+          'Pending Review': '#9C27B0',
+          'Completed': '#4CAF50',
+          'Cancelled': '#757575'
+        };
+        
+        individualStatusChart = new Chart(statusCtx, {
+          type: 'doughnut',
+          data: {
+            labels: statusLabels,
+            datasets: [{
+              label: 'Task Status',
+              data: statusData,
+              backgroundColor: statusLabels.map(s => statusColors[s] || '#BDBDBD')
+            }]
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'right'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || '';
+                    const value = context.parsed || 0;
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                    return `${label}: ${value} (${percentage}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error rendering individual chart:', error);
+    }
   }
 }
 
@@ -1081,37 +1366,92 @@ function renderCompanyCharts() {
   // Status chart
   const statusCanvas = document.getElementById('company-status-chart');
   if (statusCanvas) {
-    const statusCtx = statusCanvas.getContext('2d');
-    companyStatusChart = new Chart(statusCtx, {
-      type: 'pie',
-      data: {
-        labels: Object.keys(summary.statusCounts),
-        datasets: [{
-          label: 'Task Status',
-          data: Object.values(summary.statusCounts),
-          backgroundColor: ['#42A5F5', '#66BB6A', '#FFA726', '#EF5350', '#BDBDBD']
-        }]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    try {
+      const statusCtx = statusCanvas.getContext('2d');
+      const statusCounts = summary.statusCounts || {};
+      const statusLabels = Object.keys(statusCounts);
+      const statusData = Object.values(statusCounts);
+      
+      if (statusLabels.length > 0) {
+        const statusColors = {
+          'Unassigned': '#2196F3',
+          'Ongoing': '#FF9800',
+          'Pending Review': '#9C27B0',
+          'Completed': '#4CAF50',
+          'Cancelled': '#757575'
+        };
+        
+        companyStatusChart = new Chart(statusCtx, {
+          type: 'pie',
+          data: {
+            labels: statusLabels,
+            datasets: [{
+              label: 'Task Status',
+              data: statusData,
+              backgroundColor: statusLabels.map(s => statusColors[s] || '#BDBDBD')
+            }]
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'right'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || '';
+                    const value = context.parsed || 0;
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                    return `${label}: ${value} (${percentage}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error rendering company status chart:', error);
+    }
   }
   
   // Department chart
   const deptCanvas = document.getElementById('company-dept-chart');
   if (deptCanvas) {
-    const deptCtx = deptCanvas.getContext('2d');
-    companyDeptChart = new Chart(deptCtx, {
-      type: 'bar',
-      data: {
-        labels: Object.keys(summary.departmentCounts),
-        datasets: [{
-          label: 'Tasks by Department',
-          data: Object.values(summary.departmentCounts),
-          backgroundColor: '#7E57C2'
-        }]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    try {
+      const deptCtx = deptCanvas.getContext('2d');
+      const departmentCounts = summary.departmentCounts || {};
+      const deptLabels = Object.keys(departmentCounts);
+      const deptData = Object.values(departmentCounts);
+      
+      if (deptLabels.length > 0) {
+        companyDeptChart = new Chart(deptCtx, {
+          type: 'bar',
+          data: {
+            labels: deptLabels,
+            datasets: [{
+              label: 'Tasks by Department',
+              data: deptData,
+              backgroundColor: '#7E57C2'
+            }]
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error rendering company department chart:', error);
+    }
   }
 }
 
@@ -1134,30 +1474,86 @@ async function exportToPDF(elementId, reportName) {
     }
   });
   
-  // Convert each canvas to an image
+  // Convert each canvas to an image with proper dimensions
   for (let i = 0; i < canvasElements.length; i++) {
     const canvas = canvasElements[i];
     try {
       // Get the Chart.js instance from the canvas
       const chart = Chart.getChart(canvas);
       if (chart) {
-        // Get the base64 image of the chart with higher quality
-        // Use higher pixel ratio for better quality
-        const originalPixelRatio = chart.options.devicePixelRatio || window.devicePixelRatio || 1;
-        chart.options.devicePixelRatio = 3; // Higher quality for PDF export
+        // Get the container element to determine proper dimensions
+        const container = canvas.parentElement;
+        const containerRect = container ? container.getBoundingClientRect() : null;
+        
+        // Determine chart type and appropriate dimensions
+        const chartType = chart.config.type;
+        const isPieChart = chartType === 'pie' || chartType === 'doughnut';
+        
+        // For pie charts, use square dimensions to prevent stretching
+        // For other charts, use container dimensions
+        let exportWidth, exportHeight;
+        
+        if (isPieChart) {
+          // Use square dimensions for pie charts (use the smaller dimension)
+          const size = containerRect ? Math.min(containerRect.width, containerRect.height) : 400;
+          exportWidth = size;
+          exportHeight = size;
+        } else {
+          // For bar/line charts, use container dimensions
+          exportWidth = containerRect ? containerRect.width : 400;
+          exportHeight = containerRect ? containerRect.height : 250;
+        }
+        
+        // Store original chart options and dimensions
+        const originalAspectRatio = chart.options.maintainAspectRatio;
+        const originalCanvasWidth = chart.canvas.width;
+        const originalCanvasHeight = chart.canvas.height;
+        
+        // Temporarily modify chart for export
+        chart.options.maintainAspectRatio = true;
+        
+        // Set canvas dimensions for export (higher resolution for better quality)
+        const exportScale = 2;
+        chart.canvas.width = exportWidth * exportScale;
+        chart.canvas.height = exportHeight * exportScale;
+        
+        // Resize the chart with new dimensions
         chart.resize();
+        
+        // Force chart update to ensure it renders with new dimensions
+        chart.update('none'); // 'none' mode for faster update
+        
+        // Get the base64 image
         const imageUrl = chart.toBase64Image('image/png', 1.0);
-        // Restore original pixel ratio
-        chart.options.devicePixelRatio = originalPixelRatio;
+        
+        // Restore original chart state
+        chart.options.maintainAspectRatio = originalAspectRatio;
+        chart.canvas.width = originalCanvasWidth;
+        chart.canvas.height = originalCanvasHeight;
         chart.resize();
         
         const canvasId = canvas.id || canvas.getAttribute('data-pdf-export-id') || `canvas-${i}`;
-        canvasToImageMap.set(canvasId, imageUrl);
+        canvasToImageMap.set(canvasId, {
+          imageUrl,
+          width: exportWidth,
+          height: exportHeight,
+          isPieChart
+        });
       } else {
         // Fallback: convert canvas directly to image
+        const container = canvas.parentElement;
+        const containerRect = container ? container.getBoundingClientRect() : null;
+        const width = containerRect ? containerRect.width : canvas.width || 400;
+        const height = containerRect ? containerRect.height : canvas.height || 250;
+        
         const imageUrl = canvas.toDataURL('image/png');
         const canvasId = canvas.id || canvas.getAttribute('data-pdf-export-id') || `canvas-${i}`;
-        canvasToImageMap.set(canvasId, imageUrl);
+        canvasToImageMap.set(canvasId, {
+          imageUrl,
+          width,
+          height,
+          isPieChart: false
+        });
       }
     } catch (error) {
       console.warn('Failed to convert canvas to image:', error, canvas);
@@ -1165,7 +1561,12 @@ async function exportToPDF(elementId, reportName) {
       try {
         const imageUrl = canvas.toDataURL('image/png');
         const canvasId = canvas.id || canvas.getAttribute('data-pdf-export-id') || `canvas-${i}`;
-        canvasToImageMap.set(canvasId, imageUrl);
+        canvasToImageMap.set(canvasId, {
+          imageUrl,
+          width: canvas.width || 400,
+          height: canvas.height || 250,
+          isPieChart: false
+        });
       } catch (e) {
         console.warn('Failed to convert canvas to data URL:', e);
       }
@@ -1206,17 +1607,46 @@ async function exportToPDF(elementId, reportName) {
     const canvasId = clonedCanvas.id || clonedCanvas.getAttribute('data-pdf-export-id') || `canvas-${index}`;
     
     if (canvasToImageMap.has(canvasId)) {
+      const chartData = canvasToImageMap.get(canvasId);
       const img = document.createElement('img');
-      img.src = canvasToImageMap.get(canvasId);
+      img.src = chartData.imageUrl || chartData; // Handle both old and new format
       
-      // Preserve original canvas dimensions
-      const originalWidth = clonedCanvas.width || clonedCanvas.offsetWidth || 400;
-      const originalHeight = clonedCanvas.height || clonedCanvas.offsetHeight || 250;
+      // Use stored dimensions if available, otherwise use fallback
+      let imgWidth, imgHeight;
       
-      img.style.width = originalWidth + 'px';
-      img.style.height = originalHeight + 'px';
-      img.style.maxWidth = '100%';
+      if (typeof chartData === 'object' && chartData.width && chartData.height) {
+        // New format with dimensions
+        imgWidth = chartData.width;
+        imgHeight = chartData.height;
+      } else {
+        // Old format fallback - get from container
+        const container = clonedCanvas.parentElement;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          // For pie charts, use square dimensions
+          const canvasIdLower = canvasId.toLowerCase();
+          const isPie = canvasIdLower.includes('status') || canvasIdLower.includes('pie');
+          
+          if (isPie) {
+            const size = Math.min(containerRect.width, containerRect.height || 400);
+            imgWidth = size;
+            imgHeight = size;
+          } else {
+            imgWidth = containerRect.width || 400;
+            imgHeight = containerRect.height || 250;
+          }
+        } else {
+          imgWidth = 400;
+          imgHeight = 250;
+        }
+      }
+      
+      // Set image dimensions with aspect ratio preservation
+      img.style.width = imgWidth + 'px';
+      img.style.height = imgHeight + 'px';
+      img.style.objectFit = 'contain'; // Preserve aspect ratio
       img.style.display = 'block';
+      img.style.margin = '0 auto'; // Center the image
       
       // Replace the canvas with the image
       clonedCanvas.parentNode.replaceChild(img, clonedCanvas);
@@ -1224,18 +1654,24 @@ async function exportToPDF(elementId, reportName) {
       console.warn('No image found for canvas:', canvasId);
       // Try to convert the cloned canvas directly as fallback
       try {
+        const container = clonedCanvas.parentElement;
+        const containerRect = container ? container.getBoundingClientRect() : null;
+        const width = containerRect ? containerRect.width : 400;
+        const height = containerRect ? containerRect.height : 250;
+        
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = clonedCanvas.width || 400;
-        tempCanvas.height = clonedCanvas.height || 250;
+        tempCanvas.width = width;
+        tempCanvas.height = height;
         const ctx = tempCanvas.getContext('2d');
-        ctx.drawImage(clonedCanvas, 0, 0);
+        ctx.drawImage(clonedCanvas, 0, 0, width, height);
         
         const img = document.createElement('img');
         img.src = tempCanvas.toDataURL('image/png');
-        img.style.width = tempCanvas.width + 'px';
-        img.style.height = tempCanvas.height + 'px';
-        img.style.maxWidth = '100%';
+        img.style.width = width + 'px';
+        img.style.height = height + 'px';
+        img.style.objectFit = 'contain';
         img.style.display = 'block';
+        img.style.margin = '0 auto';
         clonedCanvas.parentNode.replaceChild(img, clonedCanvas);
       } catch (e) {
         console.warn('Failed to convert cloned canvas:', e);
@@ -1299,6 +1735,10 @@ async function exportToPDF(elementId, reportName) {
 // Watch for tab changes
 watch(activeTab, (newTab) => {
   if (newTab === 'company') {
+    // Reset to ALL when switching to company tab
+    if (companySelectedDepartments.value.length === 0 || !companySelectedDepartments.value.includes('ALL')) {
+      companySelectedDepartments.value = ['ALL'];
+    }
     fetchCompanyReport();
   }
 });
@@ -1326,13 +1766,75 @@ onMounted(() => {
 }
 
 .report-export-fixed-container {
-  width: 900px;
-  max-width: 98vw;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto 24px auto;
   background: white;
-  padding: 18px 18px 28px 18px;
+  padding: 18px;
   border-radius: 12px;
   overflow: visible !important;
+}
+
+.report-header {
+  padding: 0 !important;
+}
+
+.report-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.report-title-section {
+  flex: 1;
+  min-width: 200px;
+}
+
+.report-title {
+  word-wrap: break-word;
+  font-size: clamp(1.25rem, 4vw, 2rem);
+}
+
+.report-subtitle {
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+  word-wrap: break-word;
+}
+
+.export-btn {
+  flex-shrink: 0;
+}
+
+.export-btn-text {
+  display: inline;
+}
+
+.chart-card {
+  height: 100%;
+}
+
+.chart-container {
+  min-height: 250px;
+  position: relative;
+  width: 100%;
+}
+
+.chart-canvas {
+  max-height: 250px;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.chart-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  text-align: center;
+  padding: 32px;
+  color: rgba(0, 0, 0, 0.38);
 }
 
 .border-error {
@@ -1364,5 +1866,96 @@ onMounted(() => {
 
 .v-table td {
   background: #fff;
+}
+
+/* ===========================
+   Responsive Design - Mobile
+   =========================== */
+
+/* Tablet and below */
+@media (max-width: 960px) {
+  .report-export-fixed-container {
+    padding: 16px;
+  }
+
+  .report-header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .export-btn {
+    width: 100%;
+  }
+
+  .chart-container {
+    min-height: 300px;
+  }
+
+  .chart-canvas {
+    max-height: 300px;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 600px) {
+  .report-export-fixed-container {
+    padding: 12px;
+    margin: 0 auto 16px auto;
+  }
+
+  .report-title {
+    font-size: 1.25rem;
+  }
+
+  .report-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .chart-container {
+    min-height: 250px;
+    padding: 8px;
+  }
+
+  .chart-canvas {
+    max-height: 250px;
+  }
+
+  .chart-empty-state {
+    min-height: 200px;
+    padding: 24px 16px;
+  }
+
+  .export-btn-text {
+    display: none;
+  }
+
+  /* Make tables horizontally scrollable on mobile */
+  :deep(.v-data-table) {
+    overflow-x: auto;
+    display: block;
+  }
+
+  :deep(.v-data-table__wrapper) {
+    overflow-x: auto;
+  }
+
+  .v-table {
+    min-width: 600px;
+  }
+}
+
+/* Very small mobile devices */
+@media (max-width: 400px) {
+  .report-export-fixed-container {
+    padding: 8px;
+  }
+
+  .chart-container {
+    min-height: 200px;
+  }
+
+  .chart-canvas {
+    max-height: 200px;
+  }
 }
 </style>

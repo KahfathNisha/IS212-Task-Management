@@ -48,10 +48,10 @@ const checkReportPermission = (userRole, reportType) => {
       'company': true
     },
     'hr': {
-      'individual': true, // Can view individual reports of employees in their department
+      'individual': true, // Can view individual reports of all employees (for KPI tracking)
       'project': false,
       'department': true,
-      'company': false
+      'company': true // Can view company-wide metrics for KPI tracking
     }
   };
   
@@ -206,13 +206,7 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate department reports.' });
     }
     
-    // HR can only view their own department, Managers can view their department, Directors can view all
-    if (userRole === 'hr') {
-      const userData = userDoc.data();
-      if (department !== 'ALL' && department !== userData.department) {
-        return res.status(403).json({ success: false, message: 'Forbidden: HR can only view reports for their own department.' });
-      }
-    }
+    // HR can view all departments (for KPI tracking), Managers can view their department, Directors can view all
     if (userRole === 'manager') {
       const userData = userDoc.data();
       if (department !== 'ALL' && department !== userData.department) {
@@ -310,13 +304,13 @@ exports.generateDepartmentReport = async (req, res) => {
  */
 exports.generateCompanyReport = async (req, res) => {
   try {
-    const { requesterId, department, startDate, endDate } = req.query;
+    const { requesterId, department, departments, startDate, endDate } = req.query;
 
     if (!requesterId) {
       return res.status(401).json({ success: false, message: 'Unauthorized: Requester ID is required.' });
     }
 
-    // Authorization: Only Directors can generate company reports
+    // Authorization: Directors and HR can generate company reports
     const userDoc = await db.collection('users').doc(requesterId).get();
     if (!userDoc.exists) {
       return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
@@ -324,19 +318,44 @@ exports.generateCompanyReport = async (req, res) => {
 
     const userRole = userDoc.data().role?.toLowerCase();
     if (!checkReportPermission(userRole, 'company')) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Only directors can generate company performance reports.' });
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate company performance reports.' });
     }
 
     // Build query for tasks
-    let tasksQuery = db.collection('tasks');
+    let tasksSnapshot;
     
-    // Filter by department if provided
-    if (department && department !== 'ALL') {
-      tasksQuery = tasksQuery.where('taskOwnerDepartment', '==', department);
+    // Handle multiple department filtering
+    if (departments && departments !== 'ALL') {
+      // Multiple departments selected (comma-separated)
+      const deptArray = departments.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      
+      if (deptArray.length === 0) {
+        // If no valid departments, get all tasks
+        tasksSnapshot = await db.collection('tasks').get();
+      } else if (deptArray.length === 1) {
+        // Single department, use where query
+        tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', deptArray[0]).get();
+      } else {
+        // Multiple departments - Firestore doesn't support OR in where, so fetch all and filter
+        tasksSnapshot = await db.collection('tasks').get();
+      }
+    } else if (department && department !== 'ALL') {
+      // Single department (backward compatibility)
+      tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
+    } else {
+      // ALL departments or no filter
+      tasksSnapshot = await db.collection('tasks').get();
     }
-
-    const tasksSnapshot = await tasksQuery.get();
+    
     let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Filter by multiple departments if needed (when using departments parameter)
+    if (departments && departments !== 'ALL') {
+      const deptArray = departments.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      if (deptArray.length > 1) {
+        tasks = tasks.filter(task => deptArray.includes(task.taskOwnerDepartment));
+      }
+    }
 
     // Filter by date range if provided
     if (startDate || endDate) {
@@ -452,13 +471,7 @@ exports.generateIndividualReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate individual reports.' });
     }
 
-    // HR can only view employees in their department
-    if (requesterRole === 'hr') {
-      if (employeeDept !== requesterDept) {
-        return res.status(403).json({ success: false, message: 'Forbidden: HR can only view reports for employees in their department.' });
-      }
-    }
-
+    // HR can view all employees (for KPI tracking across company)
     // Managers can view employees in their department
     if (requesterRole === 'manager') {
       if (employeeDept !== requesterDept) {

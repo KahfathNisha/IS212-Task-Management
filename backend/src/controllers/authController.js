@@ -666,9 +666,10 @@ exports.getUsers = async (req, res) => {
       const userRole = userData.role?.toLowerCase();
       
       // Filter based on requester role
-      if (requesterRole === 'hr' || requesterRole === 'manager') {
-        // HR and managers can only see users in their department
-        if (userData.department === requesterDept && userRole !== 'director') {
+      if (requesterRole === 'hr' || requesterRole === 'director') {
+        // HR and Directors can see all users except other directors (for KPI tracking)
+        // HR needs access to all employees across all departments, including other HR staff
+        if (userRole !== 'director') {
           users.push({
             email: doc.id,
             name: userData.name || doc.id.split('@')[0],
@@ -676,9 +677,9 @@ exports.getUsers = async (req, res) => {
             department: userData.department || 'Unassigned'
           });
         }
-      } else if (requesterRole === 'director') {
-        // Directors can see all users except other directors
-        if (userRole !== 'director') {
+      } else if (requesterRole === 'manager') {
+        // Managers can only see users in their department
+        if (userData.department === requesterDept && userRole !== 'director' && userRole !== 'hr') {
           users.push({
             email: doc.id,
             name: userData.name || doc.id.split('@')[0],
