@@ -9,6 +9,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Inject the Firebase service account JSON stored in repo secrets
+      FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IS212_TASK_MANAGEMENT }}
+      # Point the server to local emulators so CI doesn't need prod Firebase access
+      FIRESTORE_EMULATOR_HOST: localhost:8080
+      AUTH_EMULATOR_HOST: localhost:9099
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,29 +35,44 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Start Firebase Emulators
+        run: |
+          # Start emulators in background and redirect logs for upload on failure
+          cd backend
+          firebase emulators:start --only auth,firestore --project=all-in-one-smu > ../emulator-logs.txt 2>&1 &
+          sleep 8
+
       - name: Start backend
         run: |
           cd backend
-          npm run start &
-          sleep 10
-
-      - name: Start Firebase Emulators
-        run: |
-          firebase emulators:start --only auth,firestore --project=all-in-one-smu &
-          sleep 10
+          # Start server in background; it will inherit FIRESTORE_EMULATOR_HOST and AUTH_EMULATOR_HOST
+          npm run start > ../backend-server.log 2>&1 &
+          sleep 8
 
       - name: Health checks
         run: |
           echo "Performing health checks..."
-          for i in 1 2 3; do
-            echo "Attempt $i: Checking backend health..."
-            curl --fail http://127.0.0.1:3000/health || (echo "Backend health check failed on attempt $i" && exit 1)
-            echo "Attempt $i: Checking auth emulator..."
-            curl --fail http://127.0.0.1:9099/ || (echo "Auth emulator check failed on attempt $i" && exit 1)
-            echo "Attempt $i: Checking firestore emulator..."
-            curl --fail http://127.0.0.1:8080/ || (echo "Firestore emulator check failed on attempt $i" && exit 1)
-            sleep 2
-          done
+          MAX_ATTEMPTS=10
+          SLEEP_SECS=3
+
+          check_url() {
+            local url=$1
+            for attempt in $(seq 1 $MAX_ATTEMPTS); do
+              if curl -sSf "$url" > /dev/null; then
+                echo "OK: $url"
+                return 0
+              else
+                echo "Waiting for $url (attempt $attempt/$MAX_ATTEMPTS)"
+                sleep $SLEEP_SECS
+              fi
+            done
+            echo "ERROR: $url did not become available after $MAX_ATTEMPTS attempts"
+            return 1
+          }
+
+          check_url "http://127.0.0.1:3000/health" || exit 1
+          check_url "http://127.0.0.1:9099/" || exit 1
+          check_url "http://127.0.0.1:8080/" || exit 1
           echo "All health checks passed."
 
       - name: Run tests
