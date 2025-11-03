@@ -209,7 +209,8 @@ exports.generateProjectReport = async (req, res) => {
  */
 exports.generateIndividualReport = async (req, res) => {
   try {
-    const { employeeEmail, departments, startDate, endDate } = req.query;
+  // Safely read query params (use empty object if req.query is missing)
+  const { employeeEmail, departments, department, startDate, endDate } = req?.query || {};
     const { requesterId } = req.query;
     const perms = await getUserPermissions(requesterId);
 
@@ -232,11 +233,9 @@ exports.generateIndividualReport = async (req, res) => {
     }
 
     // Query tasks by assignedTo first (single field index, no composite needed)
-    let tasksQuery = db.collection('tasks').where('assignedTo', '==', employeeEmail);
-    const tasksSnapshot = await tasksQuery.get();
-
-    // Build query for tasks
-    let tasksSnapshot;
+  let tasksQuery = db.collection('tasks').where('assignedTo', '==', employeeEmail);
+  // Use `let` so we can reassign the snapshot below when applying department filters
+  let tasksSnapshot = await tasksQuery.get();
     
     // Handle multiple department filtering
     if (departments && departments !== 'ALL') {
@@ -361,10 +360,19 @@ exports.generateDepartmentReport = async (req, res) => {
     }
 
     const usersQuery = await db.collection('Users').where('department', '==', department).get();
-    // Filter out HR users - they don't have tasks so shouldn't be included in department reports
-    const departmentUsers = usersQuery.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(user => user.role?.toLowerCase() !== 'hr');
+    // Build departmentUsers from snapshot; don't assume HR users have no tasks.
+    // Use doc.id as a safe fallback for email if the email field is missing.
+    const departmentUsers = usersQuery.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        email: data.email || doc.id,
+        name: data.name || doc.id.split('@')[0],
+        role: data.role || 'staff',
+        department: data.department || department,
+        ...data
+      };
+    });
     const userEmails = departmentUsers.map(user => user.email);
 
     if (userEmails.length === 0) {
