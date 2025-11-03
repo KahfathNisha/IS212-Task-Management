@@ -98,6 +98,7 @@ import { ref, watch, computed } from 'vue'
 import axios from 'axios'
 import ProjectTaskItem from './ProjectTaskItem.vue'
 import ProjectTaskItemDetails from './ProjectTaskItemDetails.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   projectId: { type: String, required: true },
@@ -121,16 +122,23 @@ const visibleStatuses = computed(() => {
   return taskStatuses.filter(status => getTasksByStatus(status).length > 0)
 })
 
+// Auth store
+const authStore = useAuthStore()
+
 // Axios client
 const axiosClient = axios.create({
   baseURL: 'http://localhost:3000/api',
   headers: { 'Content-Type': 'application/json' }
 })
 
-axiosClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('firebaseIdToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const token = await authStore.getToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.error('Error getting auth token:', error)
   }
   return config
 })

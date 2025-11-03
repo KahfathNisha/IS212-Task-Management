@@ -207,8 +207,11 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-
 import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
+
+// Auth store
+const authStore = useAuthStore()
 
 // Axios client setup
 const axiosClient = axios.create({
@@ -218,10 +221,14 @@ const axiosClient = axios.create({
   },
 })
 
-axiosClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('firebaseIdToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const token = await authStore.getToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.error('Error getting auth token:', error)
   }
   return config
 }, error => {

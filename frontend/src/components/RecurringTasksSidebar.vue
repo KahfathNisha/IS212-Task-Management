@@ -157,6 +157,7 @@ import EditRecurrenceDialog from './EditRecurrenceDialog.vue'
 import axios from 'axios'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebase'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   show: { type: Boolean, default: false }
@@ -225,16 +226,23 @@ watch(dialog, (newValue) => {
   }
 })
 
+// Auth store
+const authStore = useAuthStore()
+
 // Axios client
 const axiosClient = axios.create({
   baseURL: 'http://localhost:3000/api',
   headers: { 'Content-Type': 'application/json' }
 })
 
-axiosClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('firebaseIdToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const token = await authStore.getToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.error('Error getting auth token:', error)
   }
   return config
 })
