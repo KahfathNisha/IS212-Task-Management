@@ -26,51 +26,66 @@ jobs:
 
       - name: Setup Firebase Service Account
         run: |
-          # Create service account key file and authenticate firebase CLI
           echo "$FIREBASE_SERVICE_ACCOUNT_KEY" > service-account-key.json
           export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account-key.json"
-          # Verify the service account file was created correctly
           ls -la service-account-key.json
-          # Test firebase authentication
-          firebase projects:list
 
       - name: Install firebase-tools
         run: npm install -g firebase-tools@latest
 
-      - name: Install backend deps
+      - name: Verify firebase CLI & auth (optional)
+        run: |
+          # Optional quick check: list projects. This requires the service account JSON to be valid.
+          # If you prefer not to call Firebase production services in CI, you can remove this step.
+          firebase --version
+          firebase projects:list || echo "projects:list failed (may not be allowed in CI)"
+
+      - name: Install backend dependencies
         working-directory: backend
         run: npm ci
 
-      - name: Install frontend deps
+      - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
-      - name: Start Firebase Emulators
+      - name: Start Firebase emulators
         run: |
-          # Set up service account for emulator authentication
           export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account-key.json"
-          # Start emulators in background with proper error logging
           cd backend
-          firebase emulators:start --only auth,firestore --project=all-in-one-smu > ../emulator-logs.txt 2>&1 &
-          sleep 15  # Increased sleep time to ensure emulators are fully started
-          # Check if emulators are running
-          ps aux | grep firebase || echo "No firebase processes found"
-          # Show emulator logs for debugging
-          echo "=== Emulator startup logs ==="
-          cat ../emulator-logs.txt
+          
+          # Start emulators in background; capture logs for upload
+          nohup firebase emulators:start \
+            --only auth,firestore \
+            --project=all-in-one-smu \
+            > ../emulator-logs.txt 2>&1 &
+          
+          echo "Waiting for Firebase emulators to start..."
+          
+          for i in {1..30}; do
+            # quick port check; adjust if your emulator exposes different endpoints
+            if nc -z localhost 9099 && nc -z localhost 8080; then
+              echo "Firebase emulators are listening on expected ports"
+              break
+            fi
+            echo "Waiting for emulators... attempt $i/30"
+            sleep 2
+          done
+          
+          ps aux | grep firebase | grep -v grep || echo "Warning: No firebase processes found"
+          echo "=== Emulator startup logs (tail) ==="
+          tail -n 200 ../emulator-logs.txt || true
 
-      - name: Start backend
+      - name: Start backend server
         run: |
           cd backend
-          # Start server in background; it will inherit FIRESTORE_EMULATOR_HOST and AUTH_EMULATOR_HOST
           npm run start > ../backend-server.log 2>&1 &
           sleep 8
 
       - name: Health checks
         run: |
           echo "Performing health checks..."
-          MAX_ATTEMPTS=15  # Increased from 10 to 15 attempts
-          SLEEP_SECS=4     # Increased from 3 to 4 seconds between attempts
+          MAX_ATTEMPTS=15
+          SLEEP_SECS=4
 
           check_url() {
             local url=$1
@@ -88,32 +103,45 @@ jobs:
           }
 
           check_url "http://127.0.0.1:3000/health" || exit 1
-          check_url "http://127.0.0.1:9099/" || exit 1
-          check_url "http://127.0.0.1:8080/" || exit 1
+          
+          # port-check fallback for emulators (root may not respond with 200)
+          for port in 9099 8080; do
+            if nc -z 127.0.0.1 $port; then
+              echo "Port $port is open"
+            else
+              echo "ERROR: Port $port not open"
+              exit 1
+            fi
+          done
           echo "All health checks passed."
 
-      - name: Run tests
-        # Run backend Jest tests with emulators and servers already running.
+      - name: Run backend tests
         run: |
           export FIRESTORE_EMULATOR_HOST=localhost:8080
           export AUTH_EMULATOR_HOST=localhost:9099
-
           echo "Running backend integration tests (Jest)"
-          (cd backend && npx jest --runInBand --ci)
+          cd backend
+          npx jest --runInBand --ci
 
-      - name: Upload server & emulator logs on failure
+      - name: Upload failure logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: failure-logs
           path: |
+            emulator-logs.txt
+            backend-server.log
             firestore-debug.log
             auth-debug.log
 
-      - name: Print recent log snippets for quick debugging
+      - name: Print debugging logs on failure
         if: failure()
         run: |
-          echo "=== firestore-debug.log (last 200 lines) ==="
-          if [ -f firestore-debug.log ]; then tail -n 200 firestore-debug.log || true; else echo "(no firestore-debug.log)"; fi
-          echo "=== auth-debug.log (last 200 lines) ==="
-          if [ -f auth-debug.log ]; then tail -n 200 auth-debug.log || true; else echo "(no auth-debug.log)"; fi
+          for f in emulator-logs.txt backend-server.log firestore-debug.log auth-debug.log; do
+            echo "=== $f (last 200 lines) ==="
+            if [ -f "$f" ]; then
+              tail -n 200 "$f" || true
+            else
+              echo "(no $f found)"
+            fi
+          done
