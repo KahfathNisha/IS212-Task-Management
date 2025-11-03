@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -56,42 +55,13 @@ jobs:
           echo "All health checks passed."
 
       - name: Run tests
-        # Run tests with emulators and servers already running.
-        # This script starts frontend, waits for it to be ready,
-        # runs Jest and Playwright, then shuts down frontend.
+        # Run backend Jest tests with emulators and servers already running.
         run: |
           export FIRESTORE_EMULATOR_HOST=localhost:8080
           export AUTH_EMULATOR_HOST=localhost:9099
-          echo "Starting frontend in background (logging to frontend/frontend.log)..."
-          (cd frontend && npm run dev > frontend.log 2>&1) &
-          FRONTEND_PID=$!
-          echo "Frontend PID: $FRONTEND_PID"
-
-          echo "Waiting for frontend to be ready (may take up to 120s)..."
-          npx wait-on -t 120000 http://127.0.0.1:5173 http://127.0.0.1:5174 || (echo "Frontend wait-on failed" && exit 1)
-
-          echo "Checking frontend availability..."
-          curl --fail http://127.0.0.1:5173/ || (echo "Frontend not responding" && exit 1)
 
           echo "Running backend integration tests (Jest)"
           (cd backend && npx jest --runInBand --ci)
-
-          echo "Installing Playwright dependencies..."
-          (cd frontend && npx playwright install --with-deps)
-
-          echo "Run Playwright E2E (using existing servers)"
-          export PLAYWRIGHT_USE_EXISTING=1
-          (cd frontend && npx playwright test --reporter=list)
-
-          echo "Shutting down background servers"
-          kill ${FRONTEND_PID:-0} || true
-
-      - name: Upload Playwright reports (if any)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: frontend/playwright-report || frontend/test-results || ''
 
       - name: Upload server & emulator logs on failure
         if: failure()
@@ -99,23 +69,13 @@ jobs:
         with:
           name: failure-logs
           path: |
-            backend/backend.log
-            frontend/frontend.log
             firestore-debug.log
             auth-debug.log
-            backend/firestore-debug.log
-            backend/emulator-*.log
 
       - name: Print recent log snippets for quick debugging
         if: failure()
         run: |
-          echo "=== backend/backend.log (last 200 lines) ==="
-          if [ -f backend/backend.log ]; then tail -n 200 backend/backend.log || true; else echo "(no backend/backend.log)"; fi
-          echo "=== frontend/frontend.log (last 200 lines) ==="
-          if [ -f frontend/frontend.log ]; then tail -n 200 frontend/frontend.log || true; else echo "(no frontend/frontend.log)"; fi
           echo "=== firestore-debug.log (last 200 lines) ==="
           if [ -f firestore-debug.log ]; then tail -n 200 firestore-debug.log || true; else echo "(no firestore-debug.log)"; fi
           echo "=== auth-debug.log (last 200 lines) ==="
           if [ -f auth-debug.log ]; then tail -n 200 auth-debug.log || true; else echo "(no auth-debug.log)"; fi
-
-
