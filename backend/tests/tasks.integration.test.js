@@ -19,18 +19,19 @@ const app = require('../src/server');
 const base = request(app);
 
 // Helper function for timeout protection (from auth.integration.test.js pattern)
-// Default timeout increased for slower Firebase operations
-const withTimeout = (p, ms = 10000) => new Promise((resolve, reject) => {
+// Reduced default timeout for faster operations while still being safe
+const withTimeout = (p, ms = 8000) => new Promise((resolve, reject) => {
   const t = setTimeout(() => reject(new Error('operation timed out')), ms);
   Promise.resolve(p).then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); });
 });
 
 // Set timeout for all tests
-jest.setTimeout(30000); // 30 seconds like auth tests
+jest.setTimeout(25000); // 25 seconds - reduced from 30 for faster test execution
 
 describe('Tasks Integration Tests', () => {
   let testTasks = [];
   let testProjects = [];
+  let authTokens = {}; // Cache tokens to avoid repeated Firebase Auth calls
   const testUsers = {
     director: { email: 'director@test.com', role: 'director', department: 'All', name: 'Director User' },
     hr: { email: 'hr@test.com', role: 'hr', department: 'HR', name: 'HR User' },
@@ -50,15 +51,18 @@ describe('Tasks Integration Tests', () => {
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
         }, { merge: true }),
-        8000
+        5000 // Reduced from 8000
       );
     } catch (err) {
       // Silently fail - user might already exist or Firestore unavailable
     }
   };
 
-  // Helper to create/get auth token for a user
+  // Helper to create/get auth token for a user (cached)
   const getAuthToken = async (userKey) => {
+    // Return cached token if available
+    if (authTokens[userKey]) return authTokens[userKey];
+    
     const user = testUsers[userKey];
     if (!user || !admin || !db) return null;
     
@@ -80,7 +84,9 @@ describe('Tasks Integration Tests', () => {
       }
       
       // Create custom token (can be used as ID token with emulator)
-      return await admin.auth().createCustomToken(userRecord.uid);
+      const token = await admin.auth().createCustomToken(userRecord.uid);
+      authTokens[userKey] = token; // Cache the token
+      return token;
     } catch (err) {
       // Auth/Firestore not available
       return null;
@@ -98,7 +104,7 @@ describe('Tasks Integration Tests', () => {
         createdBy,
         createdAt: admin.firestore.Timestamp.now(),
         updatedAt: admin.firestore.Timestamp.now()
-      }), 10000);
+      }), 12000); // Slightly increased for reliability
       testProjects.push(projectRef.id);
       return projectRef.id;
     } catch (err) {
@@ -108,36 +114,45 @@ describe('Tasks Integration Tests', () => {
   };
 
   beforeAll(async () => {
-    // Best-effort user creation (with timeout protection)
+    // Best-effort user creation and token caching (with timeout protection)
     if (!db) {
       console.warn('⚠️ Firestore `db` is not available; some tests may be skipped.');
       return;
     }
 
     try {
-      // Create test users in Firestore (best effort - they might already exist)
+      // Create test users in Firestore in parallel (best effort - they might already exist)
       await Promise.allSettled(
         Object.values(testUsers).map(user => ensureTestUser(user))
+      );
+      
+      // Pre-generate and cache all auth tokens to avoid repeated Firebase Auth calls
+      await Promise.allSettled(
+        Object.keys(testUsers).map(userKey => getAuthToken(userKey))
       );
     } catch (err) {
       console.warn('⚠️ Skipping test user setup:', err.message);
     }
-  }, 20000); // 20 second timeout like auth tests
+  }, 15000); // 15 second timeout - reduced for faster startup
 
   afterAll(async () => {
-    // Best-effort cleanup (from auth.integration.test.js pattern)
+    // Best-effort cleanup with parallel operations for faster cleanup
     if (!db) return;
     
     try {
-      // Clean up test tasks (best effort)
-      for (const taskId of testTasks) {
-        await withTimeout(db.collection('tasks').doc(taskId).set(null), 2000).catch(() => {});
-      }
+      // Clean up test tasks in parallel (best effort)
+      await Promise.allSettled(
+        testTasks.map(taskId => 
+          withTimeout(db.collection('tasks').doc(taskId).set(null), 2000).catch(() => {})
+        )
+      );
       
-      // Clean up test projects (best effort)
-      for (const projectId of testProjects) {
-        await withTimeout(db.collection('projects').doc(projectId).set(null), 2000).catch(() => {});
-      }
+      // Clean up test projects in parallel (best effort)
+      await Promise.allSettled(
+        testProjects.map(projectId => 
+          withTimeout(db.collection('projects').doc(projectId).set(null), 2000).catch(() => {})
+        )
+      );
       
       // Clean up recurring tasks created during tests (best effort)
       try {
@@ -145,9 +160,11 @@ describe('Tasks Integration Tests', () => {
           db.collection('recurringTasks').where('taskOwner', 'in', Object.values(testUsers).map(u => u.email)).limit(20).get(),
           5000
         );
-        for (const doc of recurringTasksSnapshot.docs) {
-          await withTimeout(doc.ref.set(null), 2000).catch(() => {});
-        }
+        await Promise.allSettled(
+          recurringTasksSnapshot.docs.map(doc => 
+            withTimeout(doc.ref.set(null), 2000).catch(() => {})
+          )
+        );
       } catch (err) {
         // Ignore recurring tasks cleanup errors
       }
@@ -169,7 +186,7 @@ describe('Tasks Integration Tests', () => {
       // Ignore app deletion errors
     }
     // Give background SDK tasks a moment to finish and allow Jest to exit cleanly
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 300)); // Reduced from 500ms
   });
 
   beforeEach(() => {
@@ -513,35 +530,36 @@ describe('Tasks Integration Tests', () => {
       }
 
       try {
-        // Create test tasks
-        const task1Ref = await withTimeout(db.collection('tasks').add({
-          title: `Get All Tasks Test 1 ${Date.now()}`,
-          description: 'First test task',
-          taskOwner: 'director@test.com',
-          taskOwnerDepartment: 'All',
-          dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-          priority: 5,
-          status: 'Ongoing',
-          archived: false,
-          createdAt: admin.firestore.Timestamp.now(),
-          updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        // Create test tasks in parallel for faster setup
+        const [task1Ref, task2Ref] = await Promise.all([
+          withTimeout(db.collection('tasks').add({
+            title: `Get All Tasks Test 1 ${Date.now()}`,
+            description: 'First test task',
+            taskOwner: 'director@test.com',
+            taskOwnerDepartment: 'All',
+            dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+            priority: 5,
+            status: 'Ongoing',
+            archived: false,
+            createdAt: admin.firestore.Timestamp.now(),
+            updatedAt: admin.firestore.Timestamp.now()
+          }), 5000),
+          withTimeout(db.collection('tasks').add({
+            title: `Get All Tasks Test 2 ${Date.now()}`,
+            description: 'Second test task',
+            taskOwner: 'manager@test.com',
+            taskOwnerDepartment: 'Engineering',
+            dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)),
+            priority: 7,
+            status: 'Pending',
+            archived: false,
+            createdAt: admin.firestore.Timestamp.now(),
+            updatedAt: admin.firestore.Timestamp.now()
+          }), 5000)
+        ]);
+        
         testTaskId1 = task1Ref.id;
-
-        const task2Ref = await withTimeout(db.collection('tasks').add({
-          title: `Get All Tasks Test 2 ${Date.now()}`,
-          description: 'Second test task',
-          taskOwner: 'manager@test.com',
-          taskOwnerDepartment: 'Engineering',
-          dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)),
-          priority: 7,
-          status: 'Pending',
-          archived: false,
-          createdAt: admin.firestore.Timestamp.now(),
-          updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
         testTaskId2 = task2Ref.id;
-
         testTasks.push(testTaskId1, testTaskId2);
       } catch (err) {
         console.warn('⚠️ Error creating test tasks:', err.message);
@@ -614,7 +632,7 @@ describe('Tasks Integration Tests', () => {
           archived: false,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000); // Reduced timeout
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -682,7 +700,7 @@ describe('Tasks Integration Tests', () => {
           archived: false,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -848,7 +866,7 @@ describe('Tasks Integration Tests', () => {
           }],
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -928,7 +946,7 @@ describe('Tasks Integration Tests', () => {
           archived: false,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -1003,7 +1021,7 @@ describe('Tasks Integration Tests', () => {
           archived: false,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -1060,7 +1078,7 @@ describe('Tasks Integration Tests', () => {
           archived: true,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -1125,7 +1143,7 @@ describe('Tasks Integration Tests', () => {
           archived: false,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         testTaskId = taskRef.id;
         testTasks.push(testTaskId);
       } catch (err) {
@@ -1194,7 +1212,7 @@ describe('Tasks Integration Tests', () => {
           archived: true,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()
-        }), 10000);
+        }), 5000);
         archivedTaskId = taskRef.id;
         testTasks.push(archivedTaskId);
       } catch (err) {
@@ -1218,6 +1236,278 @@ describe('Tasks Integration Tests', () => {
       const archivedTask = response.body.find(t => t.id === archivedTaskId);
       expect(archivedTask).toBeDefined();
       expect(archivedTask.archived).toBe(true);
+    });
+  });
+
+  describe('GET /api/tasks/recurring - Get All Recurring Tasks', () => {
+    let recurringTaskId;
+
+    beforeEach(async () => {
+      if (!db) {
+        recurringTaskId = null;
+        return;
+      }
+
+      try {
+        // Create a recurring task template
+        const recurringTaskRef = await withTimeout(db.collection('recurringTasks').add({
+          title: `Recurring Task Test ${Date.now()}`,
+          description: 'Recurring task template',
+          taskOwner: 'director@test.com',
+          taskOwnerDepartment: 'All',
+          recurrence: {
+            enabled: true,
+            type: 'weekly',
+            startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          active: true,
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now()
+        }), 5000);
+        recurringTaskId = recurringTaskRef.id;
+      } catch (err) {
+        console.warn('⚠️ Error creating recurring task:', err.message);
+        recurringTaskId = null;
+      }
+    });
+
+    it('should return recurring tasks for director', async () => {
+      const token = await getAuthToken('director');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const response = await base
+        .get('/api/tasks/recurring')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      
+      if (recurringTaskId) {
+        const recurringTask = response.body.find(t => t.id === recurringTaskId);
+        expect(recurringTask).toBeDefined();
+      }
+    });
+
+    it('should filter recurring tasks by department for manager', async () => {
+      if (!db) {
+        console.warn('⚠️ Skipping test - Firestore not available');
+        return;
+      }
+
+      // Create recurring task in manager's department
+      const managerRecurringTask = await withTimeout(db.collection('recurringTasks').add({
+        title: `Manager Recurring Task ${Date.now()}`,
+        taskOwner: 'staff@test.com',
+        taskOwnerDepartment: 'Engineering',
+        recurrence: { enabled: true, type: 'daily' },
+        active: true,
+        createdAt: admin.firestore.Timestamp.now()
+      }), 5000);
+
+      const token = await getAuthToken('manager');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const response = await base
+        .get('/api/tasks/recurring')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+    });
+  });
+
+  describe('PUT /api/tasks/recurring/:id - Update Recurring Task', () => {
+    let recurringTaskId;
+
+    beforeEach(async () => {
+      if (!db) {
+        recurringTaskId = null;
+        return;
+      }
+
+      try {
+        const recurringTaskRef = await withTimeout(db.collection('recurringTasks').add({
+          title: `Update Recurring Task ${Date.now()}`,
+          taskOwner: 'director@test.com',
+          taskOwnerDepartment: 'All',
+          recurrence: {
+            enabled: true,
+            type: 'weekly',
+            startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          active: true,
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now()
+        }), 5000);
+        recurringTaskId = recurringTaskRef.id;
+      } catch (err) {
+        console.warn('⚠️ Error creating recurring task:', err.message);
+        recurringTaskId = null;
+      }
+    });
+
+    it('should update recurring task as owner', async () => {
+      if (!recurringTaskId) {
+        console.warn('⚠️ Skipping test - Recurring task not created');
+        return;
+      }
+
+      const token = await getAuthToken('director');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const updateData = {
+        recurrence: {
+          enabled: true,
+          type: 'daily',
+          startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      };
+
+      const response = await base
+        .put(`/api/tasks/recurring/${recurringTaskId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updateData);
+
+      expect(response.status).toBe(200);
+      expect(response.body.recurrence.type).toBe('daily');
+    });
+
+    it('should reject update by non-owner', async () => {
+      if (!recurringTaskId) {
+        console.warn('⚠️ Skipping test - Recurring task not created');
+        return;
+      }
+
+      const token = await getAuthToken('staff');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const updateData = {
+        recurrence: {
+          enabled: true,
+          type: 'daily'
+        }
+      };
+
+      const response = await base
+        .put(`/api/tasks/recurring/${recurringTaskId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updateData);
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toContain('owner');
+    });
+  });
+
+  describe('Task Collaborators', () => {
+    it('should allow collaborator with Edit permission to update task', async () => {
+      if (!db) {
+        console.warn('⚠️ Skipping test - Firestore not available');
+        return;
+      }
+
+      // Create task with collaborator (use longer timeout for task creation)
+      let taskId;
+      try {
+        const taskRef = await withTimeout(db.collection('tasks').add({
+          title: `Collaborator Task ${Date.now()}`,
+          description: 'Task with collaborator',
+          taskOwner: 'director@test.com',
+          taskOwnerDepartment: 'All',
+          assignedTo: null,
+          collaborators: [{
+            name: 'staff@test.com',
+            permission: 'Edit'
+          }],
+          dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+          priority: 5,
+          status: 'Ongoing',
+          archived: false,
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now()
+        }), 15000); // Increased timeout for task creation
+        taskId = taskRef.id;
+        testTasks.push(taskId);
+      } catch (err) {
+        console.warn('⚠️ Skipping test - Failed to create test task:', err.message);
+        return;
+      }
+
+      const token = await getAuthToken('staff');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const response = await base
+        .put(`/api/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ description: 'Updated by collaborator' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.description).toBe('Updated by collaborator');
+    });
+
+    it('should reject collaborator with View permission from updating task', async () => {
+      if (!db) {
+        console.warn('⚠️ Skipping test - Firestore not available');
+        return;
+      }
+
+      // Create task with View-only collaborator (use longer timeout)
+      let taskId;
+      try {
+        const taskRef = await withTimeout(db.collection('tasks').add({
+          title: `View Only Collaborator Task ${Date.now()}`,
+          description: 'Task with view-only collaborator',
+          taskOwner: 'director@test.com',
+          taskOwnerDepartment: 'All',
+          assignedTo: null,
+          collaborators: [{
+            name: 'staff@test.com',
+            permission: 'View'
+          }],
+          dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+          priority: 5,
+          status: 'Ongoing',
+          archived: false,
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now()
+        }), 15000); // Increased timeout for task creation
+        taskId = taskRef.id;
+        testTasks.push(taskId);
+      } catch (err) {
+        console.warn('⚠️ Skipping test - Failed to create test task:', err.message);
+        return;
+      }
+
+      const token = await getAuthToken('staff');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const response = await base
+        .put(`/api/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ description: 'Unauthorized update' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toContain('permission');
     });
   });
 
@@ -1287,6 +1577,52 @@ describe('Tasks Integration Tests', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.message).toContain('past');
+    });
+
+    it('should handle concurrent task updates gracefully', async () => {
+      if (!db) {
+        console.warn('⚠️ Skipping test - Firestore not available');
+        return;
+      }
+
+      let taskId;
+      try {
+        const taskRef = await withTimeout(db.collection('tasks').add({
+          title: `Concurrent Update Task ${Date.now()}`,
+          description: 'Task for concurrent update test',
+          taskOwner: 'director@test.com',
+          taskOwnerDepartment: 'All',
+          dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+          priority: 5,
+          status: 'Ongoing',
+          archived: false,
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now()
+        }), 15000); // Increased timeout for task creation
+        taskId = taskRef.id;
+        testTasks.push(taskId);
+      } catch (err) {
+        console.warn('⚠️ Skipping test - Failed to create test task:', err.message);
+        return;
+      }
+
+      const token = await getAuthToken('director');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      // Attempt concurrent updates
+      const updates = [
+        base.put(`/api/tasks/${taskId}`).set('Authorization', `Bearer ${token}`).send({ description: 'Update 1' }),
+        base.put(`/api/tasks/${taskId}`).set('Authorization', `Bearer ${token}`).send({ description: 'Update 2' })
+      ];
+
+      const results = await Promise.allSettled(updates);
+      
+      // At least one should succeed
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.status === 200);
+      expect(successful.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

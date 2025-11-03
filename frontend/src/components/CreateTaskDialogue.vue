@@ -356,6 +356,7 @@ import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import '../assets/styles.css';
 import RecurrenceOptions from './RecurrenceOptions.vue'
 import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   model: { type: Object, default: () => ({}) },
@@ -586,16 +587,21 @@ const onSave = () => {
 }
 
 const availableCategories = ref([])
+const authStore = useAuthStore()
 const axiosClient = axios.create({
   baseURL: 'http://localhost:3000/api',
   headers: { 'Content-Type': 'application/json' }
 })
 
 // Add axios interceptor for authentication
-axiosClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('firebaseIdToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const token = await authStore.getToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.error('Error getting auth token:', error)
   }
   return config
 }, error => {

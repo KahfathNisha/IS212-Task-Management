@@ -676,6 +676,9 @@ import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc } from '
 import { db } from '@/config/firebase';
 import ProjectTasks from '@/components/ProjectTasks.vue'
 
+// Auth store
+const authStore = useAuthStore()
+
 // Axios client configuration
 const axiosClient = axios.create({
   baseURL: 'http://localhost:3000/api',
@@ -684,19 +687,20 @@ const axiosClient = axios.create({
   },
 })
 
-// Axios interceptor to send the token
-axiosClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('firebaseIdToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+// Axios interceptor to send the token (using auth store's getToken method)
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const token = await authStore.getToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.error('Error getting auth token:', error)
   }
   return config
 }, error => {
   return Promise.reject(error)
 })
-
-// Auth store
-const authStore = useAuthStore()
 
 // Computed: Check if current user can edit owners field
 // Only the original creator (createdBy) can edit owners
