@@ -201,3 +201,56 @@ function formatTimeAgo(timestamp) {
   }
 }
 </script>
+
+<style scoped>
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .v-card {
+    margin: 8px;
+  }
+
+  .v-card-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .v-card-title .d-flex {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .v-card-title .ml-2 {
+    margin-left: 0 !important;
+  }
+
+  .v-list-item {
+    padding: 12px;
+  }
+
+  .d-flex.flex-column.align-end {
+    align-items: flex-start;
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .v-card-title {
+    font-size: 1.25rem;
+    padding: 12px;
+  }
+
+  .v-card-text {
+    padding: 8px;
+  }
+
+  .v-btn {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+  }
+
+  .v-btn .v-icon {
+    font-size: 18px;
+  }
+}
+</style>

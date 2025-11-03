@@ -227,6 +227,35 @@ const navigateTo = (route) => {
   }
 }
 
+@media (max-width: 480px) {
+  .quick-access-section {
+    padding: 48px 16px 64px 16px;
+  }
+
+  .section-title {
+    font-size: 28px;
+    margin-bottom: 32px;
+  }
+
+  .access-card {
+    padding: 24px 20px;
+    min-height: 200px;
+  }
+
+  .card-icon {
+    width: 60px;
+    height: 60px;
+  }
+
+  .card-title {
+    font-size: 20px;
+  }
+
+  .card-description {
+    font-size: 14px;
+  }
+}
+
 [data-theme="dark"] .access-card {
   background: #2a2a2a;
   border-color: #555;

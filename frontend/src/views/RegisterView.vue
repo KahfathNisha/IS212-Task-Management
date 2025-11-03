@@ -280,4 +280,28 @@ background: linear-gradient(135deg, #7b92d1 0%, #f5f4f2 40%, #f5f4f2 70%, #c5d49
   backdrop-filter: blur(10px);
   max-width: 100%;
 }
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 600px) {
+  .register-wrapper {
+    padding: 1rem 0;
+  }
+
+  .register-card {
+    margin: 8px;
+  }
+
+  .v-card-text {
+    padding: 24px 16px !important;
+  }
+
+  .v-card-title {
+    font-size: 1.5rem;
+    padding: 24px 16px 8px 16px !important;
+  }
+
+  .v-card-subtitle {
+    padding: 0 16px 24px 16px !important;
+  }
+}
 </style>
