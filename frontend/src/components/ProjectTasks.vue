@@ -162,7 +162,9 @@ const loadTasks = async () => {
   
   try {
     const response = await axiosClient.get(`/tasks/project/${props.projectId}`)
-    tasks.value = Array.isArray(response.data) ? response.data : []
+    const rawTasks = Array.isArray(response.data) ? response.data : []
+    // Filter out null/undefined entries for safety
+    tasks.value = rawTasks.filter(task => task != null)
     console.log('✅ ProjectTasks: Loaded', tasks.value.length, 'tasks')
     
   } catch (error) {
@@ -174,7 +176,7 @@ const loadTasks = async () => {
 }
 
 const getTasksByStatus = (status) => {
-  return tasks.value.filter(task => task.status === status)
+  return tasks.value.filter(task => task && task.status === status)
 }
 
 const toggleStatusSection = (status) => {
