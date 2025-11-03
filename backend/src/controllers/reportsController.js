@@ -8,15 +8,15 @@ async function getUserPermissions(requesterId) {
   if (!requesterId) {
     throw new Error('Unauthorized: Requester ID is required.');
   }
-  // Use 'Users' (uppercase) as we fixed before
-  const userDoc = await db.collection('Users').doc(requesterId).get();
+  // Use 'users' (lowercase) collection name
+  const userDoc = await db.collection('users').doc(requesterId).get();
   if (!userDoc.exists) {
     throw new Error('Forbidden: Requester profile not found.');
   }
   const userData = userDoc.data();
   const role = userData.role?.toLowerCase() || 'staff';
   
-  // Your RBAC Matrix Logic
+  // Your RBAC Matrix Logic - Updated to include HR for company reports
   return {
     user: userData,
     role: role,
@@ -24,7 +24,7 @@ async function getUserPermissions(requesterId) {
     canViewProject: ['staff', 'manager', 'director'].includes(role),
     canViewIndividual: ['staff', 'manager', 'director', 'hr'].includes(role),
     canViewDepartment: ['manager', 'director', 'hr'].includes(role),
-    canViewCompany: role === 'director',
+    canViewCompany: role === 'director' || role === 'hr', // HR can view company reports for KPI tracking
   };
 }
 
@@ -79,9 +79,20 @@ exports.generateProjectReport = async (req, res) => {
       }
     }
 
-    // Query tasks and order by due date for the timeline
-    const tasksSnapshot = await db.collection('tasks').where('projectId', '==', projectId).orderBy('dueDate', 'asc').get();
-    const tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Query tasks by projectId first (single field index, no composite needed)
+    // Then sort in memory to avoid composite index requirement
+    const tasksSnapshot = await db.collection('tasks').where('projectId', '==', projectId).get();
+    let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Sort by due date in memory to avoid composite index requirement
+    tasks.sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1; // Tasks without due date go to end
+      if (!b.dueDate) return -1;
+      const dateA = a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
+      const dateB = b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate);
+      return dateA - dateB;
+    });
 
     const totalTasks = tasks.length;
     const statusCounts = { 'To Do': 0, 'Ongoing': 0, 'Pending Review': 0, 'Completed': 0 };
@@ -125,7 +136,7 @@ exports.generateProjectReport = async (req, res) => {
     const memberEmails = Object.keys(memberWorkload);
     let memberNames = {};
     if(memberEmails.length > 0) {
-      const userRefs = memberEmails.map(email => db.collection('Users').doc(email));
+      const userRefs = memberEmails.map(email => db.collection('users').doc(email));
       const userDocs = await db.getAll(...userRefs);
       userDocs.forEach(doc => {
         if (doc.exists) {
@@ -172,7 +183,7 @@ exports.generateIndividualReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    const employeeDoc = await db.collection('Users').doc(employeeEmail).get();
+    const employeeDoc = await db.collection('users').doc(employeeEmail).get();
     if (!employeeDoc.exists) return res.status(404).json({ success: false, message: "Employee not found." });
     const employeeData = employeeDoc.data();
 
@@ -180,16 +191,35 @@ exports.generateIndividualReport = async (req, res) => {
     if (perms.role === 'staff' && requesterId !== employeeEmail) {
       return res.status(403).json({ success: false, message: "Forbidden: Staff can only view their own reports." });
     }
-    if ((perms.role === 'manager' || perms.role === 'hr') && employeeData.department !== perms.department) {
-      return res.status(403).json({ success: false, message: "Forbidden: You can only view reports for your own department." });
+    // HR can view all employees (for KPI tracking across company)
+    // Managers can only view employees in their department
+    if (perms.role === 'manager' && employeeData.department !== perms.department) {
+      return res.status(403).json({ success: false, message: "Forbidden: Managers can only view reports for employees in their department." });
     }
 
+    // Query tasks by assignedTo first (single field index, no composite needed)
     let tasksQuery = db.collection('tasks').where('assignedTo', '==', employeeEmail);
-    if (startDate) tasksQuery = tasksQuery.where('createdAt', '>=', new Date(startDate));
-    if (endDate) tasksQuery = tasksQuery.where('createdAt', '<=', new Date(endDate));
-
-    const tasksSnapshot = await getDocs(tasksQuery);
-    const tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const tasksSnapshot = await tasksQuery.get();
+    let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Filter by date range in memory to avoid composite index requirement
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+      
+      tasks = tasks.filter(task => {
+        if (!task.createdAt) return false;
+        const createdDate = task.createdAt.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
+        if (start && createdDate < start) return false;
+        if (end) {
+          // Include end date (end of day)
+          const endOfDay = new Date(end);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (createdDate > endOfDay) return false;
+        }
+        return true;
+      });
+    }
 
     const totalTasks = tasks.length;
     let completedTasks = 0;
@@ -256,12 +286,16 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    if ((perms.role === 'manager' || perms.role === 'hr') && perms.department !== department) {
-      return res.status(403).json({ success: false, message: "Forbidden: You can only view reports for your own department." });
+    // HR can view all departments (for KPI tracking), Managers can only view their own
+    if (perms.role === 'manager' && department !== 'ALL' && perms.department !== department) {
+      return res.status(403).json({ success: false, message: "Forbidden: Managers can only view reports for their own department." });
     }
 
-    const usersQuery = await db.collection('Users').where('department', '==', department).get();
-    const departmentUsers = usersQuery.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const usersQuery = await db.collection('users').where('department', '==', department).get();
+    // Filter out HR users - they don't have tasks so shouldn't be included in department reports
+    const departmentUsers = usersQuery.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(user => user.role?.toLowerCase() !== 'hr');
     const userEmails = departmentUsers.map(user => user.email);
 
     if (userEmails.length === 0) {
@@ -334,23 +368,38 @@ exports.generateCompanyReport = async (req, res) => {
     const perms = await getUserPermissions(requesterId);
 
     if (!perms.canViewCompany) {
-      return res.status(403).json({ success: false, message: "Forbidden: Only Directors can generate company-wide reports." });
+      return res.status(403).json({ success: false, message: "Forbidden: Only Directors and HR can generate company-wide reports." });
     }
 
-    let tasksQuery = db.collection('tasks');
+    // Handle multiple department filtering
+    const { departments } = req.query;
+    let tasksSnapshot;
     
-    if (department && department !== 'ALL') tasksQuery = tasksQuery.where('taskOwnerDepartment', '==', department);
-    // Note: Firestore cannot combine inequality filters (>=, <=) on different fields.
-    // We must fetch and filter in-memory if start/end dates are used with other filters.
-    // For simplicity, we will filter by department OR date range, but not both at query time.
-    
-    // Simpler query: Get tasks
-    if (department && department !== 'ALL') {
-       tasksQuery = tasksQuery.where('taskOwnerDepartment', '==', department);
+    if (departments && departments !== 'ALL') {
+      const deptArray = departments.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      
+      if (deptArray.length === 0) {
+        tasksSnapshot = await db.collection('tasks').get();
+      } else if (deptArray.length === 1) {
+        tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', deptArray[0]).get();
+      } else {
+        tasksSnapshot = await db.collection('tasks').get(); // Fetch all and filter in memory
+      }
+    } else if (department && department !== 'ALL') { // Backward compatibility for single 'department' param
+      tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
+    } else {
+      tasksSnapshot = await db.collection('tasks').get();
     }
      
-    const tasksSnapshot = await getDocs(tasksQuery);
-    let tasks = tasksSnapshot.docs.map(doc => doc.data());
+    let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Filter by multiple departments if needed (when using departments parameter and multiple were selected)
+    if (departments && departments !== 'ALL') {
+      const deptArray = departments.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      if (deptArray.length > 1) {
+        tasks = tasks.filter(task => deptArray.includes(task.taskOwnerDepartment));
+      }
+    }
 
     // Manual date filtering
     if (startDate) tasks = tasks.filter(t => t.createdAt && t.createdAt.toDate() >= new Date(startDate));
@@ -390,8 +439,8 @@ exports.generateCompanyReport = async (req, res) => {
       generatedAt: new Date().toISOString(),
       summary: {
         totalTasks: tasks.length,
-        totalOverdue,
-        overdueRate: (tasks.length > 0) ? ((totalOverdue / tasks.length) * 100).toFixed(0) : 0,
+        overdueCount: totalOverdue,
+        overduePercentage: tasks.length > 0 ? parseFloat(((totalOverdue / tasks.length) * 100).toFixed(0)) : 0,
         statusCounts,
       },
       departmentStats: Object.values(departmentStats), // Send as an array for v-data-table

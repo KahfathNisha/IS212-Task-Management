@@ -63,8 +63,33 @@ export const collections = {
 };
 
 // Firestore helper functions
+// NOTE: Direct Firestore queries may fail due to security rules.
+// Use API endpoints (/api/auth/me or /api/auth/users) instead when possible.
 export const firestoreHelpers = {
-  async getUserByEmail(email) {
+  async getUserByEmail(email, authToken) {
+    // Use API endpoint instead of direct Firestore query to avoid permission issues
+    if (authToken) {
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user && data.user.email === email) {
+            return {
+              id: data.user.email,
+              ...data.user,
+              email: data.user.email
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('Error getting user from API, will attempt Firestore fallback:', error);
+      }
+    }
+    
+    // Fallback: Direct Firestore query (may fail due to security rules)
     if (!db) return null;
     try {
       const { collection, query, where, getDocs } = await import('firebase/firestore');
@@ -77,7 +102,7 @@ export const firestoreHelpers = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting user by email:', error);
+      console.error('Error getting user by email (Firestore):', error);
       return null;
     }
   }

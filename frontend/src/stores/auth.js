@@ -33,12 +33,30 @@ export const useAuthStore = defineStore("auth", () => {
       if (firebaseUser) {
         user.value = firebaseUser;
         try {
-          // Use 'Users' (uppercase)
-          const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email);
+          // Get token first, then use API endpoint for user data
+          const idToken = await firebaseUser.getIdToken();
+          const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email, idToken);
           if (userDoc) {
             userData.value = userDoc; 
             initializeListeners(firebaseUser.email);
             console.log("✅ Persistent notification listeners initialized.");
+          } else {
+            // If getUserByEmail returns null, try /api/auth/me endpoint
+            try {
+              const response = await fetch('/api/auth/me', {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+              });
+              if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.user) {
+                  userData.value = { id: data.user.email, ...data.user };
+                  initializeListeners(firebaseUser.email);
+                  console.log("✅ User data loaded from API endpoint.");
+                }
+              }
+            } catch (apiErr) {
+              console.warn("Failed to fetch user data from API:", apiErr);
+            }
           }
         } catch (err) {
           console.error("Error fetching user data on auth state change:", err);
