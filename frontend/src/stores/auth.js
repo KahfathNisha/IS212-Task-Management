@@ -6,8 +6,11 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import { initializeListeners, cleanupListeners } from '@/services/notification-service';
 import axios from 'axios';
 
+// Use Vite env var when available (set VITE_API_BASE in Vercel). Fallback to relative '/api'.
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+const normalizedApiBase = API_BASE.replace(/\/$/, '');
 const authApiClient = axios.create({
-  baseURL: "http://localhost:3000/api/auth",
+  baseURL: `${normalizedApiBase}/auth`,
 });
 
 export const useAuthStore = defineStore("auth", () => {

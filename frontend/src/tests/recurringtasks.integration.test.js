@@ -5,6 +5,7 @@ import { nextTick } from 'vue';
 import axios from 'axios';
 import RecurringTasksSidebar from '@/components/RecurringTasksSidebar.vue';
 import EditRecurrenceDialog from '@/components/EditRecurrenceDialog.vue';
+import { API_ROOT } from '@/config/api'
 
 // Mock Firebase
 vi.mock('@/config/firebase', () => ({
@@ -133,7 +134,7 @@ describe('Recurring Tasks Integration Tests', () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(axios.create).toHaveBeenCalledWith({
-        baseURL: 'http://localhost:3000/api',
+        baseURL: API_ROOT,
         headers: { 'Content-Type': 'application/json' }
       });
 

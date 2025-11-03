@@ -68,15 +68,16 @@
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue' 
 import axios from 'axios'
+import { API_ROOT } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 
 // --- 1. Centralized Axios Client (Re-configured for this component) ---
 const authStore = useAuthStore();
 const axiosClient = axios.create({
-    baseURL: 'http://localhost:3000/api', 
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: API_ROOT,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Interceptor to attach the current Firebase ID Token

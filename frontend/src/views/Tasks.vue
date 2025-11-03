@@ -563,6 +563,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { storage } from '@/config/firebase'
 import { uploadBytes, getDownloadURL, ref as storageRef } from 'firebase/storage'
 import axios from 'axios'
+import { API_ROOT } from '@/config/api'
 import '../assets/styles.css';
 import CreateTaskDialogue from '../components/CreateTaskDialogue.vue'
 import TaskDetailsDialog from '../components/TaskDetailsDialog.vue'
@@ -574,12 +575,12 @@ import RecurringTasksSidebar from '../components/RecurringTasksSidebar.vue'
 import { useAuthStore } from '@/stores/auth'; // Import your auth store
 // import { projectService } from '@/services/projectService'
 
-// Axios client configuration (this is correct)
+// Axios client configuration (centralized)
 const axiosClient = axios.create({
-    baseURL: 'http://localhost:3000/api', 
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: API_ROOT,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Axios interceptor to send the token (FIXED: use fresh token from auth store)

@@ -61,7 +61,8 @@ function initializeUnreadNotificationListener(userId) {
 }
 
 // API functions to interact with backend notification endpoints
-const API_BASE_URL = 'http://localhost:3000/api';
+// Use Vite env var VITE_API_BASE (set this in Vercel) or fallback to relative '/api'
+const API_BASE_URL = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '');
 
 async function makeAuthenticatedRequest(endpoint, options = {}) {
   const authStore = useAuthStore();

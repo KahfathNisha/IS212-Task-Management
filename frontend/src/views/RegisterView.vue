@@ -178,6 +178,7 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios'; // We'll use axios for the API call
+import { API_ROOT } from '@/config/api'
 
 const router = useRouter();
 const registerForm = ref(null);
@@ -238,9 +239,7 @@ const handleRegister = async () => {
       name: `${form.value.firstName} ${form.value.lastName}`,
     };
 
-    const response = await axios.post('/api/auth/register', payload, {
-      baseURL: 'http://localhost:3000' // Using explicit base URL
-    });
+    const response = await axios.post(`${API_ROOT}/auth/register`, payload);
 
     message.value = { text: 'Registration was successful. You can now log in.', type: 'success' };
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
