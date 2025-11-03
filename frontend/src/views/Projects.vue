@@ -15,16 +15,20 @@
             @click="showCreateDialog = true"
             rounded="lg"
             class="add-project-btn"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
           >
-            New Project
+            <span class="d-none d-sm-inline">New Project</span>
+            <span class="d-inline d-sm-none">New</span>
           </v-btn>
           <v-btn
             color="primary"
             prepend-icon="mdi-plus"
             @click="showAddDepartmentDialog = true"
             rounded="lg"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
             v-if="authStore.userRole === 'director' || authStore.userRole === 'hr'">
-            New Department
+            <span class="d-none d-sm-inline">New Department</span>
+            <span class="d-inline d-sm-none">Dept</span>
           </v-btn>
         </div>
       </header>

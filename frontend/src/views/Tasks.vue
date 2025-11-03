@@ -123,24 +123,26 @@
             
             <v-btn 
               icon="mdi-repeat" 
-              size="default" 
+              :size="$vuetify.display.xs ? 'small' : 'default'" 
               variant="flat" 
               color="purple-lighten-2" 
               @click="showRecurringTasks = true"
               class="recurring-btn"
               rounded="lg"
               :disabled="!canViewManagementLists"
+              v-show="!$vuetify.display.xs"
             />
             
             <v-btn 
               icon="mdi-archive-arrow-down-outline" 
-              size="default" 
+              :size="$vuetify.display.xs ? 'small' : 'default'" 
               variant="flat" 
               color="primary-lighten-2" 
               @click="showArchived = true"
               class="archive-btn"
               rounded="lg"
               :disabled="!canViewManagementLists"
+              v-show="!$vuetify.display.xs"
             />
             
             <v-btn
@@ -148,11 +150,12 @@
               prepend-icon="mdi-plus"
               @click="showCreateDialog = true"
               rounded="lg"
+              :size="$vuetify.display.xs ? 'small' : 'default'"
               class="add-task-btn"
-              size="default"
               :disabled="!canCreateEdit"
             >
-              Add Task
+              <span class="d-none d-sm-inline">Add Task</span>
+              <span class="d-inline d-sm-none">Add</span>
             </v-btn>
             
           </div>

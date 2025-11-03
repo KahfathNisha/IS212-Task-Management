@@ -17,8 +17,10 @@
         prepend-icon="mdi-plus"
         @click="showAddCategoryDialog = true"
         rounded="lg"
+        class="add-global-category-btn"
     >
-        Add Global Category
+        <span class="d-none d-sm-inline">Add Global Category</span>
+        <span class="d-inline d-sm-none">Add Category</span>
     </v-btn>
     </div>
 
@@ -370,11 +372,20 @@ const viewCategoryDetails = (category) => {
   align-items: center;
   margin-bottom: 24px;
   padding: 0 24px;
+  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .search-field {
+  flex: 1 1 auto;
+  min-width: 200px;
   max-width: 500px;
-  flex: 0 0 500px;
+}
+
+.add-global-category-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .search-bar {
@@ -543,6 +554,22 @@ const viewCategoryDetails = (category) => {
     padding: 0 16px;
   }
 
+  .search-bar-row {
+    padding: 0 16px;
+    gap: 8px;
+  }
+
+  .search-field {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .add-global-category-btn {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
   .search-bar {
     padding: 0 16px;
   }
@@ -555,6 +582,21 @@ const viewCategoryDetails = (category) => {
   .category-stats {
     flex-direction: column;
     gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search-bar-row {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .search-field {
+    flex: 1 1 100%;
+  }
+
+  .add-global-category-btn {
+    width: 100%;
   }
 }
 </style>

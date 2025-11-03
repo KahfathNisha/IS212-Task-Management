@@ -177,6 +177,10 @@
   padding: 10px 24px;
   background: transparent;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  overflow-x: hidden; /* Prevent horizontal overflow */
+  overflow-y: visible;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .view-controls {
@@ -1405,10 +1409,23 @@
         gap: 8px; /* Reduce gap between tabs */
     }
 
+    .view-controls {
+        padding: 10px 12px !important; /* Add proper padding to prevent cut-off */
+        overflow-x: auto; /* Allow horizontal scroll if needed */
+    }
+
+    .controls-row {
+        min-width: 0; /* Allow shrinking */
+        overflow-x: visible;
+    }
+
     .filters-right {
         width: 100%;
         flex-wrap: wrap; /* Allow filter buttons to wrap */
         justify-content: flex-start;
+        padding: 0; /* Remove any padding that might cause overflow */
+        margin: 0;
+        box-sizing: border-box;
     }
 
     .filter-label {
@@ -1421,10 +1438,14 @@
         height: 32px !important;
         min-width: auto;
         padding: 0 12px !important;
+        flex-shrink: 0; /* Prevent buttons from shrinking */
+        white-space: nowrap; /* Prevent text wrapping */
     }
     
     .reset-btn {
         flex-grow: 1; /* Allow reset button to fill remaining space */
+        min-width: auto;
+        white-space: nowrap;
     }
 
     /* 5. Calendar View Adjustments (for Month view) */
@@ -1554,4 +1575,195 @@
         flex-grow: 1; 
         font-size: 12px;
     }
+}
+
+/* ===========================
+   Additional Mobile Responsive Styles
+   =========================== */
+@media (max-width: 768px) {
+  /* Sidebar improvements */
+  .upcoming-sidebar {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .sidebar-header {
+    padding: 12px;
+  }
+
+  .upcoming-content {
+    padding: 12px;
+  }
+
+  .upcoming-section {
+    margin-bottom: 16px;
+  }
+
+  .upcoming-section h4 {
+    font-size: 12px;
+  }
+
+  .upcoming-task {
+    padding: 10px;
+  }
+
+  .task-name {
+    font-size: 13px;
+  }
+
+  /* List view improvements */
+  .list-view-container {
+    padding: 12px;
+  }
+
+  .task-row {
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+
+  .task-info-column {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* Calendar improvements */
+  .calendar-nav {
+    padding: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .nav-center {
+    order: 1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .nav-left,
+  .nav-right {
+    order: 2;
+    flex: 1;
+  }
+
+  /* Filter chips */
+  .filter-chips {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .filter-chip {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Custom dropdown positioning */
+  .custom-filter-dropdown {
+    max-width: calc(100vw - 32px);
+    left: 16px !important;
+    right: 16px;
+  }
+
+  /* Ensure filters row doesn't overflow */
+  .view-controls {
+    padding: 8px 12px !important;
+  }
+
+  .filters-right {
+    gap: 4px;
+  }
+
+  /* Search input field - prevent cut-off */
+  .list-view-container .search-field,
+  .list-view-container input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Ultra-compact sidebar */
+  .upcoming-sidebar {
+    max-height: 250px;
+  }
+
+  .sidebar-header {
+    padding: 8px;
+  }
+
+  .upcoming-content {
+    padding: 8px;
+  }
+
+  .upcoming-task {
+    padding: 8px;
+  }
+
+  .task-name {
+    font-size: 12px;
+  }
+
+  /* View header ultra-compact */
+  .view-header {
+    padding: 8px !important;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .header-left h1 {
+    font-size: 18px;
+  }
+
+  .date-subtitle {
+    font-size: 11px;
+  }
+
+  /* List view ultra-compact */
+  .list-view-container {
+    padding: 8px;
+  }
+
+  .task-row {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  /* Calendar ultra-compact */
+  .calendar-body {
+    grid-auto-rows: minmax(45px, auto);
+  }
+
+  .calendar-day {
+    min-height: 45px;
+    padding: 1px;
+  }
+
+  .day-number {
+    font-size: 9px;
+  }
+
+  .task-item {
+    padding: 1px 2px;
+    font-size: 7px;
+    min-height: 12px;
+  }
+
+  /* Filter chips compact */
+  .filter-chips {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  .filter-chip {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  /* Custom dropdown full-width on mobile */
+  .custom-filter-dropdown {
+    max-width: calc(100vw - 24px);
+    left: 12px !important;
+    right: 12px;
+  }
 }
