@@ -129,7 +129,7 @@
               @click="showRecurringTasks = true"
               class="recurring-btn"
               rounded="lg"
-              :disabled="!canCreateEdit"
+              :disabled="!canViewManagementLists"
             />
             
             <v-btn 
@@ -140,7 +140,7 @@
               @click="showArchived = true"
               class="archive-btn"
               rounded="lg"
-              :disabled="!canCreateEdit"
+              :disabled="!canViewManagementLists"
             />
             
             <v-btn
@@ -512,8 +512,21 @@
       :is-read-only="!isTaskEditable(selectedTask)"
     />
 
-    <ArchivedTasks :show="showArchived" @close="showArchived = false" />
-    <RecurringTasksSidebar :show="showRecurringTasks" @close="showRecurringTasks = false" />
+    <ArchivedTasks 
+      :show="showArchived" 
+      @close="showArchived = false" 
+      :is-hr="isHR" 
+      :can-create-edit="canCreateEdit"
+      :current-user-email="userEmail"  :user-role="userRole"          
+    />
+
+
+    <RecurringTasksSidebar 
+      :show="showRecurringTasks" 
+      @close="showRecurringTasks = false" 
+      :is-hr="isHR" 
+      :can-create-edit="canCreateEdit"
+    />
 
     <CreateTaskDialogue
       v-model="showCreateDialog"
@@ -593,12 +606,28 @@ const userEmail = computed(() => authStore.userEmail);
 const isHR = computed(() => userRole.value === 'hr');
 const isDirector = computed(() => userRole.value === 'director'); 
 
-// General permission to create/edit: 
-// HR is now allowed to access the creation buttons (Add Task, Archive, Recurring). 
-// The actual creation/edit logic is handled by granular checks in isTaskEditable and handleCreateSave.
+// General permission to create/edit: (STRICT - HR is false)
 const canCreateEdit = computed(() => {
-    // All roles, including HR, can access the UI buttons for task creation/management.
+    // Director has full rights.
+    if (isDirector.value) {
+        return true; 
+    }
+    // HR is view-only, cannot access creation/archiving actions.
+    if (isHR.value) {
+        return false; 
+    }
+    // All other roles (Manager, Staff) can use the buttons
     return true; 
+});
+
+// 🆕 NEW: Permission to view task management lists (Archived, Recurring)
+const canViewManagementLists = computed(() => {
+    // Director and HR need oversight for these lists.
+    if (isDirector.value || isHR.value) {
+        return true;
+    }
+    // All other roles are allowed.
+    return true;
 });
 
 
@@ -631,33 +660,28 @@ const isTaskEditable = (task) => {
         currentUserEmail: userEmail.value
     });
 
-    // Director/Non-HR roles are governed by canCreateEdit logic (assumed full edit)
+    // Director/Non-HR roles are generally editable
     if (!isHR.value) {
-        console.log('✅ [isTaskEditable] Non-HR user, editable:', canCreateEdit.value);
-        return canCreateEdit.value; 
+        console.log('✅ [isTaskEditable] Non-HR user, editable: true');
+        return true; 
     }
 
-    // HR-SPECIFIC RULE: Only tasks owned or assigned to HR user are editable.
+    // HR-SPECIFIC RULE: Only tasks owned by the HR user are editable. (STRICT VIEW-ONLY RULE)
     const currentUserEmail = userEmail.value;
 
     // Check against task owner EMAIL (assuming taskOwner stores email)
     const isOwner = (task.taskOwner === currentUserEmail); 
-    // Check against assignedTo EMAIL (assuming assignedTo stores email)
-    const isAssignee = (task.assignedTo === currentUserEmail);
     
-    // Check if the current HR user is in the collaborators with Edit permission
-    const isEditor = Array.isArray(task.collaborators) && 
-                     task.collaborators.some(c => (c.email || c.name) === currentUserEmail && c.permission === 'Edit');
-    
-    const isEditable = isOwner || isAssignee || isEditor;
-    console.log('✅ [isTaskEditable] HR user, editable:', isEditable, { isOwner, isAssignee, isEditor });
+    // HR is strictly view-only unless they are the owner.
+    const isEditable = isOwner;
+    console.log('✅ [isTaskEditable] HR user, editable:', isEditable, { isOwner });
     return isEditable;
 };
 
 // 🟢 NEW: Handler for unauthorized edits
 const handleReadonlyAction = () => {
     if (isHR.value) {
-        showMessage('Permission denied. HR can only edit tasks they own or are assigned to.', 'error');
+        showMessage('Permission denied. HR users can only view tasks.', 'error');
     } else {
          showMessage('Permission denied. You do not have sufficient rights to modify this task.', 'error');
     }
@@ -688,7 +712,7 @@ const userVisibleTasks = computed(() => {
   }
 
   if (userRole === 'hr') {
-    // HR can view all tasks but cannot edit
+    // HR can view all tasks
     return tasks.value;
   }
 
@@ -1210,8 +1234,8 @@ const validateDueDate = (dateString) => {
 
 // 🌟 FIX 2: Relaxing the HR check on task creation to allow them to create their own tasks.
 const handleCreateSave = async (taskData) => {
-  // canCreateEdit is now TRUE for HR users. The actual check is now less restrictive for the creation path.
-  if (!canCreateEdit.value) { // General creation check (should always pass now)
+  // canCreateEdit is now FALSE for HR users, so this should not be reached via the button.
+  if (!canCreateEdit.value) { 
       handleReadonlyAction();
       return;
   }
@@ -1221,7 +1245,8 @@ const handleCreateSave = async (taskData) => {
   const taskOwnerInForm = taskData.taskOwner || currentUserEmail; 
 
   if (isHR.value) {
-    // HR must be creating a task for themselves (as owner or assignee)
+    // This block is effectively unreachable now since canCreateEdit is false, 
+    // but the logic remains for non-HR roles if needed, or if the user somehow bypassed the button.
     if (taskOwnerInForm !== currentUserEmail && taskData.assignedTo !== currentUserEmail) {
         showMessage('HR users must set themselves as the task owner or assignee when creating a new task.', 'error');
         return; // BLOCK THE API CALL

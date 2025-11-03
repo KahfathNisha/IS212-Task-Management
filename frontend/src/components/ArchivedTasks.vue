@@ -21,8 +21,7 @@
       <v-card-text>
         <v-list>
           <v-list-item
-            v-for="task in archivedTasks"
-            :key="task.id"
+            v-for="task in filteredArchivedTasks" :key="task.id"
             class="archived-task-item"
           >
             <template v-slot:prepend>
@@ -51,7 +50,7 @@
                 @click="unarchive(task.id)"
                 class="unarchive-btn"
                 :loading="unarchivingId === task.id"
-                :disabled="unarchivingId === task.id"
+                :disabled="unarchivingId === task.id || !canUnarchive" 
               >
                 <v-icon start size="18">mdi-archive-arrow-up</v-icon>
                 {{ unarchivingId === task.id ? 'Restoring...' : 'Unarchive' }}
@@ -59,8 +58,7 @@
             </template>
           </v-list-item>
         </v-list>
-        <div v-if="archivedTasks.length === 0" class="text-center grey--text py-6">
-          No archived tasks found.
+        <div v-if="filteredArchivedTasks.length === 0" class="text-center grey--text py-6"> No archived tasks found.
         </div>
       </v-card-text>
     </v-card>
@@ -68,10 +66,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue' 
 import axios from 'axios'
-// We are removing the direct Firestore imports: import { collection, getDocs } from 'firebase/firestore'
-import { useAuthStore } from '@/stores/auth' // Used for secure token access
+import { useAuthStore } from '@/stores/auth'
 
 // --- 1. Centralized Axios Client (Re-configured for this component) ---
 const authStore = useAuthStore();
@@ -84,7 +81,7 @@ const axiosClient = axios.create({
 
 // Interceptor to attach the current Firebase ID Token
 axiosClient.interceptors.request.use(async (config) => {
-    const token = await authStore.getToken(); // Securely get token from store
+    const token = await authStore.getToken(); 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -93,20 +90,65 @@ axiosClient.interceptors.request.use(async (config) => {
 // -------------------------------------------------------------------
 
 const props = defineProps({
-  show: Boolean
+  show: Boolean,
+  isHr: { type: Boolean, default: false },
+  canCreateEdit: { type: Boolean, default: true },
+  // 🆕 NEW PROPS: Added for filtering based on user identity
+  currentUserEmail: { type: String, default: '' },
+  userRole: { type: String, default: 'staff' }
 })
 const emit = defineEmits(['close'])
 
 const dialog = ref(props.show)
 watch(() => props.show, v => dialog.value = v)
-// Simplified close logic
 watch(dialog, v => { 
   if (!v) emit('close') 
 })
 
-const archivedTasks = ref([])
+// 🆕 NEW: Holds ALL archived tasks fetched from the API
+const rawArchivedTasks = ref([]) 
 const allUsers = ref([])
 const unarchivingId = ref(null)
+
+// 🔒 SECURITY: Computed property to control the Unarchive button state
+const canUnarchive = computed(() => {
+    // If the user is HR, unarchiving is disallowed (view-only policy).
+    if (props.isHr) {
+        return false;
+    }
+    // Otherwise, rely on the general permission from the parent.
+    return props.canCreateEdit; 
+});
+
+// 🔎 VISIBILITY: Computed property to filter the list based on user role
+const filteredArchivedTasks = computed(() => {
+    const role = props.userRole;
+    const userEmailAddr = props.currentUserEmail;
+
+    if (!userEmailAddr) {
+        return [];
+    }
+
+    // Director and HR see all tasks in the raw list
+    if (role === 'director' || role === 'hr') {
+        return rawArchivedTasks.value;
+    }
+
+    // Staff and Manager roles are restricted to tasks they are involved in
+    const filtered = rawArchivedTasks.value.filter(task => {
+        const isOwner = task.taskOwner === userEmailAddr;
+        const isAssignee = task.assigneeId === userEmailAddr; 
+        
+        // Assuming collaborators array contains objects with 'email' or 'name'
+        const isCollaborator = Array.isArray(task.collaborators) && 
+                               task.collaborators.some(c => (c.email || c.name) === userEmailAddr);
+
+        return isOwner || isAssignee || isCollaborator;
+    });
+    
+    return filtered;
+});
+
 
 // Status message state
 const statusMessage = ref({
@@ -115,7 +157,7 @@ const statusMessage = ref({
   type: 'success'
 })
 
-// Helper function to show status messages
+// Helper functions (showStatus, fetchAllUsers, getDisplayName, etc. remain the same)
 const showStatus = (message, type = 'success') => {
   statusMessage.value = {
     show: true,
@@ -127,10 +169,8 @@ const showStatus = (message, type = 'success') => {
   }, 5000)
 }
 
-// 🟢 FIX 3: Fetch users via secured backend API instead of client-side Firestore
 const fetchAllUsers = async () => {
   try {
-    // Rely on the backend's /auth/users/all secured endpoint
     const response = await axiosClient.get('/auth/users/all'); 
     allUsers.value = response.data.map(user => ({
       email: user.email,
@@ -144,8 +184,6 @@ const fetchAllUsers = async () => {
 
 onMounted(fetchAllUsers)
 
-
-// Helper to convert assignedTo to display name
 const getDisplayName = (assignedValue) => {
   if (!assignedValue) return ''
   
@@ -162,20 +200,19 @@ const getDisplayName = (assignedValue) => {
     return lookupValue
   }
   
-  // If it's an email, look up the name in the securely loaded list
   const user = allUsers.value.find(u => u.email === lookupValue)
   return user && user.name ? user.name : lookupValue
 }
 
+// ⚠️ MODIFIED: Now populates the RAW list
 const fetchArchivedTasks = async () => {
   try {
-    // 🟢 FIX 1: Use the secured axiosClient instance and the correct endpoint
     const res = await axiosClient.get('/tasks/archived');
     
-    archivedTasks.value = res.data;
+    rawArchivedTasks.value = res.data; // Store in the raw list
     
-    if (archivedTasks.value.length > 0) {
-      console.log(`📋 Successfully loaded ${archivedTasks.value.length} archived tasks`);
+    if (rawArchivedTasks.value.length > 0) {
+      console.log(`📋 Successfully loaded ${rawArchivedTasks.value.length} archived tasks into raw ref.`);
     }
     
   } catch (error) {
@@ -196,15 +233,19 @@ watch(dialog, (val) => {
 })
 
 const unarchive = async (id) => {
+  if (!canUnarchive.value) {
+    showStatus('Permission denied. You do not have rights to modify archived tasks.', 'error');
+    return;
+  }
+  
   try {
     unarchivingId.value = id
     
-    // 🟢 FIX 2: Use the secured axiosClient instance and the relative PUT URL
     const response = await axiosClient.put(`/tasks/${id}/unarchive`, {}) 
     
     if (response.status === 200) {
       showStatus('Task unarchived successfully!', 'success')
-      await fetchArchivedTasks() // Refresh the list
+      await fetchArchivedTasks() 
     }
   } catch (error) {
     console.error('Failed to unarchive task:', error)
@@ -217,7 +258,6 @@ const unarchive = async (id) => {
 
 const formatDate = (date) => {
   if (!date) return ''
-  // Handle Firestore Timestamp objects if they exist, or ISO strings
   const d = typeof date === 'string' ? new Date(date) : date.toDate ? date.toDate() : date
   return d.toLocaleDateString()
 }
