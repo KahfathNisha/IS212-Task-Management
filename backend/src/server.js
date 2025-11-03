@@ -1,7 +1,9 @@
-// server.js
+
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+// Vercel can also read .env files via its dashboard settings, 
+// but dotenv is needed for local development.
+require('dotenv').config(); 
 
 console.log('🔧 Starting server...');
 console.log('🔧 Environment variables loaded');
@@ -21,26 +23,55 @@ console.log('✅ Routes loaded successfully');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Firebase & cron jobs only if NOT testing
+// Initialize Firebase & cron jobs
+// We must initialize these resources, but we only start the cron job locally.
 if (process.env.NODE_ENV !== 'test') {
     console.log('🔧 Initializing Firebase...');
     try {
         require('./config/firebase');
         console.log('✅ Firebase initialized successfully');
 
-        // Start reminder cron job
-        require('./controllers/taskReminderJob');
-        console.log('✅ ReminderJob loaded successfully');
+        // Start reminder cron job only if running locally (not on Vercel or test)
+        // Vercel Serverless Functions should not run scheduled cron jobs;
+        // Firebase Cloud Functions or Vercel Cron Jobs service should handle this.
+        if (!process.env.VERCEL) {
+            require('./controllers/taskReminderJob');
+            console.log('✅ ReminderJob loaded successfully');
+        } else {
+            console.log('ℹ️ CronJob skipped as running on Vercel.');
+        }
+
     } catch (error) {
         console.error('❌ Firebase initialization failed:', error.message);
-        process.exit(1);
+        // Do not exit process on Vercel, just log error and let the app proceed if possible
+        if (!process.env.VERCEL) {
+            process.exit(1); 
+        }
     }
 }
 
 console.log('🔧 Setting up middleware...');
 // Middleware
+// NOTE: For Vercel, your frontend origin will be your Vercel URL (e.g., https://is212-task-management.vercel.app)
+// You might need to adjust this to include the Vercel URL in production.
+const allowedOrigins = [
+    'http://localhost:5173', 
+    'http://localhost:5174',
+    // Add your Vercel production URL here or use environment variable
+    process.env.FRONTEND_URL,
+    // Vercel preview URLs follow pattern: https://*-git-*-yourteam.vercel.app
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+].filter(Boolean);
+
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, Postman, etc.)
+        if (!origin || allowedOrigins.includes(origin) || process.env.VERCEL) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
@@ -50,7 +81,7 @@ console.log('✅ Middleware configured');
 // Routes
 app.get('/', (req, res) => {
     res.json({
-        message: 'IS212 Task Management API',
+        message: 'IS212 Task Management API (Running via Vercel Function)',
         status: 'active',
         timestamp: new Date().toISOString()
     });
@@ -75,8 +106,8 @@ app.use('/api/departments', departmentsRouter);
 
 // Test routes (only in non-production)
 if (process.env.NODE_ENV !== 'production') {
-  const testEmailRouter = require('../routes/test-email.js');
-  app.use('/api/notifications/test', testEmailRouter);
+    const testEmailRouter = require('../routes/test-email.js');
+    app.use('/api/notifications/test', testEmailRouter);
 }
 
 // Firebase test endpoint (optional)
@@ -110,9 +141,8 @@ app.use((req, res) => {
 
 console.log('🔧 Ready to start server');
 
-// Only start server if not testing
-if (process.env.NODE_ENV !== 'test') {
-    // Bind to 0.0.0.0 so both IPv4 and IPv6 loopback (::1) can reach the server in CI
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+    // This block ONLY runs locally.
     app.listen(PORT, '0.0.0.0', (err) => {
         if (err) {
             console.error('❌ Failed to start server:', err);
