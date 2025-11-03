@@ -93,31 +93,58 @@ class EmailService {
             'Deadline not specified'
         );
         
-        // Format deadline in user's timezone if valid
+        // Format deadline in user's timezone with custom format
         let userDeadline = formattedDeadline;
         if (deadline && validatedTimezone !== 'UTC') {
             try {
-                userDeadline = new Intl.DateTimeFormat('en-US', {
+                const dateStr = new Intl.DateTimeFormat('en-US', {
                     timeZone: validatedTimezone,
-                    dateStyle: 'full',
-                    timeStyle: 'short'
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                 }).format(deadline);
+                
+                const timeStr = new Intl.DateTimeFormat('en-US', {
+                    timeZone: validatedTimezone,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                }).format(deadline);
+                
+                userDeadline = `${dateStr}, at ${timeStr}`;
             } catch (error) {
                 console.warn('Failed to format deadline in timezone:', error);
                 userDeadline = formattedDeadline;
             }
         }
         
-        // email body
+        // Format time remaining more intuitively (show days if >= 24 hours)
+        let timeRemainingText;
+        if (hoursLeft >= 24) {
+            const daysLeft = Math.floor(hoursLeft / 24);
+            const remainingHours = hoursLeft % 24;
+            if (remainingHours === 0) {
+                timeRemainingText = `${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+            } else {
+                timeRemainingText = `${daysLeft} day${daysLeft === 1 ? '' : 's'} and ${remainingHours} hour${remainingHours === 1 ? '' : 's'}`;
+            }
+        } else {
+            timeRemainingText = `${hoursLeft} hour${hoursLeft === 1 ? '' : 's'} and ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}`;
+        }
+
+        // email body with matching notification emojis
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>Task Deadline Reminder</h2>
-                <p><strong>Task:</strong> ${validatedTaskData.title}</p>
-                <p><strong>Time Remaining:</strong> ${hoursLeft} hours and ${minutesLeft} minutes</p>
-                <p><strong>Deadline:</strong> ${userDeadline}</p>
-                ${validatedTaskData.description ? `<p><strong>Description:</strong> ${validatedTaskData.description}</p>` : ''}
-                ${validatedTaskData.notes ? `<p><strong>Notes:</strong> ${validatedTaskData.notes}</p>` : ''}
-                ${validatedTaskData.id ? `<p><a href="${process.env.FRONTEND_URL}/tasks/${validatedTaskData.id}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Task</a></p>` : ''}
+                <h2>✏️ Task Deadline Reminder</h2>
+                <p><strong>📋 Task:</strong> ${validatedTaskData.title}</p>
+                <p><strong>⏰ Time Remaining:</strong> ${timeRemainingText}</p>
+                <p><strong>📅 Due Date:</strong> ${userDeadline}</p>
+                <p><strong>⭐️ Priority:</strong> ${validatedTaskData.priority || 'Not specified'}</p>
+                <p><strong>📊 Status:</strong> ${validatedTaskData.status || 'Ongoing'}</p>
+                ${validatedTaskData.description ? `<p><strong>📝 Description:</strong> ${validatedTaskData.description}</p>` : ''}
+                ${validatedTaskData.notes ? `<p><strong>📝 Notes:</strong> ${validatedTaskData.notes}</p>` : ''}
+                ${validatedTaskData.id ? `<p style="text-align: center;"><a href="${process.env.FRONTEND_URL}/tasks/${validatedTaskData.id}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">🔗 View Task</a></p>` : ''}
             </div>
         `;
 
@@ -189,17 +216,28 @@ class EmailService {
             'Reassignment time not available'
         );
 
-        // Format dates in user's timezone if valid
+        // Format dates in user's timezone with custom format
         let userDueDate = formattedDueDate;
         let userReassignmentTime = formattedReassignmentTime;
 
         if (dueDate && validatedTimezone !== 'UTC') {
             try {
-                userDueDate = new Intl.DateTimeFormat('en-US', {
+                const dateStr = new Intl.DateTimeFormat('en-US', {
                     timeZone: validatedTimezone,
-                    dateStyle: 'full',
-                    timeStyle: 'short'
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                 }).format(dueDate);
+                
+                const timeStr = new Intl.DateTimeFormat('en-US', {
+                    timeZone: validatedTimezone,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                }).format(dueDate);
+                
+                userDueDate = `${dateStr}, at ${timeStr}`;
             } catch (error) {
                 console.warn('Failed to format due date in timezone:', error);
                 userDueDate = formattedDueDate;
@@ -208,11 +246,22 @@ class EmailService {
 
         if (reassignmentDateTime && validatedTimezone !== 'UTC') {
             try {
-                userReassignmentTime = new Intl.DateTimeFormat('en-US', {
+                const dateStr = new Intl.DateTimeFormat('en-US', {
                     timeZone: validatedTimezone,
-                    dateStyle: 'full',
-                    timeStyle: 'short'
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                 }).format(reassignmentDateTime);
+                
+                const timeStr = new Intl.DateTimeFormat('en-US', {
+                    timeZone: validatedTimezone,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                }).format(reassignmentDateTime);
+                
+                userReassignmentTime = `${dateStr}, at ${timeStr}`;
             } catch (error) {
                 console.warn('Failed to format reassignment time in timezone:', error);
                 userReassignmentTime = formattedReassignmentTime;
@@ -222,18 +271,19 @@ class EmailService {
         // Determine action text
         const actionText = reassignmentType === 'assigned' ? 'assigned to' : 'removed from';
 
-        // email body
+        // email body with matching notification emojis
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>Task Reassignment Notification</h2>
-                <p><strong>Task:</strong> ${validatedTaskData.title}</p>
-                <p><strong>Action:</strong> You have been ${actionText} this task</p>
-                <p><strong>Reassigned by:</strong> ${reassignedBy}</p>
-                <p><strong>Reassignment Time:</strong> ${userReassignmentTime}</p>
-                <p><strong>Priority:</strong> ${validatedTaskData.priority || 'Not specified'}</p>
-                <p><strong>Due Date:</strong> ${userDueDate}</p>
-                ${validatedTaskData.description ? `<p><strong>Description:</strong> ${validatedTaskData.description}</p>` : ''}
-                ${validatedTaskData.id ? `<p><a href="${process.env.FRONTEND_URL}/tasks/${validatedTaskData.id}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Task</a></p>` : ''}
+                <h2>✏️ Task Reassignment Notification</h2>
+                <p><strong>📋 Task:</strong> ${validatedTaskData.title}</p>
+                <p><strong>🎯 Action:</strong> You have been ${actionText} this task</p>
+                <p><strong>👤 Reassigned by:</strong> ${reassignedBy}</p>
+                <p><strong>⏰ Reassignment Time:</strong> ${userReassignmentTime}</p>
+                <p><strong>⭐️ Priority:</strong> ${validatedTaskData.priority || 'Not specified'}</p>
+                <p><strong>📊 Status:</strong> ${validatedTaskData.status || 'Ongoing'}</p>
+                <p><strong>📅 Due Date:</strong> ${userDueDate}</p>
+                ${validatedTaskData.description ? `<p><strong>📝 Description:</strong> ${validatedTaskData.description}</p>` : ''}
+                ${validatedTaskData.id ? `<p style="text-align: center;"><a href="${process.env.FRONTEND_URL}/tasks/${validatedTaskData.id}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">🔗 View Task</a></p>` : ''}
             </div>
         `;
 
