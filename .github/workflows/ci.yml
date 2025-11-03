@@ -33,13 +33,6 @@ jobs:
       - name: Install firebase-tools
         run: npm install -g firebase-tools@latest
 
-      - name: Verify firebase CLI & auth (optional)
-        run: |
-          # Optional quick check: list projects. This requires the service account JSON to be valid.
-          # If you prefer not to call Firebase production services in CI, you can remove this step.
-          firebase --version
-          firebase projects:list || echo "projects:list failed (may not be allowed in CI)"
-
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
