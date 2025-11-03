@@ -19,12 +19,24 @@ if (isEmulatorMode) {
   const keyEnv = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   const keyPath = path.resolve(__dirname, 'serviceAccountKey.json');
 
+  console.log('🔍 Firebase initialization debug:');
+  console.log('  - isEmulatorMode:', isEmulatorMode);
+  console.log('  - FIREBASE_SERVICE_ACCOUNT_KEY present:', !!keyEnv);
+  console.log('  - FIREBASE_SERVICE_ACCOUNT_KEY length:', keyEnv ? keyEnv.length : 'N/A');
+  console.log('  - serviceAccountKey.json exists:', fs.existsSync(keyPath));
+  console.log('  - FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID);
+  console.log('  - VITE_FIREBASE_PROJECT_ID:', process.env.VITE_FIREBASE_PROJECT_ID);
+
   try {
     if (!admin.apps || admin.apps.length === 0) {
       // 1) Env var containing the full JSON
       if (keyEnv) {
+        console.log('🔄 Attempting to initialize from FIREBASE_SERVICE_ACCOUNT_KEY env var');
         try {
           const serviceAccount = JSON.parse(keyEnv);
+          console.log('✅ Successfully parsed FIREBASE_SERVICE_ACCOUNT_KEY JSON');
+          console.log('  - Service account project_id:', serviceAccount.project_id);
+          console.log('  - Service account client_email:', serviceAccount.client_email);
           admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID
@@ -32,10 +44,12 @@ if (isEmulatorMode) {
           console.log('✅ Firebase Admin initialized from FIREBASE_SERVICE_ACCOUNT_KEY env var');
         } catch (parseErr) {
           console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', parseErr.message);
+          console.error('  - Raw env var value (first 100 chars):', keyEnv.substring(0, 100));
           throw parseErr;
         }
       // 2) Local file
       } else if (fs.existsSync(keyPath)) {
+        console.log('🔄 Attempting to initialize from serviceAccountKey.json file');
         try {
           const serviceAccount = require('./serviceAccountKey.json');
           admin.initializeApp({
