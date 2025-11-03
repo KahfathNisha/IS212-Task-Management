@@ -4,21 +4,33 @@
 // Load environment variables FIRST (before requiring services that use them)
 const path = require('path');
 const fs = require('fs');
-const envPath = path.join(__dirname, '../.env');
 
-if (!fs.existsSync(envPath)) {
-  console.error(`❌ .env file not found at: ${envPath}`);
-  process.exit(1);
+// Resolve .env but do NOT exit if missing. In CI we create .env from secrets.
+const envPath = path.join(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+} else {
+  // Do not call process.exit(1) here. Provide safe non-sensitive defaults so tests run
+  // in environments without .env (contributors, forks, or CI that sets env directly).
+  process.env.SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || 'SG.TEST_KEY';
+  process.env.SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'test@example.com';
+  process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+  // Add other fallbacks here if your EmailService expects them
 }
 
-require('dotenv').config({ path: envPath });
+// Mock @sendgrid/mail for integration testing BEFORE importing modules that use it
+jest.mock('@sendgrid/mail', () => {
+  const sendMock = jest.fn(() => Promise.resolve([{ statusCode: 202 }]));
+  return {
+    setApiKey: jest.fn(),
+    send: sendMock,
+    // expose mock for assertions if needed
+    __sendMock: sendMock,
+  };
+});
 
-// Mock @sendgrid/mail for integration testing
-const sgMail = require('@sendgrid/mail');
-jest.mock('@sendgrid/mail', () => ({
-  setApiKey: jest.fn(),
-  send: jest.fn()
-}));
+// Now require the mocked module and other modules that depend on it
+const sgMail = require('@sendgrid/mail'); // this will be the mocked module
 
 // Use shared Firebase initialization
 const { admin, db } = require('./firebase-init');
@@ -47,7 +59,7 @@ describe('EmailService Integration Tests', () => {
       archived: false
     };
 
-    // Mock successful email sending
+    // Mock successful email sending (will be used as default)
     sgMail.send.mockResolvedValue([{ statusCode: 202 }]);
   });
 

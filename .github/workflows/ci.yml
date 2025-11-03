@@ -105,6 +105,17 @@ jobs:
           done
           echo "All health checks passed."
 
+      - name: Create .env for tests
+        # Create a .env file from repository secrets so tests that use dotenv can load SendGrid credentials.
+        # Uses secrets you added: SENDGRID_API_KEY and SENDGRID_FROM
+        run: |
+          cat > .env <<EOF
+          SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          EMAIL_TO_TEST=${{ secrets.EMAIL_TO_TEST }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          EOF
+
       - name: Run backend tests
         run: |
           export FIRESTORE_EMULATOR_HOST=localhost:8080
