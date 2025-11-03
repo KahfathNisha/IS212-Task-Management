@@ -5,12 +5,12 @@ import { auth, firestoreHelpers } from "@/config/firebase";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { initializeListeners, cleanupListeners } from '@/services/notification-service';
 import axios from 'axios';
+import { API_ROOT } from '@/config/api'
 
-// Use Vite env var when available (set VITE_API_BASE in Vercel). Fallback to relative '/api'.
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
-const normalizedApiBase = API_BASE.replace(/\/$/, '');
+// Use centralized API_ROOT helper so deployed builds use the correct absolute path.
+// API_ROOT is either '/api' (default) or '<host>/api' when VITE_API_BASE is set.
 const authApiClient = axios.create({
-  baseURL: `${normalizedApiBase}/auth`,
+  baseURL: `${API_ROOT}/auth`,
 });
 
 export const useAuthStore = defineStore("auth", () => {
