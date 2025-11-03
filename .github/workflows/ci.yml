@@ -19,16 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 18
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Setup Firebase Service Account
-        run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT_KEY" > service-account-key.json
-          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account-key.json"
-          ls -la service-account-key.json
+      # Removed service account setup - not needed for emulator mode
+      # This prevents conflicts between production credentials and emulator expectations
 
       - name: Install firebase-tools
         run: npm install -g firebase-tools@latest
