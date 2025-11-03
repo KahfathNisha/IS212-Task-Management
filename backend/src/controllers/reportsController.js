@@ -47,6 +47,25 @@ async function getUserPermissions(requesterId, reqUser = null) {
 }
 
 /**
+ * Helper function to capitalize first letter of department names
+ * Special handling for acronyms that should be fully capitalized (e.g., "IT")
+ */
+const capitalizeFirstLetter = (str) => {
+  if (!str || typeof str !== 'string') return str;
+  if (str.length === 0) return str;
+  
+  // Handle special acronyms that should be fully capitalized
+  const upperStr = str.toUpperCase();
+  const acronyms = ['IT', 'HR', 'API', 'UI', 'UX', 'QA', 'R&D', 'CRM', 'ERP'];
+  if (acronyms.includes(upperStr)) {
+    return upperStr;
+  }
+  
+  // For other strings, capitalize first letter only
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+/**
  * Helper function to normalize task status
  */
 const normalizeStatus = (s) => {
@@ -366,7 +385,7 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    // HR can view all departments (for KPI tracking), Managers can only view their own
+    // HR and Directors can view all departments (same access rights), Managers can only view their own
     if (perms.role === 'manager' && department !== 'ALL' && perms.department !== department) {
       return res.status(403).json({ success: false, message: "Forbidden: Managers can only view reports for their own department." });
     }
@@ -388,7 +407,7 @@ exports.generateDepartmentReport = async (req, res) => {
     const userEmails = departmentUsers.map(user => user.email);
 
     if (userEmails.length === 0) {
-      return res.status(200).json({ success: true, report: { title: `${department} Report`, type: 'department', generatedAt: new Date().toISOString(), totalTasks: 0, employeeWorkloads: {} } });
+      return res.status(200).json({ success: true, report: { title: `${capitalizeFirstLetter(department)} Report`, type: 'department', generatedAt: new Date().toISOString(), totalTasks: 0, employeeWorkloads: {} } });
     }
     
     // Query tasks assigned to employees in this department
@@ -498,7 +517,7 @@ exports.generateDepartmentReport = async (req, res) => {
     }
 
     const report = {
-      title: `${department} Department Report`,
+      title: `${capitalizeFirstLetter(department)} Department Report`,
       type: 'department',
       generatedAt: new Date().toISOString(),
       employeeWorkloads,
@@ -655,7 +674,7 @@ exports.generateCompanyReport = async (req, res) => {
       }
       
       if (!departmentStats[dept]) {
-        departmentStats[dept] = { name: dept, total: 0, completed: 0, overdue: 0 };
+        departmentStats[dept] = { name: capitalizeFirstLetter(dept), total: 0, completed: 0, overdue: 0 };
       }
       
       const status = normalizeStatus(task.status);
@@ -677,7 +696,7 @@ exports.generateCompanyReport = async (req, res) => {
     });
 
     const report = {
-      title: department && department !== 'ALL' ? `${department} Department Report` : "Company-Wide Report",
+      title: department && department !== 'ALL' ? `${capitalizeFirstLetter(department)} Department Report` : "Company-Wide Report",
       type: 'company',
       generatedAt: new Date().toISOString(),
       summary: {

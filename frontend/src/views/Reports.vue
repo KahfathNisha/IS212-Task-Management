@@ -127,9 +127,11 @@
             <v-select
               v-model="params.department"
               :items="departments"
+              item-title="title"
+              item-value="value"
               label="Select a Department"
               variant="outlined"
-              :disabled="authStore.userRole === 'hr' || authStore.userRole === 'manager'"
+              :disabled="authStore.userRole === 'manager'"
             ></v-select>
           </v-window-item>
 
@@ -593,6 +595,23 @@ const hasMultipleReportTypes = computed(() => {
   return [rbac.value.canViewProject, rbac.value.canViewIndividual, rbac.value.canViewDepartment, rbac.value.canViewCompany].filter(Boolean).length > 1;
 });
 
+// Helper function to capitalize first letter of department names
+// Special handling for acronyms that should be fully capitalized (e.g., "IT")
+function capitalizeFirstLetter(str) {
+  if (!str || typeof str !== 'string') return str;
+  if (str.length === 0) return str;
+  
+  // Handle special acronyms that should be fully capitalized
+  const upperStr = str.toUpperCase();
+  const acronyms = ['IT', 'HR', 'API', 'UI', 'UX', 'QA', 'R&D', 'CRM', 'ERP'];
+  if (acronyms.includes(upperStr)) {
+    return upperStr;
+  }
+  
+  // For other strings, capitalize first letter only
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 // Set default tab based on role
 watch(() => authStore.userRole, (newRole) => {
   if (newRole) {
@@ -846,25 +865,25 @@ async function fetchSelectorData() {
         
         if (role === 'director' || role === 'hr') {
           // Directors and HR can see all departments
-          departments.value = deptArray; // This is for department report dropdown
+          departments.value = deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept })); // This is for department report dropdown
           allDepartmentsForFilter.value = [
             { title: 'All Departments', value: 'ALL' },
-            ...deptArray.map(dept => ({ title: dept, value: dept }))
+            ...deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept }))
           ];
         } else if (role === 'manager' && department) {
           // Managers can only see their own department for department reports
-          departments.value = [department];
+          departments.value = [{ title: capitalizeFirstLetter(department), value: department }];
           params.value.department = department;
           // But can see all for company report filter
           allDepartmentsForFilter.value = [
             { title: 'All Departments', value: 'ALL' },
-            ...deptArray.map(dept => ({ title: dept, value: dept }))
+            ...deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept }))
           ];
         } else {
-          departments.value = deptArray;
+          departments.value = deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept }));
           allDepartmentsForFilter.value = [
             { title: 'All Departments', value: 'ALL' },
-            ...deptArray.map(dept => ({ title: dept, value: dept }))
+            ...deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept }))
           ];
         }
       } catch (apiErr) {
@@ -872,10 +891,10 @@ async function fetchSelectorData() {
         // Fallback to known departments
         const deptArray = ['Engineering', 'Finance', 'HR and Admin', 'Operations'];
         if (department) deptArray.push(department);
-        departments.value = deptArray;
+        departments.value = deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept }));
         allDepartmentsForFilter.value = [
           { title: 'All Departments', value: 'ALL' },
-          ...deptArray.map(dept => ({ title: dept, value: dept }))
+          ...deptArray.map(dept => ({ title: capitalizeFirstLetter(dept), value: dept }))
         ];
       }
     }
