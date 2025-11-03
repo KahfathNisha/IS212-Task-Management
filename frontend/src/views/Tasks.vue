@@ -510,6 +510,7 @@
       @open-attachment="openAttachment"
       @archive="archiveTask"
       :is-read-only="!isTaskEditable(selectedTask)"
+      :currentUser="currentUser"
     />
 
     <ArchivedTasks 
@@ -648,33 +649,56 @@ const loadingProjects = ref(false)
 const isTaskEditable = (task) => {
     // If the task is null (i.e., new task being created), check general permission
     if (!task) {
-        console.log('🔍 [isTaskEditable] Task is null, checking canCreateEdit:', canCreateEdit.value);
-        return canCreateEdit.value; 
+        return canCreateEdit.value;
     }
 
-    console.log('🔍 [isTaskEditable] Checking permissions:', { 
-        userRole: userRole.value, 
-        isHR: isHR.value, 
-        canCreateEdit: canCreateEdit.value,
-        taskOwner: task.taskOwner,
-        currentUserEmail: userEmail.value
-    });
+    const currentUserEmail = userEmail.value;
+    const currentUserName = currentUser.value?.name;
 
-    // Director/Non-HR roles are generally editable
+    // Check if user is task owner, assignee, or creator
+    const isOwner = (task.taskOwner === currentUserEmail || task.taskOwner === currentUserName);
+    const isAssignee = (task.assignedTo === currentUserEmail || task.assignedTo === currentUserName);
+    const isCreator = (task.createdBy === currentUserEmail || task.createdBy === currentUserName);
+
+    if (isOwner || isAssignee || isCreator) {
+        return true;
+    }
+
+    // Check collaborator permissions - CRITICAL FIX: Handle View collaborators
+    if (task.collaborators && Array.isArray(task.collaborators)) {
+        const userCollaborator = task.collaborators.find(collaborator => {
+            const collaboratorEmail = collaborator.name || collaborator;
+            return (collaboratorEmail === currentUserEmail || collaboratorEmail === currentUserName);
+        });
+
+        if (userCollaborator) {
+            const collaboratorPermission = userCollaborator.permission || 'View';
+            if (collaboratorPermission === 'Edit') {
+                return true;
+            } else { // Specifically includes 'View' and any other non-Edit permission
+                return false;
+            }
+        }
+    }
+
+    // Director role has universal edit access if not already covered.
+    if (isDirector.value) {
+        return true;
+    }
+
+    // Fallback for non-HR, non-Director users who are not involved with the task.
+    // This allows them to edit tasks in projects they can see, which might be intended.
+    // However, to be more secure, we default to false if no explicit permission is found.
     if (!isHR.value) {
-        console.log('✅ [isTaskEditable] Non-HR user, editable: true');
-        return true; 
+        return false;
     }
 
     // HR-SPECIFIC RULE: Only tasks owned by the HR user are editable. (STRICT VIEW-ONLY RULE)
-    const currentUserEmail = userEmail.value;
-
     // Check against task owner EMAIL (assuming taskOwner stores email)
-    const isOwner = (task.taskOwner === currentUserEmail); 
-    
+    const isHROwner = (task.taskOwner === currentUserEmail);
+
     // HR is strictly view-only unless they are the owner.
-    const isEditable = isOwner;
-    console.log('✅ [isTaskEditable] HR user, editable:', isEditable, { isOwner });
+    const isEditable = isHROwner;
     return isEditable;
 };
 

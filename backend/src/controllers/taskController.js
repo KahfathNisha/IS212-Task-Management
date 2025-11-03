@@ -12,6 +12,31 @@ const formatTimestampToISO = (timestamp) => {
     return timestamp;
 };
 
+// --- Helper function to check if user can edit a task ---
+const canUserEditTask = (taskData, userEmail) => {
+    // Task owner, creator, and assignee can always edit
+    if (userEmail === taskData.taskOwner ||
+        userEmail === taskData.assignedTo ||
+        userEmail === taskData.createdBy) {
+        return true;
+    }
+    
+    // Check collaborators for edit permission
+    if (taskData.collaborators && Array.isArray(taskData.collaborators)) {
+        for (let collaborator of taskData.collaborators) {
+            // Handle both object format {name: "email", permission: "Edit"} and string format "email"
+            let collaboratorEmail = collaborator.name || collaborator;
+            let collaboratorPermission = collaborator.permission || 'View';
+            
+            if (collaboratorEmail === userEmail) {
+                return collaboratorPermission === 'Edit';
+            }
+        }
+    }
+    
+    return false;
+};
+
 // --- Helper function to update project statistics ---
 const updateProjectStats = async (projectId) => {
     if (!projectId) return;
@@ -383,6 +408,12 @@ exports.updateTask = async (req, res) => {
         const originalTask = doc.data();
 
         // --- PERMISSION CHECK ---
+        // Check if user has edit permission for this task
+        const userEmail = loggedInUser.email || loggedInUser.name;
+        if (!canUserEditTask(originalTask, userEmail)) {
+            return res.status(403).json({ message: "Forbidden: You do not have permission to edit this task." });
+        }
+
         // Check if the request is trying to change the due date
         if (dueDate !== undefined) {
             const originalDueDateISO = originalTask.dueDate.toDate().toISOString().split('T')[0];
@@ -893,6 +924,15 @@ exports.archiveTask = async (req, res) => {
         
         const task = taskDoc.data();
         console.log(`📦 [archiveTask] Task found: "${task.title}"`);
+        
+        // --- PERMISSION CHECK ---
+        // Check if user has edit permission for this task
+        const loggedInUser = req.user;
+        const userEmail = loggedInUser.email || loggedInUser.name;
+        if (!canUserEditTask(task, userEmail)) {
+            return res.status(403).json({ message: "Forbidden: You do not have permission to archive this task." });
+        }
+        // --- END OF PERMISSION CHECK ---
         
         await db.collection('tasks').doc(req.params.id).update({
             archived: true,

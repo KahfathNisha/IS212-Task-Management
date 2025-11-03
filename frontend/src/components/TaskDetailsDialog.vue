@@ -273,20 +273,20 @@
       </v-card-text>
 
       <v-card-actions class="task-details-actions">
-        <v-btn 
-          color="primary" 
-          @click="onEdit" 
-          prepend-icon="mdi-pencil" 
+        <v-btn
+          color="primary"
+          @click="onEdit"
+          prepend-icon="mdi-pencil"
           rounded="lg"
           :disabled="isReadOnly"
         >
           {{ task.isSubtask ? 'Edit Subtask' : 'Edit Task' }}
         </v-btn>
         <v-spacer />
-        <v-btn 
-          color="error" 
-          @click="onArchive" 
-          prepend-icon="mdi-archive" 
+        <v-btn
+          color="error"
+          @click="onArchive"
+          prepend-icon="mdi-archive"
           rounded="lg"
           :disabled="isReadOnly"
         >
@@ -323,7 +323,8 @@ const props = defineProps({
   taskStatuses: { type: Array, default: () => ['Ongoing', 'Completed', 'Pending Review', 'Unassigned'] },
   parentTaskProgress: { type: Number, default: 0 },
   // 🟢 NEW PROP: Accept the read-only status
-  isReadOnly: { type: Boolean, default: false }
+  isReadOnly: { type: Boolean, default: false },
+  currentUser: { type: Object, default: null }
 })
 
 const emit = defineEmits(['update:show', 'edit', 'change-status', 'view-parent', 'open-attachment', 'archive'])
@@ -384,6 +385,7 @@ const getStatusColor = (status) => {
 const getPermissionColor = (permission) => {
   return permission === 'Edit' ? 'primary' : 'secondary'
 }
+
 
 const formatDate = (s) => s ? new Date(s).toLocaleDateString() : ''
 const formatDateTime = (s) => {
