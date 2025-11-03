@@ -520,6 +520,10 @@ exports.updateTask = async (req, res) => {
 
         // Send reassignment emails if assignee changed
         if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId) {
+            console.log(`📧 [TaskController] Triggering reassignment emails for task ${req.params.id}`);
+            console.log(`   Old assignee: ${oldAssigneeId}`);
+            console.log(`   New assignee: ${newAssigneeId}`);
+            console.log(`   Reassigned by: ${loggedInUser.name}`);
             await sendReassignmentEmails(req.params.id, newAssigneeId, oldAssigneeId, loggedInUser.name);
         }
 
@@ -778,21 +782,32 @@ exports.updateTaskStatus = async (req, res) => {
 
 // Helper function to send reassignment emails
 const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reassignedBy) => {
+    console.log(`📧 [sendReassignmentEmails] Starting email process for task ${taskId}`);
     try {
         const taskDoc = await db.collection('tasks').doc(taskId).get();
-        if (!taskDoc.exists) return;
+        if (!taskDoc.exists) {
+            console.log(`❌ [sendReassignmentEmails] Task ${taskId} not found`);
+            return;
+        }
 
         const taskData = taskDoc.data();
         const reassignmentTime = admin.firestore.Timestamp.now();
+        console.log(`📧 [sendReassignmentEmails] Task found: "${taskData.title}"`);
 
         // Send email to new assignee if assigned
         if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
+            console.log(`📧 [sendReassignmentEmails] Processing new assignee: ${newAssigneeId}`);
             const newAssigneeDoc = await db.collection('Users').doc(newAssigneeId).get();
             if (newAssigneeDoc.exists()) {
                 const newAssigneeData = newAssigneeDoc.data();
                 const settings = newAssigneeData.notificationSettings || {};
+                console.log(`📧 [sendReassignmentEmails] New assignee settings:`, {
+                    emailEnabled: settings.emailEnabled,
+                    emailReassignmentAdd: settings.emailReassignmentAdd
+                });
 
                 if (settings.emailEnabled && settings.emailReassignmentAdd) {
+                    console.log(`📧 [sendReassignmentEmails] Sending "assigned" email to new assignee`);
                     await EmailService.sendReassignmentNotification(
                         newAssigneeId, // email is the document ID
                         taskData,
@@ -801,18 +816,33 @@ const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reas
                         reassignmentTime,
                         newAssigneeData.timezone || 'UTC'
                     );
+                    console.log(`✅ [sendReassignmentEmails] "Assigned" email sent successfully`);
+                } else {
+                    console.log(`📧 [sendReassignmentEmails] Email not sent - settings disabled or missing:`, {
+                        emailEnabled: settings.emailEnabled,
+                        emailReassignmentAdd: settings.emailReassignmentAdd,
+                        hasNotificationSettings: !!newAssigneeData.notificationSettings
+                    });
                 }
+            } else {
+                console.log(`❌ [sendReassignmentEmails] New assignee document not found`);
             }
         }
 
         // Send email to old assignee if removed
         if (oldAssigneeId && oldAssigneeId !== newAssigneeId) {
+            console.log(`📧 [sendReassignmentEmails] Processing old assignee: ${oldAssigneeId}`);
             const oldAssigneeDoc = await db.collection('Users').doc(oldAssigneeId).get();
             if (oldAssigneeDoc.exists()) {
                 const oldAssigneeData = oldAssigneeDoc.data();
                 const settings = oldAssigneeData.notificationSettings || {};
+                console.log(`📧 [sendReassignmentEmails] Old assignee settings:`, {
+                    emailEnabled: settings.emailEnabled,
+                    emailReassignmentRemove: settings.emailReassignmentRemove
+                });
 
                 if (settings.emailEnabled && settings.emailReassignmentRemove) {
+                    console.log(`📧 [sendReassignmentEmails] Sending "removed" email to old assignee`);
                     await EmailService.sendReassignmentNotification(
                         oldAssigneeId, // email is the document ID
                         taskData,
@@ -821,7 +851,16 @@ const sendReassignmentEmails = async (taskId, newAssigneeId, oldAssigneeId, reas
                         reassignmentTime,
                         oldAssigneeData.timezone || 'UTC'
                     );
+                    console.log(`✅ [sendReassignmentEmails] "Removed" email sent successfully`);
+                } else {
+                    console.log(`📧 [sendReassignmentEmails] Email not sent - settings disabled or missing:`, {
+                        emailEnabled: settings.emailEnabled,
+                        emailReassignmentRemove: settings.emailReassignmentRemove,
+                        hasNotificationSettings: !!oldAssigneeData.notificationSettings
+                    });
                 }
+            } else {
+                console.log(`❌ [sendReassignmentEmails] Old assignee document not found`);
             }
         }
 

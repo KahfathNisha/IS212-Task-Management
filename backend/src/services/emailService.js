@@ -17,15 +17,17 @@ function isValidTimezone(timezone) {
 class EmailService {
     // Helper method for email validation
     static validateEmail(email) {
+        console.log(`📧 [EmailService] Validating email: ${email}`);
         if (!email || typeof email !== 'string') {
-            console.warn('Invalid email address: Email is required and must be a string');
+            console.warn('❌ [EmailService] Invalid email address: Email is required and must be a string');
             return null;
         }
         const trimmedEmail = email.trim();
         if (!EMAIL_REGEX.test(trimmedEmail)) {
-            console.warn('Invalid email address format:', trimmedEmail);
+            console.warn('❌ [EmailService] Invalid email address format:', trimmedEmail);
             return null;
         }
+        console.log(`✅ [EmailService] Email validated: ${trimmedEmail.toLowerCase()}`);
         return trimmedEmail.toLowerCase();
     }
 
@@ -151,7 +153,7 @@ class EmailService {
         // to construct the email message obj
         const msg = {
             to: userEmail,
-            from: process.env.SENDGRID_FROM_EMAIL, // Verified sender email
+            from: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_FROM, // Verified sender email
             subject: subject,
             html: html
         };
@@ -182,6 +184,13 @@ class EmailService {
     // - reassignmentTime: Timestamp when reassignment occurred
     // - userTimezone: User's timezone string (e.g., 'America/New_York') for localized timestamp display
     static async sendReassignmentNotification(userEmail, taskData, reassignmentType, reassignedBy, reassignmentTime, userTimezone) {
+        console.log(`📧 [EmailService] sendReassignmentNotification called:`);
+        console.log(`   To: ${userEmail}`);
+        console.log(`   Task: ${taskData?.title || 'N/A'}`);
+        console.log(`   Type: ${reassignmentType}`);
+        console.log(`   By: ${reassignedBy}`);
+        console.log(`   Timezone: ${userTimezone}`);
+
         // Validate inputs
         let emailValidationError = null;
         const validatedTaskData = this.validateTaskData(taskData, 'sendReassignmentNotification');
@@ -288,18 +297,30 @@ class EmailService {
         `;
 
         // to construct the email message obj
+        console.log(`📧 [EmailService] Constructing email message:`);
+        console.log(`   From: ${process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_FROM}`);
+        console.log(`   To: ${userEmail}`);
+        console.log(`   Subject: ${subject}`);
+        console.log(`   Has HTML content: ${!!html}`);
+
         const msg = {
             to: userEmail,
-            from: process.env.SENDGRID_FROM_EMAIL, // Verified sender email
+            from: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_FROM, // Verified sender email
             subject: subject,
             html: html
         };
 
         try {
+            console.log(`📧 [EmailService] Sending email via SendGrid...`);
             await sgMail.send(msg);
-            console.log(`Reassignment email sent to ${userEmail} for task ${validatedTaskData.title} (${reassignmentType})`);
+            console.log(`✅ [EmailService] Reassignment email sent successfully to ${userEmail} for task ${validatedTaskData.title} (${reassignmentType})`);
         } catch (error) {
-            console.error('Reassignment email send error:', error);
+            console.error('❌ [EmailService] Reassignment email send error:', error);
+            console.error('❌ [EmailService] Error details:', {
+                message: error.message,
+                code: error.code,
+                response: error.response?.body
+            });
             // If there was an email validation error, throw that; otherwise throw the send error
             if (emailValidationError) {
                 throw emailValidationError;
@@ -331,7 +352,7 @@ class EmailService {
 
         const msg = {
             to: validatedEmail,
-            from: process.env.SENDGRID_FROM_EMAIL,
+            from: process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_FROM,
             subject: subject.trim(),
             text: text.trim()
         };
