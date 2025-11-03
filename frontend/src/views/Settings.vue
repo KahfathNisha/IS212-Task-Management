@@ -548,3 +548,35 @@ async function saveSettings() {
 }
 </script>
 
+<style scoped>
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .v-card {
+    margin: 8px;
+  }
+
+  .v-card-text {
+    padding: 16px;
+  }
+
+  .d-flex.flex-wrap {
+    gap: 8px !important;
+  }
+
+  .d-flex.gap-6 {
+    flex-direction: column;
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .v-card-title {
+    font-size: 1.25rem;
+    padding: 16px;
+  }
+
+  .v-card-text {
+    padding: 12px;
+  }
+}
+</style>
