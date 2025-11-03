@@ -1,27 +1,56 @@
-const { db } = require('../config/firebase');
+const { db, admin } = require('../config/firebase'); // Ensure admin is imported for serverTimestamp
+
+/**
+ * Helper function to get user data and check permissions.
+ * This is crucial for RBAC.
+ */
+async function getUserPermissions(requesterId) {
+  if (!requesterId) {
+    throw new Error('Unauthorized: Requester ID is required.');
+  }
+  // Use 'users' (lowercase) collection name
+  const userDoc = await db.collection('users').doc(requesterId).get();
+  if (!userDoc.exists) {
+    throw new Error('Forbidden: Requester profile not found.');
+  }
+  const userData = userDoc.data();
+  const role = userData.role?.toLowerCase() || 'staff';
+  
+  // Your RBAC Matrix Logic - Updated to include HR for company reports
+  return {
+    user: userData,
+    role: role,
+    department: userData.department,
+    canViewProject: ['staff', 'manager', 'director'].includes(role),
+    canViewIndividual: ['staff', 'manager', 'director', 'hr'].includes(role),
+    canViewDepartment: ['manager', 'director', 'hr'].includes(role),
+    canViewCompany: role === 'director' || role === 'hr', // HR can view company reports for KPI tracking
+  };
+}
 
 /**
  * Helper function to normalize task status
  */
 const normalizeStatus = (s) => {
   const val = (s || '').toString().toLowerCase();
-  if (val === 'ongoing' || val === 'in progress' || val === 'progress') return 'Ongoing';
-  if (val === 'pending review' || val === 'pending') return 'Pending Review';
-  if (val === 'completed' || val === 'complete' || val === 'done') return 'Completed';
-  if (val === 'unassigned' || val === 'to do' || val === 'todo' || val === 'not started') return 'Unassigned';
-  return 'Unassigned';
+  if (['ongoing', 'in progress', 'progress'].includes(val)) return 'Ongoing';
+  if (['pending review', 'pending'].includes(val)) return 'Pending Review';
+  if (['completed', 'complete', 'done'].includes(val)) return 'Completed';
+  return 'To Do'; // Default for 'unassigned', 'to do', etc.
 };
 
 /**
  * Helper function to check if task is overdue
  */
-const isOverdue = (dueDate, status) => {
-  if (status === 'Completed' || !dueDate) return false;
+const isOverdue = (task) => {
+  const status = normalizeStatus(task.status);
+  if (status === 'Completed' || !task.dueDate) return false;
+  // Ensure dueDate is a Firebase Timestamp
+  if (typeof task.dueDate.toDate !== 'function') return false; 
+  const dueDate = task.dueDate.toDate();
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
-  return due < today;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Compare dates only
+  return dueDate < today;
 };
 
 /**
@@ -66,260 +95,145 @@ exports.generateProjectReport = async (req, res) => {
   try {
     const { projectId } = req.params;
     const { requesterId } = req.query;
+    const perms = await getUserPermissions(requesterId);
 
-    if (!requesterId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized: Requester ID is required.' });
+    if (!perms.canViewProject) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    const [projectDoc, userDoc] = await Promise.all([
-      db.collection('projects').doc(projectId).get(),
-      db.collection('users').doc(requesterId).get()
-    ]);
-
+    const projectDoc = await db.collection('projects').doc(projectId).get();
     if (!projectDoc.exists) return res.status(404).json({ success: false, message: 'Project not found.' });
-    if (!userDoc.exists) return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
-
+    
     const projectData = projectDoc.data();
-    const userData = userDoc.data();
-    const userRole = userData.role?.toLowerCase();
 
-    // RBAC: Check if user has permission for project reports
-    if (!checkReportPermission(userRole, 'project')) {
-      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate project reports.' });
-    }
-
-    // Staff can only view projects they are members of
-    if (userRole === 'staff') {
-      const isMember = projectData.members && projectData.members.includes(requesterId);
-      if (!isMember) {
-        return res.status(403).json({ success: false, message: 'Forbidden: You must be a member of this project to view its report.' });
-      }
-    }
-    // Managers can view projects in their department or where they are a member
-    if (userRole === 'manager') {
-      const sameDepartment = projectData.department && userData.department && projectData.department === userData.department;
-      const isMember = projectData.members && projectData.members.includes(requesterId);
-      if (!sameDepartment && !isMember) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Managers may view only projects in their department or where they are a member.' });
+    // Security: Staff/Managers can only view projects they are members of.
+    if (perms.role === 'staff' || perms.role === 'manager') {
+      if (!projectData.members || !projectData.members.includes(requesterId)) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You are not a member of this project.' });
       }
     }
 
+    // Query tasks by projectId first (single field index, no composite needed)
+    // Then sort in memory to avoid composite index requirement
     const tasksSnapshot = await db.collection('tasks').where('projectId', '==', projectId).get();
-    const tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Batch fetch assignee info for all assigned emails
-    const assigneeEmails = Array.from(new Set(tasks.map(t => t.assignedTo).filter(Boolean)));
-    const userDocs = await Promise.all(assigneeEmails.map(email => db.collection('users').doc(email).get()));
-    const emailToUser = {};
-    userDocs.forEach(doc => {
-      if (doc.exists) emailToUser[doc.id] = {
-        name: doc.data().name || doc.id.split('@')[0],
-        email: doc.id,
-        department: doc.data().department || '',
-      };
+    let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Sort by due date in memory to avoid composite index requirement
+    tasks.sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1; // Tasks without due date go to end
+      if (!b.dueDate) return -1;
+      const dateA = a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
+      const dateB = b.dueDate.toDate ? b.dueDate.toDate() : new Date(b.dueDate);
+      return dateA - dateB;
     });
-    // Attach assignee info to tasks
-    const richerTasks = tasks.map(task => ({
-      ...task,
-      assignee: task.assignedTo ? (emailToUser[task.assignedTo] || { name: task.assignedTo.split('@')[0], email: task.assignedTo }) : null,
-    }));
 
-    const totalTasks = richerTasks.length;
-    const statusCounts = {};
+    const totalTasks = tasks.length;
+    const statusCounts = { 'To Do': 0, 'Ongoing': 0, 'Pending Review': 0, 'Completed': 0 };
     const memberWorkload = {};
-    const projectMembers = new Set(projectData.members || []);
-
-    // Enhanced task data with overdue status and timeline info
     let overdueCount = 0;
-    richerTasks.forEach(task => {
+    const now = new Date();
+
+    const richerTasks = tasks.map(task => {
       const status = normalizeStatus(task.status);
       statusCounts[status] = (statusCounts[status] || 0) + 1;
       
-      // Check if overdue
-      if (isOverdue(task.dueDate, task.status)) {
-        overdueCount++;
-        task.isOverdue = true;
-        task.isAtRisk = false; // Overdue tasks are not at risk, they're already overdue
-      } else if (task.dueDate && task.status !== 'Completed') {
-        // At-risk: due within 3 days and not completed
-        const due = new Date(task.dueDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const daysUntilDue = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-        task.isAtRisk = daysUntilDue <= 3 && daysUntilDue > 0;
-      }
-      
-      // Team member allocation (show all assigned members)
-      if (task.assignedTo) {
+      if (task.assignedTo) { // Your single-assignee logic
         memberWorkload[task.assignedTo] = (memberWorkload[task.assignedTo] || 0) + 1;
       }
-    });
-    
-    const report = {
-        projectId: projectDoc.id,
-        projectName: projectData.name,
-        generatedAt: new Date().toISOString(),
-        summary: { 
-          totalTasks, 
-          statusCounts, 
-          memberWorkload,
-          overdueCount,
-          overduePercentage: totalTasks > 0 ? ((overdueCount / totalTasks) * 100).toFixed(1) : 0
-        },
-        tasks: richerTasks,
-    };
-    res.status(200).json({ success: true, report });
+      
+      const overdue = isOverdue(task);
+      if (overdue) overdueCount++;
 
-  } catch (error) {
-    console.error('Error generating project report:', error);
-    res.status(500).json({ success: false, message: 'An internal server error occurred.' });
-  }
-};
-
-// --- NEW FUNCTION FOR HR ---
-/**
- * Generates a workload distribution report for a specific department (for HR).
- */
-exports.generateDepartmentReport = async (req, res) => {
-  let department = req.query.department;
-  let requesterId = req.query.requesterId;
-  console.log('--- Incoming dept report request ---');
-  console.log('Queried Department:', department);
-  console.log('Requester ID:', requesterId);
-  try {
-    if (!department) {
-      console.log('Department param missing!');
-      return res.status(400).json({ success: false, message: 'Department is required.' });
-    }
-    if (!requesterId) {
-      console.log('Requester ID missing!');
-      return res.status(401).json({ success: false, message: 'Unauthorized.' });
-    }
-    // Authorization: Check RBAC for department reports
-    const userDoc = await db.collection('users').doc(requesterId).get();
-    if (!userDoc.exists) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
-    }
-    
-    const userRole = userDoc.data().role?.toLowerCase();
-    if (!checkReportPermission(userRole, 'department')) {
-      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate department reports.' });
-    }
-    
-    // HR can view all departments (for KPI tracking), Managers can view their department, Directors can view all
-    if (userRole === 'manager') {
-      const userData = userDoc.data();
-      if (department !== 'ALL' && department !== userData.department) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Managers can only view reports for their own department.' });
+      // Check "At Risk" (due in 3 days, not complete)
+      let atRisk = false;
+      if (!overdue && status !== 'Completed' && task.dueDate?.toDate) {
+        const due = task.dueDate.toDate();
+        const daysUntilDue = (due - now) / (1000 * 60 * 60 * 24);
+        if (daysUntilDue <= 3 && daysUntilDue >= 0) { // Only if due in future
+          atRisk = true;
+        }
       }
-    }
 
-    // Query users by department
-    console.log('Querying users with department:', department);
-    let usersSnapshot;
-    if (department === 'ALL') {
-      usersSnapshot = await db.collection('users').get();
-    } else {
-      usersSnapshot = await db.collection('users').where('department', '==', department).get();
-    }
-    const departmentUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const userEmails = departmentUsers.map(user => user.email);
-    console.log(`[DeptReport] Found users:`, userEmails);
-    if (userEmails.length === 0) {
-      console.log('No users found for department:', department);
-      return res.status(200).json({ success: true, report: { departmentName: department, generatedAt: new Date().toISOString(), employeeWorkloads: {}, totalTasks: 0 } });
-    }
-
-    // Query tasks for department or all
-    console.log('Querying tasks with taskOwnerDepartment or ALL');
-    let tasksSnapshot;
-    if (department === 'ALL') {
-      tasksSnapshot = await db.collection('tasks').get();
-    } else {
-      tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
-    }
-    const allTasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log(`[DeptReport] Found tasks:`, allTasks.map(t => t.id));
-
-    // Batch fetch project names
-    const projectIdSet = new Set(allTasks.map(task => task.projectId).filter(Boolean));
-    const projectIdArr = Array.from(projectIdSet);
-    const projectDocs = await Promise.all(projectIdArr.map(projectId => db.collection('projects').doc(projectId).get()));
-    const projectIdNameMap = {};
-    for (const doc of projectDocs) {
-      if (doc.exists) projectIdNameMap[doc.id] = doc.data().name || doc.id;
-    }
-
-    // Initialize workloads
-    const employeeWorkloads = {};
-    userEmails.forEach(email => {
-      employeeWorkloads[email] = {
-        'Ongoing': 0,
-        'Pending Review': 0,
-        'Completed': 0,
-        'Unassigned': 0,
-        'Total': 0,
-        'name': departmentUsers.find(u => u.email === email)?.name || email.split('@')[0],
-        'tasks': [],
+      return {
+        id: task.id,
+        title: task.title,
+        status: status,
+        assignedTo: task.assignedTo || null,
+        dueDate: task.dueDate || null,
+        isOverdue: overdue,
+        isAtRisk: atRisk,
       };
     });
-
-    // Tally
-    allTasks.forEach(task => {
-      const assignee = task.assignedTo; // single string
-      const normStatus = normalizeStatus(task.status);
-      if (employeeWorkloads[assignee]) {
-        employeeWorkloads[assignee][normStatus] = (employeeWorkloads[assignee][normStatus] || 0) + 1;
-        employeeWorkloads[assignee]['Total']++;
-        employeeWorkloads[assignee]['tasks'].push({
-          id: task.id,
-          title: task.title || '',
-          status: normStatus,
-          dueDate: task.dueDate || null,
-          priority: task.priority || '',
-          projectId: task.projectId || '',
-          projectName: task.projectId ? (projectIdNameMap[task.projectId] || task.projectId) : '',
-        });
-      }
-    });
+    
+    // Resolve assignee names for workload chart
+    const memberEmails = Object.keys(memberWorkload);
+    let memberNames = {};
+    if(memberEmails.length > 0) {
+      const userRefs = memberEmails.map(email => db.collection('users').doc(email));
+      const userDocs = await db.getAll(...userRefs);
+      userDocs.forEach(doc => {
+        if (doc.exists) {
+          memberNames[doc.id] = doc.data().name || doc.id.split('@')[0];
+        } else {
+          memberNames[doc.id] = doc.id.split('@')[0];
+        }
+      });
+    }
 
     const report = {
-      departmentName: department === 'ALL' ? 'Company (All)' : department,
+      title: projectData.name,
+      type: 'project',
       generatedAt: new Date().toISOString(),
-      employeeWorkloads,
-      totalTasks: tasksSnapshot.size,
+      summary: { 
+        totalTasks, 
+        statusCounts, 
+        memberWorkload, // The backend sends this
+        memberNames, // And sends the names
+        overdueCount, 
+        overduePercentage: (totalTasks > 0) ? ((overdueCount / totalTasks) * 100).toFixed(0) : 0 
+      },
+      tasks: richerTasks,
     };
-
     res.status(200).json({ success: true, report });
-    console.log(`Successfully returned department report for:`, department);
+
   } catch (error) {
-    console.error('❌ [Dept Report OUTER ERROR]', error.message, error.stack, 'Values:', { department, requesterId });
-    res.status(500).json({ success: false, message: `[Outer] Server error: ${error.message}` });
+    console.error('Error generating project report:', error.message, error.stack);
+    res.status(500).json({ success: false, message: "Error generating project report: " + error.message });
   }
 };
 
 /**
- * Generates a company-wide performance report (Director only).
- * Shows all tasks from all departments with filtering options.
+ * 2. INDIVIDUAL PERFORMANCE REPORT (Staff, Manager, HR, Director)
+ * User Story: "Individual Progress Report"
  */
-exports.generateCompanyReport = async (req, res) => {
+exports.generateIndividualReport = async (req, res) => {
   try {
-    const { requesterId, department, departments, startDate, endDate } = req.query;
+    const { employeeEmail, departments, startDate, endDate } = req.query;
+    const { requesterId } = req.query;
+    const perms = await getUserPermissions(requesterId);
 
-    if (!requesterId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized: Requester ID is required.' });
+    if (!perms.canViewIndividual) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    // Authorization: Directors and HR can generate company reports
-    const userDoc = await db.collection('users').doc(requesterId).get();
-    if (!userDoc.exists) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
+    const employeeDoc = await db.collection('users').doc(employeeEmail).get();
+    if (!employeeDoc.exists) return res.status(404).json({ success: false, message: "Employee not found." });
+    const employeeData = employeeDoc.data();
+
+    // Security: Check if requester is allowed to view this specific employee
+    if (perms.role === 'staff' && requesterId !== employeeEmail) {
+      return res.status(403).json({ success: false, message: "Forbidden: Staff can only view their own reports." });
+    }
+    // HR can view all employees (for KPI tracking across company)
+    // Managers can only view employees in their department
+    if (perms.role === 'manager' && employeeData.department !== perms.department) {
+      return res.status(403).json({ success: false, message: "Forbidden: Managers can only view reports for employees in their department." });
     }
 
-    const userRole = userDoc.data().role?.toLowerCase();
-    if (!checkReportPermission(userRole, 'company')) {
-      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate company performance reports.' });
-    }
+    // Query tasks by assignedTo first (single field index, no composite needed)
+    let tasksQuery = db.collection('tasks').where('assignedTo', '==', employeeEmail);
+    const tasksSnapshot = await tasksQuery.get();
 
     // Build query for tasks
     let tasksSnapshot;
@@ -356,248 +270,255 @@ exports.generateCompanyReport = async (req, res) => {
         tasks = tasks.filter(task => deptArray.includes(task.taskOwnerDepartment));
       }
     }
-
-    // Filter by date range if provided
+    
+    // Filter by date range in memory to avoid composite index requirement
     if (startDate || endDate) {
       const start = startDate ? new Date(startDate) : null;
       const end = endDate ? new Date(endDate) : null;
       
       tasks = tasks.filter(task => {
         if (!task.createdAt) return false;
-        const taskDate = new Date(task.createdAt);
-        
-        if (start && taskDate < start) return false;
-        if (end && taskDate > end) return false;
+        const createdDate = task.createdAt.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
+        if (start && createdDate < start) return false;
+        if (end) {
+          // Include end date (end of day)
+          const endOfDay = new Date(end);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (createdDate > endOfDay) return false;
+        }
         return true;
       });
     }
 
-    // Calculate metrics
     const totalTasks = tasks.length;
-    let overdueCount = 0;
-    const statusCounts = {};
-    const departmentCounts = {};
-    
+    let completedTasks = 0;
+    let overdueTasks = 0;
+    const statusCounts = { 'To Do': 0, 'Ongoing': 0, 'Pending Review': 0, 'Completed': 0 };
+    let totalTimeDays = 0;
+    const timeBreakdown = [];
+
     tasks.forEach(task => {
       const status = normalizeStatus(task.status);
       statusCounts[status] = (statusCounts[status] || 0) + 1;
+      if (status === 'Completed') completedTasks++;
+      if (isOverdue(task)) overdueTasks++;
       
-      if (isOverdue(task.dueDate, task.status)) {
-        overdueCount++;
+      if (status === 'Completed' && task.createdAt?.toDate && task.updatedAt?.toDate) {
+        const created = task.createdAt.toDate();
+        const updated = task.updatedAt.toDate();
+        const daysTaken = Math.max(1, Math.ceil((updated - created) / (1000 * 60 * 60 * 24))); // Min 1 day
+        totalTimeDays += daysTaken;
+        timeBreakdown.push({
+          id: task.id,
+          title: task.title,
+          daysTaken: daysTaken
+        });
       }
-      
-      const dept = task.taskOwnerDepartment || 'Unassigned';
-      departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
     });
-
-    const overduePercentage = totalTasks > 0 ? ((overdueCount / totalTasks) * 100).toFixed(1) : 0;
-
-    // Get all departments for filter dropdown
-    const departmentsSnapshot = await db.collection('users').get();
-    const allDepartments = new Set();
-    departmentsSnapshot.docs.forEach(doc => {
-      const dept = doc.data().department;
-      if (dept) allDepartments.add(dept);
-    });
+    
+    timeBreakdown.sort((a, b) => b.daysTaken - a.daysTaken);
 
     const report = {
-      reportType: 'company',
+      title: `Individual Report: ${employeeData.name}`,
+      type: 'individual',
       generatedAt: new Date().toISOString(),
-      filters: {
-        department: department || 'ALL',
-        startDate: startDate || null,
-        endDate: endDate || null
-      },
+      employee: employeeData,
       summary: {
         totalTasks,
-        overdueCount,
-        overduePercentage: parseFloat(overduePercentage),
+        completedTasks,
+        overdueTasks,
+        completionRate: (totalTasks > 0) ? ((completedTasks / totalTasks) * 100).toFixed(0) : 0,
+        avgTimePerTask: (completedTasks > 0) ? (totalTimeDays / completedTasks).toFixed(1) : 0,
         statusCounts,
-        departmentCounts,
-        availableDepartments: Array.from(allDepartments)
       },
-      tasks: tasks.slice(0, 100) // Limit to first 100 tasks for response size
+      timeBreakdown: timeBreakdown.slice(0, 10),
     };
-
     res.status(200).json({ success: true, report });
+
   } catch (error) {
-    console.error('Error generating company report:', error);
-    res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+    console.error('Error generating individual report:', error.message, error.stack);
+    res.status(500).json({ success: false, message: "Error generating individual report: " + error.message });
   }
 };
 
 /**
- * Generates an individual progress report for a specific team member (Manager/HR).
+ * 3. DEPARTMENT WORKLOAD REPORT (Manager, HR, Director)
+ * User Story: "Workload Distribution Report for HR Management"
  */
-exports.generateIndividualReport = async (req, res) => {
+exports.generateDepartmentReport = async (req, res) => {
   try {
-    const { employeeEmail, requesterId, startDate, endDate } = req.query;
+    const { department } = req.query;
+    const { requesterId } = req.query;
+    const perms = await getUserPermissions(requesterId);
 
-    if (!requesterId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized: Requester ID is required.' });
+    if (!perms.canViewDepartment) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    if (!employeeEmail) {
-      return res.status(400).json({ success: false, message: 'Employee email is required.' });
+    // HR can view all departments (for KPI tracking), Managers can only view their own
+    if (perms.role === 'manager' && department !== 'ALL' && perms.department !== department) {
+      return res.status(403).json({ success: false, message: "Forbidden: Managers can only view reports for their own department." });
     }
 
-    // Authorization check
-    const [requesterDoc, employeeDoc] = await Promise.all([
-      db.collection('users').doc(requesterId).get(),
-      db.collection('users').doc(employeeEmail).get()
-    ]);
+    const usersQuery = await db.collection('users').where('department', '==', department).get();
+    // Filter out HR users - they don't have tasks so shouldn't be included in department reports
+    const departmentUsers = usersQuery.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(user => user.role?.toLowerCase() !== 'hr');
+    const userEmails = departmentUsers.map(user => user.email);
 
-    if (!requesterDoc.exists) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Requester profile not found.' });
+    if (userEmails.length === 0) {
+      return res.status(200).json({ success: true, report: { title: `${department} Report`, type: 'department', generatedAt: new Date().toISOString(), totalTasks: 0, employeeWorkloads: {} } });
     }
-
-    if (!employeeDoc.exists) {
-      return res.status(404).json({ success: false, message: 'Employee not found.' });
-    }
-
-    const requesterRole = requesterDoc.data().role?.toLowerCase();
-    const requesterDept = requesterDoc.data().department;
-    const employeeDept = employeeDoc.data().department;
-
-    // RBAC: Check permissions
-    // Staff can only view their own individual report, managers/HR/directors can view others
-    if (requesterRole === 'staff') {
-      // Staff can only view their own report
-      if (requesterId !== employeeEmail) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Staff can only view their own individual performance report.' });
-      }
-    } else if (!checkReportPermission(requesterRole, 'individual')) {
-      // Other roles need explicit permission
-      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to generate individual reports.' });
-    }
-
-    // HR can view all employees (for KPI tracking across company)
-    // Managers can view employees in their department
-    if (requesterRole === 'manager') {
-      if (employeeDept !== requesterDept) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Managers can only view reports for employees in their department.' });
-      }
-    }
-
-    // Query tasks assigned to this employee
-    // Check both assignedTo and assigneeId fields as tasks may use either
-    const [tasksSnapshot1, tasksSnapshot2] = await Promise.all([
-      db.collection('tasks').where('assignedTo', '==', employeeEmail).get(),
-      db.collection('tasks').where('assigneeId', '==', employeeEmail).get()
-    ]);
     
-    // Combine results and remove duplicates
-    const allTasksDocs = [...tasksSnapshot1.docs, ...tasksSnapshot2.docs];
-    const uniqueTasksMap = new Map();
-    allTasksDocs.forEach(doc => {
-      uniqueTasksMap.set(doc.id, doc);
-    });
-    
-    let tasks = Array.from(uniqueTasksMap.values()).map(doc => {
-      const taskData = doc.data();
-      // Normalize: if task has assigneeId but not assignedTo, use assigneeId as assignedTo for consistency
-      if (taskData.assigneeId && !taskData.assignedTo) {
-        taskData.assignedTo = taskData.assigneeId;
-      }
-      return { id: doc.id, ...taskData };
-    });
-    
-    // Filter out archived tasks (if archived field exists and is true)
-    tasks = tasks.filter(task => task.archived !== true);
-    
-    // Debug logging to help troubleshoot
-    console.log(`[IndividualReport] Found ${tasks.length} tasks for ${employeeEmail}`, {
-      byAssignedTo: tasksSnapshot1.size,
-      byAssigneeId: tasksSnapshot2.size,
-      statusBreakdown: tasks.reduce((acc, t) => {
-        const status = normalizeStatus(t.status);
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {})
+    const tasksQuery = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
+    const tasks = tasksQuery.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+    const employeeWorkloads = {};
+    departmentUsers.forEach(user => {
+      employeeWorkloads[user.email] = {
+        name: user.name,
+        'To Do': 0, 'Ongoing': 0, 'Pending Review': 0, 'Completed': 0, 'Total': 0, 'Overdue': 0,
+        tasks: []
+      };
     });
 
-    // Filter by date range if provided
-    if (startDate || endDate) {
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-      
-      tasks = tasks.filter(task => {
-        if (!task.createdAt) return false;
-        const taskDate = new Date(task.createdAt);
-        if (start && taskDate < start) return false;
-        if (end && taskDate > end) return false;
-        return true;
-      });
-    }
-
-    // Calculate metrics
-    const totalTasks = tasks.length;
-    let completedCount = 0;
-    let overdueCount = 0;
-    const statusCounts = {};
-    const timeMetrics = [];
-    let totalTimeDays = 0;
+    const projectIds = [...new Set(tasks.map(t => t.projectId).filter(Boolean))];
+    const projectRefs = projectIds.map(id => db.collection('projects').doc(id));
+    const projectDocs = projectRefs.length > 0 ? await db.getAll(...projectRefs) : [];
+    const projectMap = projectDocs.reduce((acc, doc) => {
+      if (doc.exists) acc[doc.id] = doc.data().name;
+      return acc;
+    }, {});
 
     tasks.forEach(task => {
-      const status = normalizeStatus(task.status);
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-      
-      if (status === 'Completed') {
-        completedCount++;
-      }
-      
-      if (isOverdue(task.dueDate, task.status)) {
-        overdueCount++;
-      }
-
-      // Calculate time taken per task (only for completed tasks)
-      // Use normalized status to be consistent
-      if (status === 'Completed' && task.createdAt && task.updatedAt) {
-        const created = new Date(task.createdAt);
-        const updated = new Date(task.updatedAt);
-        const days = Math.ceil((updated - created) / (1000 * 60 * 60 * 24));
-        timeMetrics.push({
-          taskId: task.id,
-          taskTitle: task.title || 'Untitled',
-          daysTaken: days
+      const assignee = task.assignedTo;
+      if (employeeWorkloads[assignee]) {
+        const status = normalizeStatus(task.status);
+        employeeWorkloads[assignee][status]++;
+        employeeWorkloads[assignee]['Total']++;
+        if (isOverdue(task)) {
+          employeeWorkloads[assignee]['Overdue']++;
+        }
+        employeeWorkloads[assignee].tasks.push({
+          id: task.id,
+          title: task.title,
+          status: status,
+          priority: task.priority,
+          dueDate: task.dueDate || null,
+          projectName: projectMap[task.projectId] || 'N/A'
         });
-        totalTimeDays += days;
       }
     });
 
-    const completionRate = totalTasks > 0 ? ((completedCount / totalTasks) * 100).toFixed(1) : 0;
-    const avgTimePerTask = completedCount > 0 ? (totalTimeDays / completedCount).toFixed(1) : 0;
+    const report = {
+      title: `${department} Department Report`,
+      type: 'department',
+      generatedAt: new Date().toISOString(),
+      employeeWorkloads,
+      totalTasks: tasksQuery.size,
+    };
+    res.status(200).json({ success: true, report });
 
-    const employeeData = employeeDoc.data();
+  } catch (error) {
+    console.error('Error generating department report:', error.message, error.stack);
+    res.status(500).json({ success: false, message: "Error generating department report: " + error.message });
+  }
+};
+
+/**
+ * 4. COMPANY PERFORMANCE REPORT (Director)
+ * User Story: "Report Generation for Board Review for Director"
+ */
+exports.generateCompanyReport = async (req, res) => {
+   try {
+    const { startDate, endDate, department } = req.query;
+    const { requesterId } = req.query;
+    const perms = await getUserPermissions(requesterId);
+
+    if (!perms.canViewCompany) {
+      return res.status(403).json({ success: false, message: "Forbidden: Only Directors and HR can generate company-wide reports." });
+    }
+
+    // Handle multiple department filtering
+    const { departments } = req.query;
+    let tasksSnapshot;
+    
+    if (departments && departments !== 'ALL') {
+      const deptArray = departments.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      
+      if (deptArray.length === 0) {
+        tasksSnapshot = await db.collection('tasks').get();
+      } else if (deptArray.length === 1) {
+        tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', deptArray[0]).get();
+      } else {
+        tasksSnapshot = await db.collection('tasks').get(); // Fetch all and filter in memory
+      }
+    } else if (department && department !== 'ALL') { // Backward compatibility for single 'department' param
+      tasksSnapshot = await db.collection('tasks').where('taskOwnerDepartment', '==', department).get();
+    } else {
+      tasksSnapshot = await db.collection('tasks').get();
+    }
+     
+    let tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Filter by multiple departments if needed (when using departments parameter and multiple were selected)
+    if (departments && departments !== 'ALL') {
+      const deptArray = departments.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      if (deptArray.length > 1) {
+        tasks = tasks.filter(task => deptArray.includes(task.taskOwnerDepartment));
+      }
+    }
+
+    // Manual date filtering
+    if (startDate) tasks = tasks.filter(t => t.createdAt && t.createdAt.toDate() >= new Date(startDate));
+    if (endDate) tasks = tasks.filter(t => t.createdAt && t.createdAt.toDate() <= new Date(endDate));
+    
+    const departmentStats = {};
+    let totalOverdue = 0;
+    const statusCounts = { 'To Do': 0, 'Ongoing': 0, 'Pending Review': 0, 'Completed': 0 };
+
+    tasks.forEach(task => {
+      const dept = task.taskOwnerDepartment || 'Uncategorized';
+      if (!departmentStats[dept]) {
+        departmentStats[dept] = { name: dept, total: 0, completed: 0, overdue: 0 };
+      }
+      
+      const status = normalizeStatus(task.status);
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+      departmentStats[dept].total++;
+
+      if (status === 'Completed') {
+        departmentStats[dept].completed++;
+      }
+      if (isOverdue(task)) {
+        departmentStats[dept].overdue++;
+        totalOverdue++;
+      }
+    });
+    
+    Object.values(departmentStats).forEach(stats => {
+      stats.completionRate = (stats.total > 0) ? ((stats.completed / stats.total) * 100).toFixed(0) : 0;
+      stats.overdueRate = (stats.total > 0) ? ((stats.overdue / stats.total) * 100).toFixed(0) : 0;
+    });
 
     const report = {
-      reportType: 'individual',
+      title: department && department !== 'ALL' ? `${department} Department Report` : "Company-Wide Report",
+      type: 'company',
       generatedAt: new Date().toISOString(),
-      employee: {
-        email: employeeEmail,
-        name: employeeData.name || employeeEmail.split('@')[0],
-        department: employeeData.department || 'Unassigned'
+      summary: {
+        totalTasks: tasks.length,
+        overdueCount: totalOverdue,
+        overduePercentage: tasks.length > 0 ? parseFloat(((totalOverdue / tasks.length) * 100).toFixed(0)) : 0,
+        statusCounts,
       },
-      filters: {
-        startDate: startDate || null,
-        endDate: endDate || null
-      },
-      metrics: {
-        totalTasks,
-        completedCount,
-        overdueCount,
-        completionRate: parseFloat(completionRate),
-        avgTimePerTask: parseFloat(avgTimePerTask),
-        statusCounts
-      },
-      timeBreakdown: timeMetrics.slice(0, 20), // Top 20 completed tasks
-      tasks: tasks.slice(0, 50) // Limit response size
+      departmentStats: Object.values(departmentStats), // Send as an array for v-data-table
     };
-
     res.status(200).json({ success: true, report });
+
   } catch (error) {
-    console.error('Error generating individual report:', error);
-    res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+    console.error('Error generating company report:', error.message, error.stack);
+    res.status(500).json({ success: false, message: "Error generating company report: " + error.message });
   }
 };
 

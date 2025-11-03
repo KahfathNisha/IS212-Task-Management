@@ -6,7 +6,6 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import { initializeListeners, cleanupListeners } from '@/services/notification-service';
 import axios from 'axios';
 
-// This is the correct, centralized API client for all authentication requests.
 const authApiClient = axios.create({
   baseURL: "http://localhost:3000/api/auth",
 });
@@ -21,26 +20,46 @@ export const useAuthStore = defineStore("auth", () => {
   const SESSION_DURATION = 30 * 60 * 1000;
 
   const isAuthenticated = computed(() => !!user.value);
-  const userRole = computed(() => userData.value?.role || '');
+  const userRole = computed(() => userData.value?.role?.toLowerCase() || ''); // Added toLowerCase()
   const userName = computed(() => userData.value?.name || 'User');
   const userEmail = computed(() => user.value?.email || '');
+  
+  // --- THIS IS THE FIX FOR THE 'UNDEFINED' ERROR ---
+  // This computed property was missing.
+  const userDepartment = computed(() => userData.value?.department || null);
 
   const initializeAuth = () => {
     onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         user.value = firebaseUser;
         try {
+          // Get token first, then use API endpoint for user data
           const idToken = await firebaseUser.getIdToken();
-          localStorage.setItem('firebaseIdToken', idToken);
-          const meResponse = await authApiClient.get('/me', {
-            headers: { Authorization: `Bearer ${idToken}` }
-          });
-          if (meResponse.data?.success) {
-            userData.value = meResponse.data.user;
+          const userDoc = await firestoreHelpers.getUserByEmail(firebaseUser.email, idToken);
+          if (userDoc) {
+            userData.value = userDoc; 
             initializeListeners(firebaseUser.email);
+            console.log("✅ Persistent notification listeners initialized.");
+          } else {
+            // If getUserByEmail returns null, try /api/auth/me endpoint
+            try {
+              const response = await fetch('/api/auth/me', {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+              });
+              if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.user) {
+                  userData.value = { id: data.user.email, ...data.user };
+                  initializeListeners(firebaseUser.email);
+                  console.log("✅ User data loaded from API endpoint.");
+                }
+              }
+            } catch (apiErr) {
+              console.warn("Failed to fetch user data from API:", apiErr);
+            }
           }
         } catch (err) {
-          console.error("Error fetching user profile from backend:", err);
+          console.error("Error fetching user data on auth state change:", err);
         }
         startSessionTimer();
         updateLastActivity();
@@ -51,27 +70,21 @@ export const useAuthStore = defineStore("auth", () => {
     });
   };
 
-
-
-  // This is the new, more secure login flow.
   const login = async (email, password) => {
     loading.value = true;
     error.value = null;
     try {
       const checkResponse = await authApiClient.post('/check-lockout', { email });
-      if (checkResponse.data.isLocked) {
-        throw new Error(checkResponse.data.message || 'Account is locked.');
-      }
+      if (checkResponse.data.isLocked) throw new Error(checkResponse.data.message);
 
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      user.value = userCredential.user;
+      user.value = userCredential.user; // Set user state immediately
 
       const idToken = await userCredential.user.getIdToken();
-      localStorage.setItem('firebaseIdToken', idToken);
       const loginResponse = await authApiClient.post('/login', { idToken });
       if (!loginResponse.data.success) throw new Error(loginResponse.data.message);
       
-      userData.value = loginResponse.data.user;
+      userData.value = loginResponse.data.user; // Set user data (role, dept)
       return { success: true, user: userCredential.user };
     } catch (err) {
       console.error("Login error:", err);
@@ -81,8 +94,10 @@ export const useAuthStore = defineStore("auth", () => {
           const recordResponse = await authApiClient.post('/record-failed-attempt', { email });
           userFriendlyMessage = recordResponse.data.message || 'Incorrect email or password.';
         } catch (apiErr) {
-          userFriendlyMessage = 'Could not verify login. Please try again later.';
+          userFriendlyMessage = 'Could not verify login.';
         }
+      } else if (err.response?.data?.message) {
+        userFriendlyMessage = err.response.data.message; // Use backend error
       } else {
         userFriendlyMessage = err.message;
       }
@@ -107,8 +122,7 @@ export const useAuthStore = defineStore("auth", () => {
       return { redirect: "/login" };
     }
   };
-  
-  // --- Password Reset logic is now restored and uses the new API client ---
+
   const requestPasswordReset = async (email) => {
     const response = await authApiClient.post('/request-password-reset', { email });
     return response.data;
@@ -129,7 +143,6 @@ export const useAuthStore = defineStore("auth", () => {
     if (sessionTimeout.value) clearTimeout(sessionTimeout.value);
   };
   
-  // --- Session Management logic is now fully implemented ---
   const startSessionTimer = () => {
     if (sessionTimeout.value) clearTimeout(sessionTimeout.value);
     const checkSession = () => {
@@ -168,27 +181,22 @@ export const useAuthStore = defineStore("auth", () => {
     };
   };
 
-  // Get Firebase ID token for API requests
+  // --- This function is CRITICAL for your API calls ---
   const getToken = async () => {
-    if (!user.value) {
-      throw new Error('User not authenticated');
+    if (!auth.currentUser) {
+      return null;
     }
-    try {
-      // Force refresh the token to ensure it's valid
-      const token = await user.value.getIdToken(true);
-      return token;
-    } catch (error) {
-      console.error('Error getting Firebase token:', error);
-      throw new Error('Failed to get authentication token');
-    }
+    // Force refresh the token if it's about to expire
+    return await auth.currentUser.getIdToken(true);
   };
 
-  // Ensure all functions are exported.
   return {
     user, userData, loading, error, isAuthenticated, userRole, userName, userEmail,
-    initializeAuth, login, logout, getToken,
+    userDepartment, // <-- EXPORT THE NEW PROPERTY
+    initializeAuth, login, logout,
     requestPasswordReset, verifySecurityAnswer, resetPassword,
-    updateLastActivity, extendSession, setupActivityListeners
+    updateLastActivity, extendSession, setupActivityListeners,
+    getToken // <-- EXPORT THE GETTOKEN FUNCTION
   };
 });
 
