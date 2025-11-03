@@ -1,11 +1,10 @@
 <template>
   <v-app>
-    <!-- Your custom NavBar remains, shown only when authenticated -->
     <NavBar v-if="isAuthenticated" />
 
     <!-- Main Content -->
     <v-main class="app-main">
-      <!-- Your existing Session Warning Dialog remains -->
+      
       <v-dialog v-model="showSessionWarning" persistent max-width="400">
         <v-card>
           <v-card-title class="text-h6">
@@ -37,11 +36,6 @@
       </router-view>
     </v-main>
 
-    <!-- 
-      THIS IS THE FIX: 
-      The old, conflicting v-snackbar has been removed.
-      We now use our new, stable Notifications component which will handle all popups.
-    -->
     <Notifications />
   </v-app>
 </template>
@@ -52,8 +46,6 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import NavBar from '@/components/NavBar.vue';
 
-// --- THIS IS THE FIX ---
-// This now imports the component from its correct location and removes the old snackbar logic.
 import Notifications from '@/components/Notifications.vue';
 
 const router = useRouter();
