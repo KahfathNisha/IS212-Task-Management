@@ -676,6 +676,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import CategoriesDetail from '@/components/CategoryDetailsDialog.vue'
 import axios from 'axios'
+import { API_ROOT } from '@/config/api'
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import ProjectTasks from '@/components/ProjectTasks.vue'
@@ -683,9 +684,9 @@ import ProjectTasks from '@/components/ProjectTasks.vue'
 // Auth store
 const authStore = useAuthStore()
 
-// Axios client configuration
+// Axios client configuration (centralized API root)
 const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: API_ROOT,
   headers: {
     'Content-Type': 'application/json',
   },

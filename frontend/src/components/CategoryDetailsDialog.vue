@@ -210,6 +210,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { API_ROOT } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 
 // Auth store
@@ -217,7 +218,7 @@ const authStore = useAuthStore()
 
 // Axios client setup
 const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: API_ROOT,
   headers: {
     'Content-Type': 'application/json',
   },

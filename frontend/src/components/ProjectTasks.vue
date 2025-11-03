@@ -96,6 +96,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import axios from 'axios'
+import { API_ROOT } from '@/config/api'
 import ProjectTaskItem from './ProjectTaskItem.vue'
 import ProjectTaskItemDetails from './ProjectTaskItemDetails.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -127,7 +128,7 @@ const authStore = useAuthStore()
 
 // Axios client
 const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: API_ROOT,
   headers: { 'Content-Type': 'application/json' }
 })
 

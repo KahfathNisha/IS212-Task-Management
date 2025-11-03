@@ -356,6 +356,7 @@ import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import '../assets/styles.css';
 import RecurrenceOptions from './RecurrenceOptions.vue'
 import axios from 'axios'
+import { API_ROOT } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
@@ -589,7 +590,7 @@ const onSave = () => {
 const availableCategories = ref([])
 const authStore = useAuthStore()
 const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: API_ROOT,
   headers: { 'Content-Type': 'application/json' }
 })
 
