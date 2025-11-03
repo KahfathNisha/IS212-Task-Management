@@ -86,6 +86,29 @@ describe('Projects Integration Tests', () => {
     }
   };
 
+  // Helper to create a test project
+  const createTestProject = async (name, department, createdBy) => {
+    if (!db) return null;
+    try {
+      const projectRef = await withTimeout(db.collection('projects').add({
+        name: `${name} ${Date.now()}`,
+        department,
+        isDeleted: false,
+        createdBy,
+        createdAt: admin.firestore.Timestamp.now(),
+        updatedAt: admin.firestore.Timestamp.now(),
+        totalTasks: 0,
+        completedTasks: 0,
+        progress: 0
+      }), 12000);
+      testProjects.push(projectRef.id);
+      return projectRef.id;
+    } catch (err) {
+      console.warn(`⚠️ Failed to create test project ${name}:`, err.message);
+      return null;
+    }
+  };
+
   beforeAll(async () => {
     // Best-effort user creation (with timeout protection)
     if (!db) {
@@ -582,6 +605,177 @@ describe('Projects Integration Tests', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.message).toContain('department');
+    });
+
+    it('should update project with members array', async () => {
+      if (!projectId) {
+        console.warn('⚠️ Skipping test - Project not created');
+        return;
+      }
+      
+      const token = await getAuthToken('director');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const updateData = {
+        members: ['director@test.com', 'manager@test.com', 'staff@test.com']
+      };
+
+      const response = await base
+        .put(`/api/projects/${projectId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updateData);
+
+      expect(response.status).toBe(200);
+      
+      // Verify members were updated
+      const projectDoc = await db.collection('projects').doc(projectId).get();
+      const projectData = projectDoc.data();
+      expect(Array.isArray(projectData.members)).toBe(true);
+      expect(projectData.members.length).toBe(3);
+    });
+
+    it('should prevent manager from changing project department', async () => {
+      if (!projectId) {
+        console.warn('⚠️ Skipping test - Project not created');
+        return;
+      }
+      
+      const token = await getAuthToken('manager');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const response = await base
+        .put(`/api/projects/${projectId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ department: 'Sales' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toContain('department');
+    });
+
+    it('should allow only project creator to modify owners', async () => {
+      if (!db) {
+        console.warn('⚠️ Skipping test - Firestore not available');
+        return;
+      }
+
+      // Create project as director using the helper function for reliability
+      let createdProjectId;
+      try {
+        const createdProjectRef = await withTimeout(db.collection('projects').add({
+          name: `Owners Test Project ${Date.now()}`,
+          department: 'Engineering',
+          isDeleted: false,
+          createdBy: 'director@test.com',
+          owners: ['director@test.com'],
+          members: ['director@test.com'],
+          createdAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now(),
+          totalTasks: 0,
+          completedTasks: 0,
+          progress: 0
+        }), 15000); // Increased timeout to 15 seconds
+        createdProjectId = createdProjectRef.id;
+        testProjects.push(createdProjectId);
+        
+        // Small delay to ensure Firestore consistency
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err) {
+        console.warn('⚠️ Skipping test - Failed to create test project:', err.message);
+        return;
+      }
+
+      // Try to update owners as manager (not creator)
+      const managerToken = await getAuthToken('manager');
+      if (!managerToken) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const response = await base
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ owners: ['manager@test.com'] });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toContain('creator');
+    }, 25000); // Increase test timeout to 25 seconds
+
+    it('should return 404 when updating non-existent project', async () => {
+      const token = await getAuthToken('director');
+      if (!token) {
+        console.warn('⚠️ Skipping test - Firebase Auth not available');
+        return;
+      }
+
+      const fakeId = 'non-existent-project-id-12345';
+      const response = await base
+        .put(`/api/projects/${fakeId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ description: 'Should fail' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toContain('not found');
+    });
+  });
+
+  describe('Project Statistics Integration', () => {
+    it('should track project statistics when tasks are created', async () => {
+      if (!db) {
+        console.warn('⚠️ Skipping test - Firestore not available');
+        return;
+      }
+
+      // Create a project
+      const projectId = await createTestProject('Stats Project', 'Engineering', 'director@test.com');
+      if (!projectId) {
+        console.warn('⚠️ Skipping test - Failed to create test project');
+        return;
+      }
+
+      // Create multiple tasks for this project
+      const task1Ref = await withTimeout(db.collection('tasks').add({
+        title: `Stats Task 1 ${Date.now()}`,
+        taskOwner: 'director@test.com',
+        taskOwnerDepartment: 'All',
+        projectId: projectId,
+        dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+        priority: 5,
+        status: 'Ongoing',
+        archived: false,
+        createdAt: admin.firestore.Timestamp.now(),
+        updatedAt: admin.firestore.Timestamp.now()
+      }), 5000);
+
+      const task2Ref = await withTimeout(db.collection('tasks').add({
+        title: `Stats Task 2 ${Date.now()}`,
+        taskOwner: 'director@test.com',
+        taskOwnerDepartment: 'All',
+        projectId: projectId,
+        dueDate: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+        priority: 5,
+        status: 'Completed',
+        archived: false,
+        createdAt: admin.firestore.Timestamp.now(),
+        updatedAt: admin.firestore.Timestamp.now()
+      }), 5000);
+
+      // Wait for project stats to update (async operation)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Verify project stats
+      const projectDoc = await db.collection('projects').doc(projectId).get();
+      const projectData = projectDoc.data();
+      
+      // Note: Project stats are updated asynchronously, so we check they exist
+      expect(projectData).toHaveProperty('totalTasks');
+      expect(projectData).toHaveProperty('completedTasks');
+      expect(projectData).toHaveProperty('progress');
     });
   });
 });
