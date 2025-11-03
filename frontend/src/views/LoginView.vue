@@ -5,7 +5,7 @@
         <v-col cols="12" sm="10" md="6" lg="5" xl="4" class="px-4">
           <v-card elevation="12" class="login-card">
             <v-card-title class="text-h5 font-weight-bold text-center pt-8 pb-2" style="word-wrap: break-word; white-space: normal;">
-              Task Management System
+              All in One Task Management System
             </v-card-title>
             
             <v-card-subtitle class="text-center pb-6 text-medium-emphasis">
@@ -92,20 +92,6 @@
               </v-btn>
               </v-form>
             </v-card-text>
-
-            <!-- Demo Credentials -->
-            <v-card-text class="text-caption text-grey">
-            <v-divider class="mb-3" />
-            <div class="text-center" style="line-height: 1.6;">
-              <strong>Demo Credentials:</strong><br>
-              <strong>Director:</strong> jack.sim@company.com / Password123!<br>
-              <strong>Manager:</strong> michael.brown@company.com / Password123!<br>
-              <strong>HR:</strong> sally.loh@company.com / Password123!<br>
-              <strong>Staff 1:</strong> john.doe@company.com / TestPassword123!<br>
-              <strong>Staff 2:</strong> jane.smith@company.com / AdminPass456!<br>
-              <strong>Staff 3:</strong> alice.johnson@company.com / Password123!
-            </div>
-          </v-card-text>
           </v-card>
         </v-col>
       </v-row>
