@@ -119,7 +119,7 @@ beforeEach(async () => {
   if (cfg.auth.__reset) cfg.auth.__reset();
 
   // baseline user profile
-  await cfg.db.collection('users').doc(TEST_USER_ID).set({ name: 'Test User', role: 'staff', email: TEST_USER_ID, failedAttempts: 0, lockedUntil: null });
+  await cfg.db.collection('Users').doc(TEST_USER_ID).set({ name: 'Test User', role: 'staff', email: TEST_USER_ID, failedAttempts: 0, lockedUntil: null });
   await cfg.auth.createUser({ email: TEST_USER_ID, password: 'x', displayName: 'Test User' });
 });
 
@@ -127,13 +127,13 @@ describe('Auth Controller - unit tests', () => {
   test('recordFailedAttempt increments and locks after max attempts', async () => {
     const req = { body: { email: TEST_USER_ID } };
     for (let i = 0; i < 5; i++) { const res = makeRes(); await authController.recordFailedAttempt(req, res); }
-    const userDoc = await cfg.db.collection('users').doc(TEST_USER_ID).get(); const data = userDoc.data(); expect(data.failedAttempts).toBe(5); expect(data.lockedUntil).not.toBeNull(); const millis = (typeof data.lockedUntil.toMillis === 'function') ? data.lockedUntil.toMillis() : data.lockedUntil; expect(millis).toBeGreaterThan(Date.now() - 1000);
+    const userDoc = await cfg.db.collection('Users').doc(TEST_USER_ID).get(); const data = userDoc.data(); expect(data.failedAttempts).toBe(5); expect(data.lockedUntil).not.toBeNull(); const millis = (typeof data.lockedUntil.toMillis === 'function') ? data.lockedUntil.toMillis() : data.lockedUntil; expect(millis).toBeGreaterThan(Date.now() - 1000);
   });
 
   test('registerUser creates user on valid data', async () => {
     const req = { body: { firstName: 'Michelle', lastName: 'Goh', email: 'michelle.goh@company.com', password: 'ValidPassword123!', department: 'System Solutioning', role: 'staff', title: 'Support Team', securityQuestion: 'Q', securityAnswer: 'A' } };
     const res = makeRes(); await authController.registerUser(req, res); const result = res._get(); expect(result.statusCode).toBe(201);
-    const userDoc = await cfg.db.collection('users').doc('michelle.goh@company.com').get(); expect(userDoc.exists).toBe(true); expect(userDoc.data().name).toBe('Michelle Goh'); expect(userDoc.data().testEmail).toBe('breannong@gmail.com');
+    const userDoc = await cfg.db.collection('Users').doc('michelle.goh@company.com').get(); expect(userDoc.exists).toBe(true); expect(userDoc.data().name).toBe('Michelle Goh'); expect(userDoc.data().testEmail).toBe('breannong@gmail.com');
   });
 
   test('registerUser returns 409 when auth user exists', async () => {

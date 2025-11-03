@@ -44,7 +44,7 @@ describe('Projects Integration Tests', () => {
     if (!db) return;
     try {
       await withTimeout(
-        db.collection('users').doc(userData.email).set({
+        db.collection('Users').doc(userData.email).set({
           ...userData,
           createdAt: admin.firestore.Timestamp.now(),
           updatedAt: admin.firestore.Timestamp.now()

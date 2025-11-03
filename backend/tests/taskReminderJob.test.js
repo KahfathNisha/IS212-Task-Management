@@ -123,7 +123,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return mockCollection;
@@ -201,7 +201,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -292,7 +292,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -372,7 +372,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -452,7 +452,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -534,7 +534,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -633,7 +633,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -709,7 +709,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         return { where: jest.fn() };
       });
@@ -763,7 +763,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         return { where: jest.fn() };
       });
@@ -786,7 +786,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         return { where: jest.fn() };
       });
 
@@ -856,7 +856,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };
@@ -937,7 +937,7 @@ describe('Task Reminder Job Edge Cases', () => {
       };
 
       db.collection.mockImplementation((collectionName) => {
-        if (collectionName === 'users') return mockUsersCollection;
+        if (collectionName === 'Users') return mockUsersCollection;
         if (collectionName === 'tasks') return mockTasksCollection;
         if (collectionName === 'emailReminders') return mockRemindersCollection;
         return { where: jest.fn() };

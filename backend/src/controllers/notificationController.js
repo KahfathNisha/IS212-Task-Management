@@ -75,7 +75,7 @@ exports.deleteNotification = async (req, res) => {
         const userId = req.user.email;
         const { notificationId } = req.params;
 
-        await db.collection('users').doc(userId).collection('notifications').doc(notificationId).delete();
+        await db.collection('Users').doc(userId).collection('notifications').doc(notificationId).delete();
 
         res.status(200).json({
             success: true,
@@ -96,10 +96,10 @@ exports.getNotificationStats = async (req, res) => {
         const userId = req.user.email;
 
         const [unreadSnapshot, totalSnapshot] = await Promise.all([
-            db.collection('users').doc(userId).collection('notifications')
+            db.collection('Users').doc(userId).collection('notifications')
                 .where('isRead', '==', false)
                 .get(),
-            db.collection('users').doc(userId).collection('notifications')
+            db.collection('Users').doc(userId).collection('notifications')
                 .get()
         ]);
 
@@ -125,7 +125,7 @@ exports.clearAllNotifications = async (req, res) => {
     try {
         const userId = req.user.email;
         
-        const notificationsSnapshot = await db.collection('users').doc(userId).collection('notifications').get();
+        const notificationsSnapshot = await db.collection('Users').doc(userId).collection('notifications').get();
         
         if (notificationsSnapshot.empty) {
             return res.status(200).json({

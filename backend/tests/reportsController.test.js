@@ -40,7 +40,7 @@ jest.mock('../src/config/firebase', () => ({
     collection: jest.fn((name) => {
       if (name === 'tasks') return mockTasksCollection;
       if (name === 'projects') return mockProjectsCollection;
-      if (name === 'users') return mockUsersCollection;
+      if (name === 'Users') return mockUsersCollection;
       throw new Error(`Unknown collection: ${name}`);
     }),
     getAll: mockGetAll,

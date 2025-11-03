@@ -55,7 +55,7 @@ jest.mock('../src/config/firebase', () => {
           if (name === 'tasks') return mockTasksCollection;
           if (name === 'projects') return mockProjectsCollection;
           if (name === 'recurringTasks') return mockRecurringTasksCollection;
-          if (name === 'users') return mockUsersCollection;
+          if (name === 'Users') return mockUsersCollection;
           return {};
         }),
       batch: jest.fn(() => mockBatch),

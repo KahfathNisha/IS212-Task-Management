@@ -64,7 +64,7 @@ exports.login = async (req, res) => {
     }
 
     // Fetch the user's profile from your Firestore database
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
@@ -166,7 +166,7 @@ exports.checkLockout = async (req, res) => {
       });
     }
     
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -238,7 +238,7 @@ exports.loginSuccess = async (req, res) => {
       });
     }
     
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     await userRef.update({
       failedAttempts: 0,
       lockedUntil: null,
@@ -274,7 +274,7 @@ exports.recordFailedAttempt = async (req, res) => {
       });
     }
     
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -377,7 +377,7 @@ exports.requestPasswordReset = async (req, res) => {
     }
     
     // Get user from Firestore
-    const userRef = db.collection('users').doc(email);
+    const userRef = db.collection('Users').doc(email);
     const userDoc = await userRef.get();
     
     if (!userDoc.exists) {
@@ -455,7 +455,7 @@ exports.verifySecurityAnswer = async (req, res) => {
     }
     
     // Get user data
-    const userRef = db.collection('users').doc(resetData.email);
+    const userRef = db.collection('Users').doc(resetData.email);
     const userDoc = await userRef.get();
     const userData = userDoc.data();
     
@@ -543,7 +543,7 @@ exports.resetPassword = async (req, res) => {
     });
     
     // Reset failed login attempts
-    const userRef = db.collection('users').doc(resetData.email);
+    const userRef = db.collection('Users').doc(resetData.email);
     await userRef.update({
       failedAttempts: 0,
       lockedUntil: null,
@@ -615,8 +615,8 @@ exports.registerUser = async (req, res) => {
     });
 
     // --- Create User Profile in Firestore (AC1) ---
-    // Using 'users' (lowercase) collection name
-    const userDocRef = db.collection('users').doc(email);
+    // Using 'Users' collection name
+    const userDocRef = db.collection('Users').doc(email);
     
     await userDocRef.set({
       uid: userRecord.uid,
@@ -658,7 +658,7 @@ exports.getUsers = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to view users.' });
     }
 
-    const usersSnapshot = await db.collection('users').get();
+    const usersSnapshot = await db.collection('Users').get();
     const users = [];
 
     usersSnapshot.docs.forEach(doc => {
@@ -707,7 +707,7 @@ exports.getAllUsers = async (req, res) => {
     const { db } = require('../config/firebase');
 
     // Fetch all users without any role-based filtering
-    const usersSnapshot = await db.collection('users').get();
+    const usersSnapshot = await db.collection('Users').get();
     const users = [];
 
     usersSnapshot.docs.forEach(doc => {

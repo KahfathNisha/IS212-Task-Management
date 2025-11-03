@@ -18,7 +18,7 @@ const reportsController = require('../src/controllers/reportsController');
 
 // Helper to create test data
 async function createTestUser(email, userData) {
-  await db.collection('users').doc(email).set({
+  await db.collection('Users').doc(email).set({
     name: userData.name || 'Test User',
     email: email,
     role: userData.role || 'staff',
@@ -54,7 +54,7 @@ async function createTestTask(taskId, taskData) {
 
 async function cleanupTestData(testPrefix) {
   // Clean up users
-  const usersSnapshot = await db.collection('users')
+  const usersSnapshot = await db.collection('Users')
     .where('email', '>=', testPrefix)
     .where('email', '<=', testPrefix + '\uf8ff')
     .get();

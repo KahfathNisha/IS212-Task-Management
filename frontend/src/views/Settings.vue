@@ -343,7 +343,7 @@ async function loadUserSettings(email) {
   }
   loading.value = true;
   try {
-    const userDocRef = doc(db, "users", email);
+    const userDocRef = doc(db, "Users", email);
     const userDoc = await getDoc(userDocRef);
     if (userDoc.exists()) {
       // Get user data
@@ -424,7 +424,7 @@ async function saveReminderType() {
   const userEmail = authStore.userEmail;
   if (userEmail) {
     try {
-      const userDocRef = doc(db, "users", userEmail);
+      const userDocRef = doc(db, "Users", userEmail);
       await setDoc(userDocRef, { notificationSettings: { emailReminderType: settings.value.emailReminderType } }, { merge: true });
     } catch (error) {
       // Silent fail for background reminder type saves
@@ -465,7 +465,7 @@ async function saveCustomReminders() {
   const userEmail = authStore.userEmail;
   if (userEmail) {
     try {
-      const userDocRef = doc(db, "users", userEmail);
+      const userDocRef = doc(db, "Users", userEmail);
       await setDoc(userDocRef, { notificationSettings: settings.value }, { merge: true });
       showCustomDialog.value = false;
       notificationStore.addNotification({
@@ -530,7 +530,7 @@ async function saveSettings() {
     return;
   }
   try {
-    const userDocRef = doc(db, "users", userEmail);
+    const userDocRef = doc(db, "Users", userEmail);
     await setDoc(userDocRef, { notificationSettings: settings.value }, { merge: true });
     notificationStore.addNotification({
       title: "Success",

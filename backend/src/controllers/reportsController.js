@@ -8,8 +8,8 @@ async function getUserPermissions(requesterId) {
   if (!requesterId) {
     throw new Error('Unauthorized: Requester ID is required.');
   }
-  // Use 'users' (lowercase) collection name
-  const userDoc = await db.collection('users').doc(requesterId).get();
+  // Use 'Users' collection name
+  const userDoc = await db.collection('Users').doc(requesterId).get();
   if (!userDoc.exists) {
     throw new Error('Forbidden: Requester profile not found.');
   }
@@ -170,7 +170,7 @@ exports.generateProjectReport = async (req, res) => {
     const memberEmails = Object.keys(memberWorkload);
     let memberNames = {};
     if(memberEmails.length > 0) {
-      const userRefs = memberEmails.map(email => db.collection('users').doc(email));
+      const userRefs = memberEmails.map(email => db.collection('Users').doc(email));
       const userDocs = await db.getAll(...userRefs);
       userDocs.forEach(doc => {
         if (doc.exists) {
@@ -217,7 +217,7 @@ exports.generateIndividualReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission for this report type.' });
     }
 
-    const employeeDoc = await db.collection('users').doc(employeeEmail).get();
+    const employeeDoc = await db.collection('Users').doc(employeeEmail).get();
     if (!employeeDoc.exists) return res.status(404).json({ success: false, message: "Employee not found." });
     const employeeData = employeeDoc.data();
 
@@ -360,7 +360,7 @@ exports.generateDepartmentReport = async (req, res) => {
       return res.status(403).json({ success: false, message: "Forbidden: Managers can only view reports for their own department." });
     }
 
-    const usersQuery = await db.collection('users').where('department', '==', department).get();
+    const usersQuery = await db.collection('Users').where('department', '==', department).get();
     // Filter out HR users - they don't have tasks so shouldn't be included in department reports
     const departmentUsers = usersQuery.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
