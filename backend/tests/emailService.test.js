@@ -108,7 +108,7 @@ describe('EmailService', () => {
 
       const sentEmail = sgMail.send.mock.calls[0][0];
       // The exact formatted date will depend on the timezone, but it should contain date/time info
-      expect(sentEmail.html).toContain('<p><strong>Deadline:</strong>');
+      expect(sentEmail.html).toContain('<p><strong>📅 Due Date:</strong>');
     });
   });
 
@@ -192,7 +192,7 @@ describe('EmailService', () => {
       );
 
       const sentEmail = sgMail.send.mock.calls[0][0];
-      expect(sentEmail.html).toContain('<p><strong>Priority:</strong> Not specified</p>');
+      expect(sentEmail.html).toContain('<p><strong>⭐️ Priority:</strong> Not specified</p>');
     });
 
     it('should handle task without description', async () => {
@@ -245,8 +245,8 @@ describe('EmailService', () => {
       );
 
       const sentEmail = sgMail.send.mock.calls[0][0];
-      expect(sentEmail.html).toContain('<p><strong>Due Date:</strong>');
-      expect(sentEmail.html).toContain('<p><strong>Reassignment Time:</strong>');
+      expect(sentEmail.html).toContain('<p><strong>📅 Due Date:</strong>');
+      expect(sentEmail.html).toContain('<p><strong>⏰ Reassignment Time:</strong>');
     });
   });
 
@@ -422,7 +422,7 @@ describe('EmailService Deadline Reminder Edge Cases', () => {
       expect(sgMail.send).toHaveBeenCalledTimes(1);
       const sentEmail = sgMail.send.mock.calls[0][0];
       
-      expect(sentEmail.html).toContain('48 hours and 0 minutes');
+      expect(sentEmail.html).toContain('2 days');
       expect(sentEmail.subject).toBe('Deadline Reminder: Extended Task');
     });
 
@@ -451,7 +451,7 @@ describe('EmailService Deadline Reminder Edge Cases', () => {
       expect(sgMail.send).toHaveBeenCalledTimes(1);
       const sentEmail = sgMail.send.mock.calls[0][0];
       
-      expect(sentEmail.html).toContain('168 hours and 0 minutes');
+      expect(sentEmail.html).toContain('7 days');
       expect(sentEmail.html).toContain('Task with extended deadline');
     });
   });
