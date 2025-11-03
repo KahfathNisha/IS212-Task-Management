@@ -116,6 +116,55 @@ describe('Auth Store', () => {
           expect(result.success).toBe(true);
       }
     });
+
+  // --- Extra edge-case tests ---
+  describe('Edge cases and error handling', () => {
+    it('should surface network error from check-lockout', async () => {
+      const authStore = useAuthStore();
+      mockPost.mockRejectedValueOnce(new Error('network failure'));
+
+      await expect(authStore.login('noone@example.com', 'pw'))
+        .rejects.toThrow('network failure');
+    });
+
+    it('should surface token retrieval failure after sign-in', async () => {
+      const authStore = useAuthStore();
+      mockPost.mockResolvedValueOnce({ data: { isLocked: false } });
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const badCred = { user: { getIdToken: () => Promise.reject(new Error('token fail')) } };
+      signInWithEmailAndPassword.mockResolvedValue(badCred);
+
+      await expect(authStore.login('john.doe@company.com', 'pw'))
+        .rejects.toThrow('token fail');
+    });
+
+    it('should surface backend login failure message', async () => {
+      const authStore = useAuthStore();
+      mockPost.mockResolvedValueOnce({ data: { isLocked: false } });
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const goodCred = { user: { getIdToken: () => Promise.resolve('token') } };
+      signInWithEmailAndPassword.mockResolvedValue(goodCred);
+      mockPost.mockResolvedValueOnce({ data: { success: false, message: 'User disabled' } });
+
+      await expect(authStore.login('john.doe@company.com', 'pw'))
+        .rejects.toThrow('User disabled');
+    });
+
+    it('logout should attempt to sign out and return proper redirect', async () => {
+      const authStore = useAuthStore();
+      const { signOut } = await import('firebase/auth');
+      signOut.mockResolvedValue();
+
+      const r = await authStore.logout('session_expired');
+      expect(r.redirect).toContain('sessionExpired=true');
+    });
+
+    it('getToken returns null when no current user', async () => {
+      const authStore = useAuthStore();
+      const token = await authStore.getToken();
+      expect(token).toBeNull();
+    });
+  });
   });
 });
 

@@ -151,4 +151,69 @@ describe('Auth Controller - unit tests', () => {
     const req = { body: { firstName: '', lastName: 'X', email: 'a@b.com', password: 'ValidPass1!', department: 'D', role: 'staff', title: 'T', securityQuestion: 'Q', securityAnswer: 'A' } };
     const res = makeRes(); await authController.registerUser(req, res); const result = res._get(); expect(result.statusCode).toBe(400); expect(result.body.message).toBe('All fields are required.');
   });
+
+  test('checkLockout returns not locked for unknown user', async () => {
+    const req = { body: { email: 'unknown@company.com' } };
+    const res = makeRes();
+    await authController.checkLockout(req, res);
+    const r = res._get();
+    expect(r.statusCode).toBe(200);
+    expect(r.body.isLocked).toBe(false);
+  });
+
+  test('recordFailedAttempt returns invalid credentials for non-existent user', async () => {
+    const req = { body: { email: 'noexist@company.com' } };
+    const res = makeRes();
+    await authController.recordFailedAttempt(req, res);
+    const r = res._get();
+    expect(r.statusCode).toBe(200);
+    expect(r.body.message).toBe('Invalid credentials.');
+  });
+
+  test('verifySecurityAnswer rejects incorrect answer', async () => {
+    // Create a reset request and a user
+    const resetCode = 'reset-xyz';
+    await cfg.db.collection('passwordResets').doc(resetCode).set({
+      email: TEST_USER_ID,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 100000,
+      used: false,
+      verified: false
+    });
+
+    const req = { body: { resetCode, answer: 'wrong-answer' } };
+    const res = makeRes();
+    await authController.verifySecurityAnswer(req, res);
+    const r = res._get();
+    expect(r.statusCode).toBe(401);
+    expect(r.body.message).toMatch(/Incorrect answer/);
+  });
+
+  test('resetPassword rejects weak new password and invalid code', async () => {
+    const resetCode = 'reset-abc';
+    // make a reset doc but mark verified true to get past verification
+    await cfg.db.collection('passwordResets').doc(resetCode).set({
+      email: TEST_USER_ID,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 100000,
+      used: false,
+      verified: true
+    });
+
+    // Weak password
+    const reqWeak = { body: { resetCode, newPassword: 'short' } };
+    const resWeak = makeRes();
+    await authController.resetPassword(reqWeak, resWeak);
+    const rWeak = resWeak._get();
+    expect(rWeak.statusCode).toBe(400);
+    expect(rWeak.body.message).toMatch(/Password must be at least 12 characters/);
+
+    // Invalid code
+    const reqInvalid = { body: { resetCode: 'does-not-exist', newPassword: 'ValidPass1234' } };
+    const resInvalid = makeRes();
+    await authController.resetPassword(reqInvalid, resInvalid);
+    const rInvalid = resInvalid._get();
+    expect(rInvalid.statusCode).toBe(400);
+    expect(rInvalid.body.message).toMatch(/Invalid reset code/);
+  });
 });

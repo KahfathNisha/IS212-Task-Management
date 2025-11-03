@@ -183,7 +183,8 @@ export const useAuthStore = defineStore("auth", () => {
 
   // --- This function is CRITICAL for your API calls ---
   const getToken = async () => {
-    if (!auth.currentUser) {
+    // Guard when the Firebase client `auth` export is not initialized (e.g. in tests)
+    if (!auth || !auth.currentUser) {
       return null;
     }
     // Force refresh the token if it's about to expire
