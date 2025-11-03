@@ -279,7 +279,7 @@ exports.getTask = async (req, res) => {
 // Get All Tasks
 exports.getAllTasks = async (req, res) => {
     try {
-        const { email, role, department } = req.user;
+    const { email, role, department } = req.user;
         const { archived } = req.query;  
 
         // console.log('📋 [getAllTasks] Fetching tasks for:', { email, role, department });
@@ -326,7 +326,7 @@ exports.getAllTasks = async (req, res) => {
             };
         });
         
-        console.log('✅ [getAllTasks] Returning', tasks.length, 'tasks');
+    console.log('✅ [getAllTasks] Returning', tasks.length, 'tasks');
         res.status(200).json(tasks);
     } catch (err) {
         console.error('❌ [getAllTasks] Error:', err);
@@ -1089,7 +1089,7 @@ exports.updateRecurringTask = async (req, res) => {
             return res.status(404).json({ error: 'Recurring task not found' });
         }
         
-        const originalData = originalDoc.data();
+    const originalData = originalDoc.data();
         const loggedInUser = req.user;
         const isOwner = originalData.taskOwner === loggedInUser.email || 
                        originalData.taskOwner === loggedInUser.name;

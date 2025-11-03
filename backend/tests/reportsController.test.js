@@ -1,3 +1,183 @@
+// Jest tests for reportsController
+const mockTasksCollection = {
+  where: jest.fn().mockReturnThis(),
+  get: jest.fn(),
+  doc: jest.fn(),
+};
+
+const mockProjectsCollection = {
+  doc: jest.fn(),
+};
+
+const mockUsersCollection = {
+  doc: jest.fn(),
+  where: jest.fn().mockReturnThis(),
+  get: jest.fn(),
+};
+
+const mockProjectDocRef = { get: jest.fn() };
+
+jest.mock('../src/config/firebase', () => {
+  return {
+    db: {
+      collection: jest.fn((name) => {
+        if (name === 'tasks') return mockTasksCollection;
+        if (name === 'projects') return mockProjectsCollection;
+        if (name === 'Users') return mockUsersCollection;
+        return {};
+      }),
+      // getAll is used by controller to resolve multiple doc refs
+      getAll: jest.fn(),
+    },
+    admin: {
+      firestore: {
+        Timestamp: { now: jest.fn(() => ({ toDate: () => new Date() })), fromDate: jest.fn(d => ({ toDate: () => d })) },
+        FieldValue: { delete: jest.fn() },
+      },
+    },
+  };
+});
+
+const reportsController = require('../src/controllers/reportsController');
+
+function buildDoc(id, data) {
+  return { id, data: () => data };
+}
+
+function ts(dateString) {
+  const d = new Date(dateString);
+  return { toDate: () => d };
+}
+
+describe('reportsController', () => {
+  let req;
+  let res;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    req = { params: {}, query: {}, user: null };
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+    mockProjectsCollection.doc.mockReturnValue(mockProjectDocRef);
+  });
+
+  describe('generateProjectReport', () => {
+    it('returns 200 and a report for director', async () => {
+      req.params.projectId = 'p1';
+      req.user = { email: 'd@example.com', role: 'director' };
+
+      mockProjectDocRef.get.mockResolvedValueOnce({ exists: true, data: () => ({ name: 'Project P1' }) });
+
+      // tasks query
+      mockTasksCollection.where.mockReturnThis();
+      mockTasksCollection.get.mockResolvedValueOnce({ docs: [ buildDoc('t1', { title: 'T1', status: 'ongoing', assignedTo: 'a@example.com', dueDate: ts('2099-01-01'), createdAt: ts('2024-01-01'), updatedAt: ts('2024-01-02'), projectId: 'p1' }) ] });
+
+      // db.getAll should resolve the assignee name
+      const db = require('../src/config/firebase').db;
+      db.getAll.mockResolvedValueOnce([{ exists: true, id: 'a@example.com', data: () => ({ name: 'Alice' }) }]);
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.success).toBe(true);
+      expect(payload.report).toBeDefined();
+      expect(payload.report.type).toBe('project');
+      expect(payload.report.title).toBe('Project P1');
+      expect(payload.report.tasks[0].id).toBe('t1');
+    });
+
+    it('returns 404 when project not found', async () => {
+      req.params.projectId = 'p2';
+      req.user = { email: 'd@example.com', role: 'director' };
+      mockProjectDocRef.get.mockResolvedValueOnce({ exists: false });
+
+      await reportsController.generateProjectReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Project not found.' });
+    });
+  });
+
+  describe('generateIndividualReport', () => {
+    it('returns individual report for HR', async () => {
+      req.query.employeeEmail = 'e@example.com';
+      req.user = { email: 'hr@example.com', role: 'hr' };
+
+      // employee doc
+      mockUsersCollection.doc.mockReturnValue({ get: () => Promise.resolve({ exists: true, data: () => ({ name: 'Emp', department: 'Sales', role: 'staff' }) }) });
+
+      // tasks assigned to employee
+      mockTasksCollection.where.mockReturnThis();
+      mockTasksCollection.get.mockResolvedValueOnce({ docs: [ buildDoc('ta', { title: 'A', status: 'completed', assignedTo: 'e@example.com', createdAt: ts('2024-01-01'), updatedAt: ts('2024-01-03') }) ] });
+
+      await reportsController.generateIndividualReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.success).toBe(true);
+      expect(payload.report.type).toBe('individual');
+      expect(payload.report.employee.email).toBe('e@example.com');
+    });
+
+    it('returns 404 when employee not found', async () => {
+      req.query.employeeEmail = 'noone@example.com';
+      req.user = { email: 'hr@example.com', role: 'hr' };
+      mockUsersCollection.doc.mockReturnValue({ get: () => Promise.resolve({ exists: false }) });
+
+      await reportsController.generateIndividualReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Employee not found.' });
+    });
+  });
+
+  describe('generateDepartmentReport', () => {
+    it('returns department report for manager', async () => {
+      req.query.department = 'Sales';
+      req.user = { email: 'm@example.com', role: 'manager', department: 'Sales' };
+
+      // Users in department
+      mockUsersCollection.where.mockReturnThis();
+      mockUsersCollection.get.mockResolvedValueOnce({ docs: [ buildDoc('u1', { email: 'u1@example.com', name: 'U1', role: 'staff', department: 'Sales' }) ] });
+
+      // Tasks for department
+      mockTasksCollection.get.mockResolvedValueOnce({ docs: [ buildDoc('t1', { title: 'Task', assignedTo: 'u1@example.com', status: 'ongoing', taskOwnerDepartment: 'Sales', projectId: 'p1' }) ] });
+
+      // db.getAll for projects
+      const db = require('../src/config/firebase').db;
+      db.getAll.mockResolvedValueOnce([]);
+
+      await reportsController.generateDepartmentReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.success).toBe(true);
+      expect(payload.report.type).toBe('department');
+      expect(payload.report.totalTasks).toBe(1);
+      expect(Object.keys(payload.report.employeeWorkloads)).toContain('u1@example.com');
+    });
+  });
+
+  describe('generateCompanyReport', () => {
+    it('returns company report for director', async () => {
+      req.user = { email: 'd@example.com', role: 'director' };
+
+      // Users snapshot to build department map
+      mockUsersCollection.get.mockResolvedValueOnce({ docs: [ buildDoc('u1@example.com', { email: 'u1@example.com', department: 'Sales' }) ] });
+
+      // tasks snapshot
+      mockTasksCollection.get.mockResolvedValueOnce({ docs: [ buildDoc('t1', { title: 'T', status: 'ongoing', taskOwnerDepartment: 'Sales', createdAt: ts('2024-01-01') }) ] });
+
+      await reportsController.generateCompanyReport(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.success).toBe(true);
+      expect(payload.report.type).toBe('company');
+      expect(Array.isArray(payload.report.departmentStats)).toBe(true);
+    });
+  });
+});
 const { db, admin } = require('../config/firebase'); // Ensure admin is imported for serverTimestamp
 
 /**
