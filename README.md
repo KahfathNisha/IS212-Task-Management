@@ -1,84 +1,200 @@
 # IS212 Task Management System
 
-## Team Members
-- [Name 1] - Namyra (User Authorization & Authentication)
-- [Name 2] - Sandra (Task Management)
-- [Name 3] - Breann (Task Grouping & Organization)
-- [Name 4] - Adrian (Deadline & Schedule Tracking)
-- [Name 5] - Tasha (Notification System)
-- [Name 6] - Nisha (Report Generation & Exporting)
+Repository: https://github.com/KahfathNisha/IS212-Task-Management
 
-## Project Structure
+## IMPORTANT! Local secrets & env files (paths & instructions)
+
+Some files required for Firebase and local development are kept out of source control and must be created locally. For this project there are 3 files - two .env files and one serviceAccountKey.json file: 
+
+- Frontend environment file (place locally):
+
+	`IS212-Task-Management\frontend\.env`
+
+- Backend environment file (place locally):
+
+	`IS212-Task-Management\backend\.env`
+
+- Service account JSON for Firebase Admin SDK (place locally):
+
+	`IS212-Task-Management\backend\src\config\serviceAccountKey.json`
+
+
+## Project Structure (detailed)
 is212-task-management/
-├── frontend/          # Vue.js frontend application
-├── backend/           # Express.js backend server
-│   ├── functions/     # Firebase Cloud Functions
-│   └── src/          # Express server code
-└── shared/           # Shared utilities and types
+
+Top-level folders and important files:
+
+├── frontend/                # Vue 3 frontend (Vite)
+│   ├── package.json         # frontend npm scripts & deps
+│   ├── vite.config.js       # Vite configuration
+│   ├── public/              # static assets (favicon, index.html template)
+│   └── src/                 # Vue app source code
+│       ├── main.js          # app bootstrap
+│       ├── App.vue          # root Vue component
+│       ├── assets/          # images, fonts, icons
+│       ├── components/      # reusable Vue components
+│       ├── views/           # page-level views / routes
+│       ├── router/          # Vue Router routes
+│       ├── stores/          # Pinia stores (state management)
+│       ├── services/        # HTTP clients / API wrappers (calls to backend)
+│       └── tests/           # frontend unit / e2e tests (Vitest/Playwright - works locally but not in CI Pipeline)
+
+├── backend/                 # Express backend + Firebase emulator config
+│   ├── package.json         # backend npm scripts & deps
+│   ├── firebase.json        # firebase emulator + functions configuration
+│   ├── firestore.rules      # Firestore security rules
+│   ├── firestore.indexes.json # Firestore indexes for emulator / prod
+│   ├── functions/           # Firebase Cloud Functions (deployed code)
+│   │   └── index.js         # Cloud Functions entrypoint
+│   └── src/                 # Express server source
+│       ├── server.js        # Express app bootstrap (used in dev)
+│       ├── config/          # backend configuration helpers (firebase init etc.)
+│       │   └── firebase.js  # emulator connection + service account (local only)
+│       ├── controllers/     # request handlers (controllers)
+│       ├── routes/          # express routers (map endpoints to controllers)
+│       ├── models/          # database models / Firestore access wrappers
+│       ├── services/        # business logic and external integrations (email, notifications)
+│       ├── middleware/      # auth, validation, error handlers
+│       └── tests/           # backend unit & integration tests (jest)
+
+├── config/                  # shared configuration used by both frontend & backend
+│   └── firebase.js          # SDK config for emulator/production toggles
+
+├── scripts/                 # helper scripts (seed data, emulator helpers)
+│   ├── setup-test-data.js
+│   └── debug-login.js
+
+├── tests/                   # top-level test suites and CI helpers
+│   ├── setup.js
+│   ├── globalTeardown.js
+│   └── integration.test.js
+
+├── public/                  # (root-level) files served by hosting in simple setups
+
+├── run-ci-checks.sh         # local CI runner for Unix
+├── run-ci-checks.bat        # local CI runner for Windows
+└── README.md                # this file
+
+
+Notes:
+- The `frontend/src/services` folder contains the code that calls the backend API endpoints (e.g., axios wrappers). Keep API URL configuration centralized so dev/prod endpoints are easy to switch.
+- The `backend/src/models` are thin wrappers around Firestore operations so unit tests can mock them easily.
+- Use `scripts/setup-test-data.js` to seed the emulator with demo data for local testing.
+- Sensitive local config (service account JSON, test credentials) are excluded from version control and kept out of the repo (see Accounts/Secrets all the way at the top).
+- The `.github\workflows\ci.yml` allows the CI pipeline to run automatically in Github whenever a commit is merged to main
+
+
+
+
+
 
 ## Tech Stack
-- **Frontend:** Vue 3, Vuetify, Pinia, Vue Router
-- **Backend:** Express.js, Node.js
-- **Database:** Firebase Firestore
-- **Authentication:** Firebase Auth
-- **Hosting:** Firebase Hosting
-- **Cloud Functions:** Firebase Functions
+- Frontend: Vue 3, Vuetify, Pinia, Vue Router
+- Backend: Express.js, Node.js
+- Database: Firebase Firestore (emulated in local development)
+- Authentication: Firebase Auth
+- Hosting & Functions: Firebase Hosting & Cloud Functions
 
 ## Setup Instructions
 
 ### Prerequisites
-- Node.js v20+ installed
-- Git installed
-- Firebase CLI installed (`npm install -g firebase-tools`)
+- Node.js v20+ (LTS recommended)
+- npm (bundled with Node.js)
+- Git
+- Firebase CLI (`npm install -g firebase-tools`)
 
-### Installation
-1. Clone the repository:
-```bash
-   git clone https://github.com/KahfathNisha/is212-task-management.git
-   cd is212-task-management
+### Installation (local dev)
+1. Clone the repository and enter it:
+
+```powershell
+git clone https://github.com/KahfathNisha/IS212-Task-Management.git
+cd IS212-Task-Management
+```
 
 2. Install frontend dependencies:
-    bash   cd frontend
-    npm install
+
+```powershell
+cd frontend
+npm install
+cd ..
+```
 
 3. Install backend dependencies:
-    bash   cd ../backend
-    npm install
 
+```powershell
+cd backend
+npm install
+cd ..
+```
 
-### Running the Application
-Start Backend Server:
-    cd backend
-    npm run dev
-Start Frontend Development Server:
-    cd frontend
-    npm run dev
-Run Firebase Emulators:
-    cd backend
-    firebase emulators:start
+4. (Optional) If you use the Firebase emulators in development, authenticate once and start the emulators from `backend`:
 
-Access the application at:
-    Frontend: http://localhost:5173
-    Backend API: http://localhost:3000
-    Firebase Emulator UI: http://localhost:4000
+```powershell
+cd backend
+firebase login --no-localhost
+firebase emulators:start
+```
 
+### Running the application (dev)
+- Start backend (Express server that connects to emulators):
+
+```powershell
+cd backend
+npm run dev
+```
+
+- Start frontend (Vite dev server):
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Default local ports (project conventions):
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- Firebase Emulator UI: http://localhost:4000
 
 ---
-## 🚀 **Test Your Setup Now**
 
-Use Command Prompt (not PowerShell):
+## 🚀 Test Your Setup Quickly (recommended)
 
-**Terminal 1:**
-```cmd
-cd C:\Users\nisha\is212-task-management\backend
+Open two terminals.
+
+Terminal A — backend (PowerShell):
+
+```powershell
+cd IS212-Task-Management\backend
 npm run dev
-Should show: Server running on port 3000
-**Terminal 2:**
-```cmd 
-cd C:\Users\nisha\is212-task-management\frontend
+# Expect: "Server running on port 3000" 
+```
+
+Terminal B — frontend (PowerShell):
+
+```powershell
+cd IS212-Task-Management\frontend
 npm run dev
-Should show: Local: http://localhost:5173/
+# Expect: Vite dev server output, Local: http://localhost:5173
+```
+
 ---
+
+## Local CI pipeline testing
+For macOS / Linux:
+
+```bash
+chmod +x run-ci-checks.sh
+./run-ci-checks.sh
+```
+
+For Windows:
+
+```powershell
+.\run-ci-checks.bat
+```
+
+---
+
 
 ## Local CI pipeline testing
 # For macOS / Linux
